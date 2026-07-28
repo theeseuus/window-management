@@ -4,6 +4,10 @@
 
 local M = {}
 
+function M.indicatorTitle(value)
+  return "[" .. tostring(value == nil and "?" or value) .. "]"
+end
+
 function M.contains(values, needle)
   for _, value in ipairs(values or {}) do
     if value == needle then

@@ -28,6 +28,10 @@ local function sameList(actual, expected, label)
   end
 end
 
+equal(logic.indicatorTitle(1), "[1]", "first Space indicator")
+equal(logic.indicatorTitle("—"), "[—]", "non-user Space indicator")
+equal(logic.indicatorTitle(), "[?]", "unavailable Space indicator")
+
 local types = {
   [101] = "user",
   [102] = "fullscreen",

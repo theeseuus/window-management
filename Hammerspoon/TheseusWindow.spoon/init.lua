@@ -12,7 +12,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWindow"
-obj.version = "0.4"
+obj.version = "0.5"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -712,7 +712,7 @@ function obj:updateSpaceIndicator()
 
   local screen = hs.screen.mainScreen()
   if not screen then
-    self._spaceIndicator:setTitle("Space ?")
+    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle())
     self._spaceIndicator:setTooltip("No active screen")
     return
   end
@@ -720,26 +720,26 @@ function obj:updateSpaceIndicator()
   local activeOK, activeSpace, activeErr = pcall(hs.spaces.activeSpaceOnScreen, screen)
   if not activeOK or not activeSpace then
     local reason = activeOK and activeErr or activeSpace
-    self._spaceIndicator:setTitle("Space ?")
+    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle())
     self._spaceIndicator:setTooltip("Could not read active Space: " .. tostring(reason))
     return
   end
 
   local userSpaces, userSpacesErr = orderedUserSpaces(screen)
   if not userSpaces then
-    self._spaceIndicator:setTitle("Space ?")
+    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle())
     self._spaceIndicator:setTooltip(tostring(userSpacesErr))
     return
   end
 
   local ordinal, count = spaceLogic.ordinal(userSpaces, activeSpace)
   if ordinal then
-    self._spaceIndicator:setTitle("Space " .. tostring(ordinal))
+    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle(ordinal))
     self._spaceIndicator:setTooltip(
       string.format("Active user Space %d of %d", ordinal, count)
     )
   else
-    self._spaceIndicator:setTitle("Space —")
+    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle("—"))
     self._spaceIndicator:setTooltip("Active Space is full-screen or tiled")
   end
 end

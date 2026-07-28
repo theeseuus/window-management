@@ -116,7 +116,8 @@ spoon.TheseusWindow.maxWindowWidthRatio = 1.0
 
 ## Optional Space indicator
 
-The supplied `Hammerspoon/init.lua` enables a menu-bar label such as `Space 2`:
+The supplied `Hammerspoon/init.lua` enables a compact menu-bar label such as
+`[2]`:
 
 ```lua
 spoon.TheseusWindow.showSpaceIndicator = true
@@ -126,7 +127,9 @@ spoon.TheseusWindow:bindHotkeys():start()
 Set `showSpaceIndicator` to `false` to disable it. The indicator has no hotkeys
 and performs no Space switching. An `hs.spaces.watcher` triggers updates; the
 label is recomputed from the ordered list of user Spaces rather than displaying
-an opaque macOS Space ID. A full-screen/tiled Space is shown as `Space —`.
+an opaque macOS Space ID. The square brackets provide a simple monochrome box
+without consuming the width of the word “Space.” An unavailable Space is shown
+as `[?]`; a full-screen/tiled Space is shown as `[—]`.
 
 ## Security and privacy
 
