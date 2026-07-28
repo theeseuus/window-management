@@ -1,0 +1,6 @@
+[tools]
+lua = "5.4.8"
+
+[tasks.validate]
+description = "Compile Lua sources and run pure logic tests"
+run = "./scripts/validate.sh"

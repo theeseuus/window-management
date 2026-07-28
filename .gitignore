@@ -1,0 +1,17 @@
+# macOS metadata
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Local editor and runtime state
+*.log
+*.swp
+*~
+mise.local.toml
+.mise.local.toml
+
+# Local environment files
+.env
+.env.*
+!.env.example
