@@ -47,9 +47,54 @@ files to its source state and deploy them through that manager.
 ## Features
 
 TheseusWindow provides cross-app window switching, deterministic geometry
-cycles in both directions, stash/restore, accordion layout, a centred
+cycles in both directions, stateless canonical size and position cycles,
+current-Space directional focus, stash/restore, accordion layout, a centred
 half-width layout, position-preserving horizontal centering, maximize/minimize,
 geometry restoration, width adjustments, and spatial arrow controls.
+
+## Directional window focus
+
+- `Hyper + H`: focus the closest suitable window to the left.
+- `Hyper + J`: focus the closest suitable window below.
+- `Hyper + K`: focus the closest suitable window above.
+- `Hyper + L`: focus the closest suitable window to the right.
+
+Candidates are limited to normal, visible, non-full-screen windows in the
+current Space. The focused window's current screen gets first refusal before
+the command considers another visible screen in that Space. Left/right
+selection requires positive vertical overlap; up/down requires positive
+horizontal overlap. This keeps focus in the same visual row or column instead
+of allowing a diagonally placed window to win. No window geometry changes.
+
+The example Raycast map in `SHORTCUTS.md` also lists `Hyper + K` for Shortcut
+Viewer. TheseusWindow reserves that binding for upward focus, so remove or
+reassign the Raycast binding if it remains configured.
+
+## Stateless canonical geometry
+
+- `Hyper + -`: cycle size through `1/2` → `1/4` → `1/8` → `1/16` → `1/2`.
+- `Hyper + Shift + -`: run the same size cycle in reverse.
+- `Hyper + =`: advance to the next canonical position for the current size.
+- `Hyper + Shift + =`: move to the preceding canonical position.
+
+These commands derive their result from the focused window's current frame;
+they do not keep a hidden per-window cycle counter. A manually sized or placed
+window is first interpreted as the nearest canonical size and position.
+Changing size selects the target slot nearest the window's current centre.
+When two finer slots are equally close, ties favour the outer edge already
+occupied by the source window—for example, a top-right quarter becomes the
+top-right eighth rather than its inward neighbour.
+
+Canonical position order is:
+
+- `1/2`: left → centre → right.
+- `1/4`: top-left → top-right → bottom-right → bottom-left.
+- `1/8`: top row left-to-right, then bottom row right-to-left.
+- `1/16`: a four-row serpentine, alternating direction on every row.
+
+The established `Hyper + 2/3/4/8` geometry cycles remain available for
+comparison. Maximize, arrow controls, stash, accordion, Space movement, and the
+cross-app switcher are unchanged.
 
 ## Spatial arrow controls
 
@@ -201,9 +246,12 @@ The repository pins Lua 5.4.8 in `mise.toml`. You may also run
 
 The script compiles all Lua files and runs pure tests for ordered user-Space
 filtering, left/right selection, non-wrapping boundaries, ordinal lookup,
-forward/reverse cycle initialization, and position-preserving horizontal
-centering. In particular, the first press of a reverse cycle starts at its final
-position, and horizontal centering changes only `x`. The validator deliberately
+forward/reverse stateful-cycle initialization, position-preserving horizontal
+centering, stateless canonical size/position selection, outward tie-breaking,
+and axis-aligned directional focus. In particular, the first press of a
+stateful reverse cycle starts at its final position, canonical forward/reverse
+cycles wrap correctly without hidden state, diagonal focus candidates are
+rejected, and horizontal centering changes only `x`. The validator deliberately
 does not invoke Hammerspoon's `hs` command-line client: on affected macOS
 versions that client can block before Lua evaluation while connecting to system
 services. No live window or Space is manipulated by these tests.
@@ -211,8 +259,8 @@ services. No live window or Space is manipulated by these tests.
 Validation levels are intentionally distinct:
 
 - **Syntax:** every Lua file compiles.
-- **Pure logic:** ordered-Space selection and boundaries pass without desktop
-  manipulation.
+- **Pure logic:** Space selection, geometry, and directional-window ranking
+  pass without desktop manipulation.
 - **Hammerspoon runtime/reload:** Hammerspoon evaluates the configuration and
   its console remains free of load errors.
 - **Live integration:** a person confirms actual macOS window movement, Space
@@ -232,6 +280,15 @@ Validation levels are intentionally distinct:
 - [ ] On a window with no cycle history, press `Hyper + Shift + 2/3/4/8` and
       confirm the first result is the final position of that cycle; continue
       pressing to confirm reverse order and wrapping.
+- [ ] Arrange overlapping rows and columns of windows, then use
+      `Hyper + H/J/K/L`; confirm focus follows the nearest axis-aligned window,
+      rejects diagonal-only candidates, and stays in the current Space.
+- [ ] Use `Hyper + -` and `Hyper + Shift + -` from canonical and manually sized
+      windows; confirm size cycling, reverse order, wrapping, and outward edge
+      preservation.
+- [ ] Use `Hyper + =` and `Hyper + Shift + =` for halves, quarters, eighths,
+      and sixteenths; confirm the documented forward and reverse position
+      orders without relying on prior key presses.
 - [ ] Confirm minimized, full-screen, transient, and non-standard targets fail
       cleanly.
 - [ ] Press `Hyper + Up`, then `Hyper + Down`; confirm centred layout and frame

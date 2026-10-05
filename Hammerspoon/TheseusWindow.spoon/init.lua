@@ -6,13 +6,14 @@
 -- + Centre-preserving focused-window width adjustment
 -- + Accordion layout (fan windows of active app from focused window)
 -- + Cross-app window switcher (Hyper+W / Hyper+Shift+W) with UI
+-- + Stateless canonical size/position cycles and spatial focus
 ----------------------------------------------------------------------
 
 local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWindow"
-obj.version = "0.6"
+obj.version = "0.9"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -36,6 +37,8 @@ local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local spaceLogic = dofile(sourcePath .. "space_logic.lua")
 local cycleLogic = dofile(sourcePath .. "cycle_logic.lua")
 local geometryLogic = dofile(sourcePath .. "geometry_logic.lua")
+local canonicalLayout = dofile(sourcePath .. "canonical_layout.lua")
+local spatialFocusLogic = dofile(sourcePath .. "spatial_focus_logic.lua")
 local nativeSpaceMove = dofile(sourcePath .. "native_space_move.lua")
 
 ------------------------------------------------------------
@@ -638,6 +641,16 @@ windowFilter:setOverrideFilter({
 
 local windowSwitcher = hs.window.switcher.new(windowFilter)
 
+-- Directional focus is deliberately scoped to normal, visible windows in the
+-- current Space. The default filter's app exclusions remain in force.
+local spatialWindowFilter = hs.window.filter.new()
+spatialWindowFilter:setOverrideFilter({
+  visible = true,
+  currentSpace = true,
+  fullscreen = false,
+  allowRoles = { "AXStandardWindow" },
+})
+
 -- UI tuning (restrained; adjust if you want bigger previews)
 windowSwitcher.ui.showTitles = true
 windowSwitcher.ui.showThumbnails = true
@@ -712,6 +725,82 @@ local eighths = {
   function(s) local f=s:frame(); return {x=f.x+1*f.w/4,y=f.y+f.h/2,w=f.w/4,h=f.h/2} end,
   function(s) local f=s:frame(); return {x=f.x,y=f.y+f.h/2,w=f.w/4,h=f.h/2} end,
 }
+
+------------------------------------------------------------
+-- Stateless canonical geometry experiment
+------------------------------------------------------------
+local function focusedCanonicalWindow()
+  local win = hs.window.focusedWindow()
+  if not win
+    or not win:isStandard()
+    or not win:isVisible()
+    or win:isMinimized()
+    or win:isFullScreen() then
+    return nil
+  end
+
+  local screen = win:screen()
+  if not screen then return nil end
+  return win, screen
+end
+
+local function cycleCanonicalSize(step)
+  local win, screen = focusedCanonicalWindow()
+  if not win then return end
+
+  local targetFrame, sizeName = canonicalLayout.sizeCycle(win:frame(), screen:frame(), step)
+  if not targetFrame then return end
+
+  win:setFrame(targetFrame)
+  showHUD(win, "SIZE " .. canonicalLayout.label(sizeName))
+end
+
+local function cycleCanonicalPosition(step)
+  local win, screen = focusedCanonicalWindow()
+  if not win then return end
+
+  local targetFrame, sizeName, positionIndex, positionCount =
+    canonicalLayout.positionCycle(win:frame(), screen:frame(), step)
+  if not targetFrame then return end
+
+  win:setFrame(targetFrame)
+  showHUD(
+    win,
+    string.format("POS %s %d/%d", canonicalLayout.label(sizeName), positionIndex, positionCount)
+  )
+end
+
+local function focusDirectionalWindow(direction)
+  local win, screen = focusedCanonicalWindow()
+  if not win then return end
+
+  local candidates = spatialWindowFilter:getWindows() or {}
+  local candidateRecords = {}
+  local sameScreenRecords = {}
+  local screenID = screen:id()
+  for _, candidate in ipairs(candidates) do
+    local candidateScreen = candidate:screen()
+    if candidate:id() ~= win:id() then
+      local record = {
+        frame = candidate:frame(),
+        window = candidate,
+      }
+      table.insert(candidateRecords, record)
+      if candidateScreen and candidateScreen:id() == screenID then
+        table.insert(sameScreenRecords, record)
+      end
+    end
+  end
+
+  -- Prefer this screen, then fall back to another visible screen in the
+  -- current Space. Axis-aligned selection requires cross-axis overlap, which
+  -- prevents a diagonal window from winning over the window beside it.
+  local target = spatialFocusLogic.nearest(win:frame(), sameScreenRecords, direction)
+  if not target then
+    target = spatialFocusLogic.nearest(win:frame(), candidateRecords, direction)
+  end
+  if target and target.window then target.window:focus() end
+end
 
 ------------------------------------------------------------
 -- Public API
@@ -834,6 +923,32 @@ function obj:bindHotkeys()
 
   hs.hotkey.bind(hshift, "w", function()
     windowSwitcher:previous()
+  end)
+
+  -- Spatial window focus: current Space only; current-screen candidates win.
+  -- Hyper + K is reserved here for upward window focus.
+  hs.hotkey.bind(h, "h", function()
+    focusDirectionalWindow("left")
+  end)
+  hs.hotkey.bind(h, "j", function()
+    focusDirectionalWindow("down")
+  end)
+  hs.hotkey.bind(h, "k", function()
+    focusDirectionalWindow("up")
+  end)
+  hs.hotkey.bind(h, "l", function()
+    focusDirectionalWindow("right")
+  end)
+
+  -- Experiment: derive geometry directly from the current frame. Shift runs
+  -- the same stateless cycles in reverse; legacy Hyper + 2/3/4/8 remain intact.
+  hs.hotkey.bind(h, "-", cycleCanonicalSize)
+  hs.hotkey.bind(h, "=", cycleCanonicalPosition)
+  hs.hotkey.bind(hshift, "-", function()
+    cycleCanonicalSize(-1)
+  end)
+  hs.hotkey.bind(hshift, "=", function()
+    cycleCanonicalPosition(-1)
   end)
 
   -- Micro cycles (forward + reverse).
