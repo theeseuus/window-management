@@ -1,6 +1,6 @@
 # Complete Keyboard Shortcut Reference
 
-2026-07-28.2
+2026-10-05.1
 
 Hyper = `Control + Option + Command`
 
@@ -67,7 +67,7 @@ These are native macOS bindings. Hammerspoon does not replace them.
 | `Hyper + 4` | Cycle quarters: top-left → clockwise → bottom-left |
 | `Hyper + 8` | Cycle eighths clockwise around a 4×2 grid |
 | `Hyper + Shift + 2/3/4/8` | Run the geometry cycle in reverse |
-| `Hyper + Return` | Centred half-width/full-height |
+| `Hyper + Return` | Centre horizontally; preserve width, height, and vertical position |
 | `Hyper + Shift + Return` | Maximize |
 | `Hyper + D` | Minimize |
 | `Hyper + S` | Toggle stash offscreen/restore |

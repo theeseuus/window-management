@@ -12,7 +12,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWindow"
-obj.version = "0.5"
+obj.version = "0.6"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -35,6 +35,7 @@ obj.spaceNativeReleaseDelay = 1.8
 local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local spaceLogic = dofile(sourcePath .. "space_logic.lua")
 local cycleLogic = dofile(sourcePath .. "cycle_logic.lua")
+local geometryLogic = dofile(sourcePath .. "geometry_logic.lua")
 local nativeSpaceMove = dofile(sourcePath .. "native_space_move.lua")
 
 ------------------------------------------------------------
@@ -115,6 +116,14 @@ local function centerHalfWidth(win)
     w = width,
     h = f.h
   })
+  showHUD(win, "CENTER")
+end
+
+local function centerWindowHorizontally(win)
+  local screen = win:screen()
+  if not screen then return end
+
+  win:setFrame(geometryLogic.centerHorizontally(win:frame(), screen:frame()))
   showHUD(win, "CENTER")
 end
 
@@ -805,6 +814,14 @@ function obj:moveFocusedWindowToAdjacentSpace(direction)
   return self
 end
 
+function obj:centerFocusedWindowHorizontally()
+  local win = hs.window.focusedWindow()
+  if win then
+    centerWindowHorizontally(win)
+  end
+  return self
+end
+
 function obj:bindHotkeys()
   local h      = self.hyper
   local hshift = self.hyperShift
@@ -909,11 +926,9 @@ function obj:bindHotkeys()
     resizeFocusedWindowWidth(self, 1)
   end)
 
-  -- Meso controls
-  -- Hyper + Return → Center column (50% width), full height
+  -- Hyper + Return → center horizontally without resizing.
   hs.hotkey.bind(h, "return", function()
-    local w = hs.window.focusedWindow()
-    if w then centerHalfWidth(w) end
+    self:centerFocusedWindowHorizontally()
   end)
 
   -- Hyper + Shift + Return → Maximize

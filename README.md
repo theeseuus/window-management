@@ -48,8 +48,8 @@ files to its source state and deploy them through that manager.
 
 TheseusWindow provides cross-app window switching, deterministic geometry
 cycles in both directions, stash/restore, accordion layout, a centred
-half-width layout, maximize/minimize, geometry restoration, width adjustments,
-and spatial arrow controls.
+half-width layout, position-preserving horizontal centering, maximize/minimize,
+geometry restoration, width adjustments, and spatial arrow controls.
 
 ## Spatial arrow controls
 
@@ -113,6 +113,20 @@ spoon.TheseusWindow.widthStep = 80
 spoon.TheseusWindow.minWindowWidth = 360
 spoon.TheseusWindow.maxWindowWidthRatio = 1.0
 ```
+
+## Position-only centering
+
+- `Hyper + Return` centres the focused window horizontally on its current
+  screen without resizing it.
+
+Only the window's `x` coordinate changes. Its width, height, and vertical
+position remain unchanged. For example, a top quarter becomes a top-centre
+quarter, while a bottom quarter becomes a bottom-centre quarter. This leaves
+quarter-width columns on both sides—each exactly wide enough for the windows
+produced by the eighths cycle.
+
+`Hyper + Up` remains the separate command for creating a centred
+half-width/full-height column, and `Hyper + Shift + Return` still maximizes.
 
 ## Optional Space indicator
 
@@ -186,13 +200,13 @@ The repository pins Lua 5.4.8 in `mise.toml`. You may also run
 `VALIDATION_LUA_BIN` to a compatible Lua executable.
 
 The script compiles all Lua files and runs pure tests for ordered user-Space
-filtering, left/right selection, non-wrapping boundaries, ordinal lookup, and
-forward/reverse cycle initialization. In particular, the first press of a
-reverse cycle now starts at its final position rather than incorrectly starting
-at position 1. The validator deliberately does not invoke Hammerspoon's `hs`
-command-line client: on affected macOS versions that client can block before
-Lua evaluation while connecting to system services. No live window or Space is
-manipulated by these tests.
+filtering, left/right selection, non-wrapping boundaries, ordinal lookup,
+forward/reverse cycle initialization, and position-preserving horizontal
+centering. In particular, the first press of a reverse cycle starts at its final
+position, and horizontal centering changes only `x`. The validator deliberately
+does not invoke Hammerspoon's `hs` command-line client: on affected macOS
+versions that client can block before Lua evaluation while connecting to system
+services. No live window or Space is manipulated by these tests.
 
 Validation levels are intentionally distinct:
 
@@ -222,6 +236,9 @@ Validation levels are intentionally distinct:
       cleanly.
 - [ ] Press `Hyper + Up`, then `Hyper + Down`; confirm centred layout and frame
       restoration.
+- [ ] Place quarter windows at the top and bottom, press `Hyper + Return`, and
+      confirm each window centres horizontally without changing width, height,
+      or vertical position.
 - [ ] Repeatedly press `Hyper + [` and `Hyper + ]`; confirm symmetric resizing,
       width limits, horizontal containment, and unchanged height/y-position.
 - [ ] Traverse Spaces with native `Control + Left/Right`; confirm the menu-bar
