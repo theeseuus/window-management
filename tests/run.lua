@@ -13,6 +13,7 @@ local luaFiles = {
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/init.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/workspace_logic.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/frame_restore.lua",
+  repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/capture_dialog.lua",
   repositoryRoot .. "/tests/canonical_layout_spec.lua",
   repositoryRoot .. "/tests/cycle_logic_spec.lua",
   repositoryRoot .. "/tests/geometry_logic_spec.lua",
@@ -20,6 +21,7 @@ local luaFiles = {
   repositoryRoot .. "/tests/spatial_focus_logic_spec.lua",
   repositoryRoot .. "/tests/workspace_logic_spec.lua",
   repositoryRoot .. "/tests/workspace_runtime_spec.lua",
+  repositoryRoot .. "/tests/workspace_capture_spec.lua",
   repositoryRoot .. "/tests/frame_restore_spec.lua"
 }
 
@@ -38,5 +40,6 @@ dofile(repositoryRoot .. "/tests/space_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/spatial_focus_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_runtime_spec.lua")
+dofile(repositoryRoot .. "/tests/workspace_capture_spec.lua")
 dofile(repositoryRoot .. "/tests/frame_restore_spec.lua")
 print("validation: passed")

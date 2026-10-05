@@ -8,7 +8,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWorkspace"
-obj.version = "0.1.1"
+obj.version = "0.1.2"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -20,6 +20,11 @@ obj.excludedBundleIDs = {}
 local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local workspaceLogic = dofile(sourcePath .. "workspace_logic.lua")
 local frameRestore = dofile(sourcePath .. "frame_restore.lua")
+local captureDialog = dofile(sourcePath .. "capture_dialog.lua")
+
+local function copyFrame(frame)
+  return { x = frame.x, y = frame.y, w = frame.w, h = frame.h }
+end
 
 local function showAlert(text, screen, duration)
   screen = screen or hs.screen.mainScreen()
@@ -41,6 +46,7 @@ local function reasonText(reason)
     ["workspace-exists"] = "a workspace with that name already exists",
     ["workspace-not-found"] = "workspace was not found",
     ["no-windows"] = "no eligible windows are present in this Space",
+    ["active-space-changed"] = "the active Space changed during capture; cancel and try again",
   }
   return reasons[reason] or tostring(reason)
 end
@@ -70,7 +76,7 @@ local function currentUserSpaceContext()
 
   return {
     screen = screen,
-    screenFrame = screen:frame(),
+    screenFrame = copyFrame(screen:frame()),
     spaceID = spaceID,
   }
 end
@@ -109,7 +115,7 @@ local function describeWindow(controller, window, context)
       id = window:id(),
       bundleID = bundleID,
       appName = app:title() or bundleID,
-      frame = window:frame(),
+      frame = copyFrame(window:frame()),
       screenFrame = context.screenFrame,
       window = window,
     }
@@ -124,7 +130,7 @@ local function describeWindow(controller, window, context)
   return recordOrReason
 end
 
-local function collectCurrentWindows(controller, context)
+local function collectCurrentWindows(controller, context, excludedWindowID)
   local windowsOK, windowIDs, windowsErr = pcall(hs.spaces.windowsForSpace, context.spaceID)
   if not windowsOK then
     return nil, "could not enumerate windows in the active Space: " .. tostring(windowIDs)
@@ -133,11 +139,25 @@ local function collectCurrentWindows(controller, context)
     return nil, "could not enumerate windows in the active Space: " .. tostring(windowsErr)
   end
 
+  -- hs.window.get() enumerates every application's windows on each call.
+  -- Build one ID index instead of repeating that work for every Space ID.
+  local allOK, allWindows = pcall(hs.window.allWindows)
+  if not allOK or type(allWindows) ~= "table" then
+    return nil, "could not enumerate application windows: " .. tostring(allWindows)
+  end
+  local windowsByID = {}
+  for _, window in ipairs(allWindows) do
+    local idOK, id = pcall(function() return window:id() end)
+    if idOK and id then windowsByID[id] = window end
+  end
+
   local records = {}
   local skipped = {}
   for _, windowID in ipairs(windowIDs) do
-    local getOK, window = pcall(hs.window.get, windowID)
-    if getOK and window then
+    local window = windowsByID[windowID]
+    if windowID == excludedWindowID then
+      skipped["capture-dialog"] = (skipped["capture-dialog"] or 0) + 1
+    elseif window then
       local record, reason = describeWindow(controller, window, context)
       if record then
         table.insert(records, record)
@@ -216,7 +236,25 @@ local function chooserChoices(controller)
   return choices
 end
 
-function obj:captureCurrentWorkspace(name, options)
+local function takeSnapshot(controller, context, excludedWindowID)
+  local capturedAt = os.date("!%Y-%m-%dT%H:%M:%SZ")
+  local activeOK, activeSpace = pcall(hs.spaces.activeSpaceOnScreen, context.screen)
+  if not activeOK or activeSpace ~= context.spaceID then
+    return nil, "active-space-changed"
+  end
+  local records, collection = collectCurrentWindows(controller, context, excludedWindowID)
+  if not records then return nil, collection end
+  if #records == 0 then return nil, "no-windows" end
+  activeOK, activeSpace = pcall(hs.spaces.activeSpaceOnScreen, context.screen)
+  if not activeOK or activeSpace ~= context.spaceID then
+    return nil, "active-space-changed"
+  end
+  -- Retain plain geometry/identity values, never live window handles, while naming.
+  for _, record in ipairs(records) do record.window = nil end
+  return { records = records, collection = collection, capturedAt = capturedAt, context = context }
+end
+
+local function saveSnapshot(controller, name, snapshot, options)
   options = options or {}
   local normalizedName, nameErr = workspaceLogic.normalizeName(name)
   if not normalizedName then
@@ -224,7 +262,8 @@ function obj:captureCurrentWorkspace(name, options)
     return nil, nameErr
   end
 
-  local catalog, catalogErr = loadCatalog(self)
+  -- Re-read the catalog at save time, preserving recipes changed while naming.
+  local catalog, catalogErr = loadCatalog(controller)
   if not catalog then
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(catalogErr)) end
     return nil, catalogErr
@@ -234,22 +273,11 @@ function obj:captureCurrentWorkspace(name, options)
     return nil, "workspace-exists"
   end
 
-  local context, contextErr = currentUserSpaceContext()
-  if not context then
-    if not options.silent then showAlert("WORKSPACE: " .. reasonText(contextErr)) end
-    return nil, contextErr
-  end
-
-  local records, collection = collectCurrentWindows(self, context)
-  if not records then
-    if not options.silent then showAlert("WORKSPACE: " .. reasonText(collection), context.screen) end
-    return nil, collection
-  end
-
+  local context, collection = snapshot.context, snapshot.collection
   local recipe, recipeErr = workspaceLogic.buildRecipe(
     normalizedName,
-    records,
-    os.date("!%Y-%m-%dT%H:%M:%SZ")
+    snapshot.records,
+    snapshot.capturedAt
   )
   if not recipe then
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(recipeErr), context.screen) end
@@ -257,7 +285,7 @@ function obj:captureCurrentWorkspace(name, options)
   end
 
   catalog.recipes[normalizedName] = recipe
-  local saved, saveErr = saveCatalog(self, catalog)
+  local saved, saveErr = saveCatalog(controller, catalog)
   if not saved then
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(saveErr), context.screen) end
     return nil, saveErr
@@ -283,6 +311,35 @@ function obj:captureCurrentWorkspace(name, options)
     )
   end
   return recipe, report
+end
+
+function obj:captureCurrentWorkspace(name, options)
+  options = options or {}
+  local normalizedName, nameErr = workspaceLogic.normalizeName(name)
+  if not normalizedName then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(nameErr)) end
+    return nil, nameErr
+  end
+  local catalog, catalogErr = loadCatalog(self)
+  if not catalog then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(catalogErr)) end
+    return nil, catalogErr
+  end
+  if catalog.recipes[normalizedName] and not options.replace then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText("workspace-exists")) end
+    return nil, "workspace-exists"
+  end
+  local context, contextErr = currentUserSpaceContext()
+  if not context then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(contextErr)) end
+    return nil, contextErr
+  end
+  local snapshot, snapshotErr = takeSnapshot(self, context)
+  if not snapshot then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(snapshotErr), context.screen) end
+    return nil, snapshotErr
+  end
+  return saveSnapshot(self, normalizedName, snapshot, options)
 end
 
 function obj:restoreWorkspace(name, options)
@@ -496,41 +553,63 @@ function obj:deleteWorkspace(name, options)
 end
 
 function obj:promptCaptureCurrentWorkspace()
-  local button, name = hs.dialog.textPrompt(
-    "Capture workspace",
-    "Save eligible windows in the current Space. Window titles and document paths are not stored.",
-    "",
-    "Capture",
-    "Cancel"
-  )
-  if button ~= "Capture" then return self end
-
-  local normalizedName, nameErr = workspaceLogic.normalizeName(name)
-  if not normalizedName then
-    showAlert("WORKSPACE: " .. reasonText(nameErr))
+  if self._captureDialog then
+    self._captureDialog:bringToFront()
     return self
   end
-
-  local catalog, catalogErr = loadCatalog(self)
-  if not catalog then
-    showAlert("WORKSPACE: " .. reasonText(catalogErr))
+  -- Select the original window's screen/Space before the dialog takes focus.
+  local context, contextErr = currentUserSpaceContext()
+  if not context then
+    showAlert("WORKSPACE: " .. reasonText(contextErr))
     return self
   end
-
-  local replace = false
-  if catalog.recipes[normalizedName] then
-    local response = hs.dialog.blockAlert(
-      "Replace workspace?",
-      string.format("A workspace named “%s” already exists.", normalizedName),
-      "Replace",
-      "Cancel",
-      "warning"
-    )
-    if response ~= "Replace" then return self end
-    replace = true
+  local snapshot
+  local ok, sessionOrError = pcall(captureDialog.open, context.screenFrame, {
+    capture = function(session)
+      local snapshotErr
+      snapshot, snapshotErr = takeSnapshot(self, context, session:windowID())
+      if not snapshot then
+        session:failed("Capture failed: " .. reasonText(snapshotErr))
+        return
+      end
+      session:ready(string.format(
+        "Snapshot ready · %d %s. You can move windows now; name and save this snapshot.",
+        #snapshot.records, #snapshot.records == 1 and "window" or "windows"
+      ))
+    end,
+    save = function(session, name)
+      if not snapshot then return end
+      local normalizedName, nameErr = workspaceLogic.normalizeName(name)
+      if not normalizedName then session:ready(reasonText(nameErr)); return end
+      local catalog, catalogErr = loadCatalog(self)
+      if not catalog then session:ready(reasonText(catalogErr)); return end
+      local replace = false
+      if catalog.recipes[normalizedName] then
+        local response = hs.dialog.blockAlert(
+          "Replace workspace?",
+          string.format("A workspace named “%s” already exists.", normalizedName),
+          "Replace", "Cancel", "warning"
+        )
+        if session.closed then return end
+        if response ~= "Replace" then
+          session:ready("Replacement cancelled. Choose another name or cancel.")
+          return
+        end
+        replace = true
+      end
+      local recipe, saveErr = saveSnapshot(self, normalizedName, snapshot, { replace = replace })
+      if recipe then session:close() else session:ready(reasonText(saveErr)) end
+    end,
+    closed = function(session)
+      snapshot = nil
+      if self._captureDialog == session then self._captureDialog = nil end
+    end,
+  })
+  if ok then
+    self._captureDialog = sessionOrError
+  else
+    showAlert("WORKSPACE: could not open capture dialog: " .. tostring(sessionOrError), context.screen)
   end
-
-  self:captureCurrentWorkspace(normalizedName, { replace = replace })
   return self
 end
 
@@ -592,6 +671,7 @@ function obj:start()
 end
 
 function obj:stop()
+  if self._captureDialog then self._captureDialog:close() end
   if self._restoreOperation then
     local operation = self._restoreOperation
     operation.report.cancelled = true

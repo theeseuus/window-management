@@ -125,6 +125,7 @@ local settings = {}
 local alerts = {}
 local timers = {}
 local currentSpaceID = 901
+local enumerationCount = 0
 
 local function drainTimers()
   local steps = 0
@@ -149,6 +150,10 @@ hs = {
   window = {
     focusedWindow = function() return focusedWindow end,
     get = function(id) return windows[id] end,
+    allWindows = function()
+      enumerationCount = enumerationCount + 1
+      return { windows[11], windows[21], windows[31], windows[41] }
+    end,
   },
   spaces = {
     activeSpaceOnScreen = function() return currentSpaceID end,
@@ -175,7 +180,7 @@ local workspace = dofile(
 )
 
 equal(workspace.name, "TheseusWorkspace", "workspace Spoon name")
-equal(workspace.version, "0.1.1", "workspace Spoon version")
+equal(workspace.version, "0.1.2", "workspace Spoon version")
 equal(workspace.author, "Theeseuus", "workspace Spoon author")
 
 local recipe, captureReport = workspace:captureCurrentWorkspace(
@@ -187,6 +192,7 @@ equal(captureReport.captured, 2, "capture eligible windows")
 equal(captureReport.enumerated, 3, "capture enumerated windows")
 equal(captureReport.skippedCount, 1, "capture skipped window count")
 equal(captureReport.skipped["not-exclusive-to-current-space"], 1, "skip sticky window")
+equal(enumerationCount, 1, "capture enumerates application windows only once")
 equal(#settings.TheseusWorkspaceRecipesV1.recipes["Project Atlas"].windows, 2, "persist recipe")
 equal(
   settings.TheseusWorkspaceRecipesV1.recipes["Project Atlas"].windows[1].title,

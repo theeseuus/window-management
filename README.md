@@ -80,8 +80,10 @@ TheseusWorkspace treats the eligible windows in the current native user Space
 as one cross-application project group. Its initial capture-and-reconcile slice
 supports:
 
-- `Hyper + Shift + R`: prompt for a name and capture the current workspace.
-  Capturing an existing name requires explicit replacement confirmation.
+- `Hyper + Shift + R`: open the capture dialog immediately, freeze the current
+  workspace, then name and save that snapshot. Naming and Save stay disabled
+  while capture is in progress. An existing name requires explicit replacement
+  confirmation.
 - `Hyper + R`: choose a saved workspace and restore its matching existing
   windows in the current Space.
 - Named recipe listing and explicit deletion through the public Spoon API.
@@ -99,6 +101,19 @@ belong exclusively to the current ordinary user Space and selected screen.
 Sticky windows, panels, desktop elements, hidden/minimized windows, full-screen
 windows, and windows on another screen are skipped. The current implementation
 is intentionally single-monitor-first.
+
+The dialog first shows **Capturing…**. Keep windows still until it shows
+**Snapshot ready** and enables the name field. You can then rearrange windows,
+switch Spaces, or take your time naming the layout: Save uses only the frozen
+snapshot, never another read of the live windows. Cancel, Escape, or closing the
+dialog discards the unsaved snapshot. Repeating the capture shortcut brings the
+existing dialog forward rather than starting another capture.
+
+Window discovery uses one application-window enumeration per operation instead
+of a full scan for every window ID. Capture still reads macOS Accessibility
+information sequentially; it is not an atomic screenshot of the entire desktop
+at the instant the key is pressed. If the selected Space changes during
+collection, capture fails without saving. The capture dialog itself is excluded.
 
 Recipes identify a slot using the owning application's bundle identifier plus
 an ordinal. They do not store window titles, document paths, browser URLs,
@@ -124,6 +139,10 @@ spoon.TheseusWorkspace:restoreWorkspace("Project Atlas")
 spoon.TheseusWorkspace:listWorkspaces()
 spoon.TheseusWorkspace:deleteWorkspace("Project Atlas")
 ```
+
+The direct `captureCurrentWorkspace` API captures and saves synchronously when
+called; the shortcut uses the non-blocking capture/name/save dialog. Both store
+the same recipe schema, so existing recipes remain compatible.
 
 Restoration is asynchronous. The returned report has `finished` and `pending`
 fields; it remains unfinished while frame checks are pending. Its `applied`
@@ -374,6 +393,13 @@ bounded full-frame retries, separated resize/move fallback, cancellation,
 visibility changes, and Space changes. They do not prove that a particular
 application will accept a live macOS frame request.
 
+Capture-dialog tests cover disabled naming/Save until readiness, one window
+enumeration, moves and screen changes after readiness, frozen geometry across
+replacement confirmation and save retries, catalog changes while naming,
+cancel/close/stop cleanup, Space changes during collection, and failed discovery.
+The frame-copy regression deliberately moves Ghostty's mocked geometry after
+capture and confirms that Save retains the original coordinates.
+
 The separated resize/move fallback was informed by Hammerspoon's
 [frame-setting timing discussion](https://github.com/Hammerspoon/hammerspoon/issues/3731).
 It uses non-blocking timers and verifies the outcome; no code from that
@@ -423,8 +449,17 @@ Validation levels are intentionally distinct:
       width limits, horizontal containment, and unchanged height/y-position.
 - [ ] Traverse Spaces with native `Control + Left/Right`; confirm the menu-bar
       ordinal updates and that it creates no switching hotkeys.
-- [ ] In an ordinary project Space, press `Hyper + Shift + R`, capture a named
-      workspace, and confirm the alert reports the expected eligible count.
+- [ ] In an ordinary project Space, press `Hyper + Shift + R`; confirm the
+      dialog opens with **Capturing…**, a disabled name field, and disabled Save.
+      Wait for **Snapshot ready**, name/save the workspace, and confirm the
+      completion notice reports the expected eligible count.
+- [ ] Once the snapshot is ready but before saving, move a captured window.
+      Save, then restore the recipe; confirm the window returns to the position
+      from before naming, not the moved position. Repeat with replacement
+      confirmation and verify it still uses the original snapshot.
+- [ ] Cancel a capturing or ready dialog, press Escape, close its window, and
+      repeat the capture shortcut while it is open; confirm no unsaved recipe
+      is persisted and no duplicate capture dialog is created.
 - [ ] Move and resize those windows, press `Hyper + R`, choose the recipe, and
       confirm all matching windows return to their captured relative frames,
       including background Ghostty windows. Wait for the verified completion

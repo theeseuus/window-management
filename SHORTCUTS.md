@@ -101,11 +101,16 @@ reference `Hammerspoon/init.lua` configuration.
 
 | Shortcut | Action |
 | --- | --- |
-| `Hyper + Shift + R` | Name and capture eligible windows in the current user Space |
+| `Hyper + Shift + R` | Open capture dialog, freeze eligible windows, then name and save the snapshot |
 | `Hyper + R` | Choose a captured workspace and restore matching existing windows here |
 
 Restore waits for verified frame placement before showing its completion
 notice. Missing or failed applications are named; shortcuts are unchanged.
+
+The capture dialog opens with naming and Save disabled. Keep windows still
+until **Snapshot ready** enables the name field. Moving windows after that point
+does not change what Save records. Cancel/Escape/close discards the unsaved
+snapshot; repeating the shortcut brings the existing dialog forward.
 
 Capture requires confirmation before replacing an existing name. Restore uses
 application identity and normalized geometry, reports missing recipe slots, and
