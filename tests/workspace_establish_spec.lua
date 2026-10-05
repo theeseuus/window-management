@@ -57,6 +57,11 @@ local function environment()
     guard = function() return env.active, "active-space-changed" end,
     collect = function()
       if env.failCollect then return nil, "enumeration-failed" end
+      if env.launchChecks then
+        env.launchChecks = env.launchChecks + 1
+        if env.launchChecks == env.launchAfterChecks then env.running[env.launchingBundle] = true end
+        if env.launchChecks == env.launchWindowAfterChecks then env:add(env.launchingBundle) end
+      end
       local candidates, seenIDs = {}, {}
       for _, window in ipairs(env.windows) do
         seenIDs[window.id] = true
@@ -70,8 +75,9 @@ local function environment()
       table.insert(env.launches, bundle)
       return child(function()
         if env.launchError then callback(false, env.launchError); return end
-        if not env.noLaunch then env.running[bundle] = true end
-        if env.launchWindow then env:add(bundle) end
+        env.launchingBundle, env.launchChecks = bundle, 0
+        if not env.noLaunch and not env.launchAfterChecks then env.running[bundle] = true end
+        if env.launchWindow and not env.launchWindowAfterChecks then env:add(bundle) end
         callback(true)
       end)
     end,
@@ -212,6 +218,35 @@ report = env:start(recipe({ "Ghostty" }))
 env:drain()
 equal(#env.creates, 0, "do not send new-window command to failed launch")
 equal(report.creationFailures[1].reason, "application-did-not-launch", "bounded launch timeout")
+
+env = environment()
+env.running.Chrome, env.launchAfterChecks, env.launchWindowAfterChecks = false, 35, 40
+report = env:start(recipe({ "Chrome", "Chrome" }))
+env:drain()
+equal(#env.launches, 1, "allow a cold process to become ready after five seconds")
+equal(#env.creates, 1, "count the delayed startup window before filling another slot")
+equal(report.created, 2, "both cold-start and explicit windows verified")
+equal(report.applied, 2, "slow cold launch completes placement")
+equal(#report.creationFailures, 0, "slow launch is not a premature failure")
+env = environment()
+env.running.Chrome, env.launchWindowAfterChecks = false, 35
+report = env:start(recipe({ "Chrome" }))
+env:drain()
+equal(#env.creates, 0, "running process is not proof that its default window is ready")
+equal(report.created, 1, "reuse the late default instead of creating a duplicate")
+env = environment()
+env.running.Claude, env.launchWindow = false, true
+env.createError = "claude-new-window-unavailable"
+report = env:start(recipe({ "Claude" }))
+env:drain()
+equal(#env.creates, 0, "launch-only app can establish its first main window")
+equal(report.applied, 1, "place Claude's launch-created local main window")
+equal(#report.creationFailures, 0, "no extra-window command needed")
+report = env:start(recipe({ "Claude", "Claude" }))
+env:drain()
+equal(report.reused, 1, "retain and place an existing local Claude window")
+equal(#report.missing, 1, "additional Claude slot remains explicitly missing")
+equal(report.creationFailures[1].reason, "claude-new-window-unavailable", "launch-only limitation named")
 
 env = environment()
 env.changeSpace = true

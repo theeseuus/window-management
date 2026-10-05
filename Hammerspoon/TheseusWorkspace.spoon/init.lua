@@ -8,7 +8,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWorkspace"
-obj.version = "0.2.0"
+obj.version = "0.3.0"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -58,7 +58,11 @@ local function reasonText(reason)
     ["new-window-not-in-destination-space"] = "no new eligible window appeared in this Space",
     ["ambiguous-new-windows"] = "more than one new window appeared; left them untouched",
     ["application-did-not-launch"] = "the app did not become ready before the launch timeout",
-    ["new-window-command-unavailable"] = "this app's new-window scripting command is unavailable",
+    ["new-window-command-unavailable"] = "this app's genuine New Window command is unavailable",
+    ["new-window-menu-disabled"] = "this app's New Window menu is disabled; no fallback was used",
+    ["application-not-running"] = "the app is no longer running",
+    ["application-identity-mismatch"] = "the running app does not match the saved bundle identifier",
+    ["claude-new-window-unavailable"] = "Claude has no verified independent-window command; reuse a local window or launch it from closed",
     ["window-command-failed"] = "the native app window command failed",
     ["windows-disappeared-during-establish"] = "windows closed during Establish; no extra replacements were requested",
   }

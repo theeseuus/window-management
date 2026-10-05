@@ -3,6 +3,7 @@
 local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local logic = dofile(sourcePath .. "workspace_logic.lua")
 local establish = {}
+local launchCheckLimit = 60 -- up to 15 seconds for a cold app/default window
 
 function establish.start(recipe, options, complete)
   local report = {
@@ -217,11 +218,11 @@ function establish.start(recipe, options, complete)
         end
         stableTicks = count == lastCount and stableTicks + 1 or 0
         lastCount, ticks = count, ticks + 1
-        if options.isRunning(app.bundleID) and ((count > 0 and stableTicks >= 3) or ticks >= 20) then
+        if options.isRunning(app.bundleID) and ((count > 0 and stableTicks >= 3) or ticks >= launchCheckLimit) then
           -- Count launch-created/default windows before requesting more.
           rememberNew(discovered, baseline, app.bundleID)
           createOne()
-        elseif ticks >= 20 then
+        elseif ticks >= launchCheckLimit then
           creationFailure(app, "application-did-not-launch")
           nextApp()
         else later(awaitLaunch) end

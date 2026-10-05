@@ -30,9 +30,10 @@ Spoon.
 - At least two ordinary user Spaces for TheseusWindow move-and-follow commands.
 - An ordinary user Space for TheseusWorkspace capture and restore. Full-screen
   and tiled Spaces are deliberately rejected.
-- For **Establish here**, macOS Automation permission for each supported app
-  being controlled. Ghostty creation requires version 1.3 or later with its
-  AppleScript support enabled. Finder and Safari use their native scripting APIs.
+- For **Establish here**, macOS Automation permission for the scripting adapters
+  (Ghostty, Finder, Safari, BBEdit, and Chrome). Ghostty requires version 1.3 or
+  later with AppleScript enabled. ChatGPT's menu adapter uses the existing
+  Accessibility permission and requires an enabled **File → New Window** menu.
 - A Hyper-key mapping if using the reference bindings. The supplied setup uses
   Karabiner-Elements to make held Tab emit
   `Control + Option + Command`; Karabiner configuration is not included.
@@ -131,14 +132,31 @@ claiming that Hammerspoon can recover the original document or tab identity.
 Space. It never launches apps or creates windows.
 
 **Establish here** reuses eligible windows already in the current Space, launches
-supported apps if needed, and creates only the missing slots. Initial creation
-support is deliberately limited to:
+supported apps if needed, and creates only the missing slots. The adapters are:
 
 | App | New-window operation |
 | --- | --- |
 | Ghostty | Native `new window` with a default surface configuration |
 | Finder | Native `make new Finder window`, without a captured folder path |
 | Safari | Native new document at `about:blank`, not a tab or a captured URL |
+| BBEdit | Native `make new text window`, not a document added to an existing window |
+| Chrome | Native new window; set only that new window's active tab to `about:blank` |
+| ChatGPT / OpenAI desktop | Exact **File → New Window** menu, without activating an old window or substituting **New Chat** |
+| Claude desktop | Launch-created main window and existing local-window reuse only; no verified additional-window command |
+
+The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
+but only invokes the genuine New Window menu in the exact app identified by the
+recipe. A missing/disabled menu fails cleanly. Older releases that offer only
+New Chat are not assumed to create independent windows. Bundle identifiers are
+not aliases: after changing desktop-app variants, recapture the layout if it
+should use the new app instead of the previously captured one.
+
+The inspected Claude desktop release exposes **New Chat**, not **New Window**.
+Establish can launch Claude if closed and place a main window that appears in
+the current Space, or reuse an eligible Claude window already here. It cannot
+safely create an additional independent Claude window while another is open on
+another Space. Missing Claude slots are reported explicitly; no New Chat, deep
+link, second process, or existing-window movement is used as a fallback.
 
 Windows belonging to other Spaces, other screens, or excluded apps are never
 borrowed. Unsupported apps can still have their existing local windows placed;
@@ -146,7 +164,8 @@ their missing slots are reported without a generic `Command + N` fallback.
 Discovery is scoped to the apps named in the recipe. Its extra-window count
 therefore covers those apps, not unrelated apps elsewhere on the desktop.
 
-Establish waits for launch-created windows before asking for more. Each explicit
+Establish allows up to about 15 seconds for a cold launch and observes stable
+launch-created windows before asking for more. Each explicit
 creation must produce one new eligible window exclusively in the destination
 Space, then all matching frames must settle before they count as placed. A
 successful script alone is not proof of creation or placement. Repeat Establish
@@ -383,8 +402,9 @@ bundle identifiers, per-application slot ordinals, and normalized window
 geometry through `hs.settings`. It deliberately does not inspect or persist
 window titles, paths, URLs, terminal working directories, or document content.
 Recipes are local runtime data and are not stored in this public repository.
-Establish uses fixed, allowlisted native app scripts; recipe names, application
-names, and captured content are never interpolated into executable scripts.
+Establish uses fixed, allowlisted native app scripts and exact new-window menu
+paths; recipe names, application names, and captured content are never
+interpolated into executable scripts or selected as menus.
 macOS app Automation access is broader than just window placement. Review the
 source before granting it. The adapters neither read contents nor send terminal
 input, and do not change app launch/session preferences.
@@ -472,7 +492,8 @@ Escape, replacement, and Spoon stop. They use an in-memory catalog and reject
 any attempt by the deletion path to inspect windows or Spaces.
 
 Establish tests cover existing-window reuse, exact missing-window counts,
-repeat-use idempotency, default windows created during launch, unsupported and
+repeat-use idempotency, delayed cold-launch default windows, launch-only apps,
+genuine new-window menus, missing/disabled menus, exact app identity, unsupported and
 excluded apps, denied automation, wrong-Space and ambiguous creations, bounded
 waits, safe categorical errors, cancellation, and verified placement. They
 also verify scoped app discovery, untouched other-Space windows, mutual
@@ -560,6 +581,18 @@ Validation levels are intentionally distinct:
       retry explicitly if the first command timed out. Verify only supported
       missing slots get new windows, no other project windows are moved, and
       `lastEstablishReport` confirms settled frames and destination membership.
+- [ ] Include two ChatGPT windows, two BBEdit windows, and two Chrome windows.
+      Confirm each missing slot becomes a separate window, not a tab, document,
+      or replacement chat. Chrome's new tabs should be blank; existing browser
+      tabs, chats, and text documents must remain unchanged.
+- [ ] With an app that can safely be closed already quit by the owner, Establish
+      its layout. Confirm startup windows are counted before requesting extras;
+      repeat after success and confirm no duplicate windows. App-controlled
+      session restoration may reopen windows elsewhere; those stay untouched.
+- [ ] For Claude, verify reuse of a local window and launch from closed with a
+      one-window recipe. If Claude is already running elsewhere, or another
+      independent window is needed, confirm an explicit missing-slot notice
+      instead of changing that other window or its chat.
 - [ ] Establish the same layout again; confirm no new windows are created.
       Leave an extra window and include an unsupported app to check extra/missing
       reporting. Switch Spaces during an operation and confirm further work

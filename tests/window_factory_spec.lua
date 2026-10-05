@@ -9,15 +9,34 @@ end
 local previousHs = hs
 local info, tasks, timers, allowed, failNew, failStart, failSchedule
 local result, calls
+local app, menuItem, menuCalls, menuError, menuSelected, identity
 local function reset()
   info = { CFBundleShortVersionString = "1.3.1", OSAScriptingDefinition = "Ghostty.sdef" }
   tasks, timers, allowed = {}, {}, true
   failNew, failStart, failSchedule, result, calls = false, false, false, nil, 0
+  menuItem, menuCalls, menuError, menuSelected, identity = { enabled = true }, {}, nil, true, nil
+  app = {
+    bundleID = function() return identity or "com.openai.codex" end,
+    findMenuItem = function(_, menu)
+      equal(table.concat(menu, "/"), "File/New Window", "exact genuine menu path")
+      if menuError == "lookup" then error("private application text") end
+      return menuItem
+    end,
+    selectMenuItem = function(_, menu)
+      table.insert(menuCalls, table.concat(menu, "/"))
+      if menuError == "selection" then error("private application text") end
+      if menuError == "space" then allowed = false end
+      return menuSelected
+    end,
+  }
 end
 local function complete(ok, reason) calls = calls + 1; result = { ok = ok, reason = reason } end
 local options = { guard = function() return allowed, "active-space-changed" end }
 hs = {
-  application = { infoForBundleID = function() return info end },
+  application = {
+    infoForBundleID = function() return info end,
+    get = function() return app end,
+  },
   task = { new = function(executable, callback, arguments)
     if failNew then return nil end
     local task = { executable = executable, callback = callback, arguments = arguments }
@@ -54,6 +73,9 @@ reset()
 equal(factory.support("com.apple.finder"), true, "Finder capability")
 equal(factory.support("com.apple.Safari"), true, "Safari capability")
 equal(factory.support("com.mitchellh.ghostty"), true, "Ghostty scripting capability")
+for _, bundle in ipairs({ "com.google.Chrome", "com.barebones.bbedit", "com.openai.chat", "com.openai.codex", "com.anthropic.claudefordesktop" }) do
+  equal(factory.support(bundle), true, "allowlisted Establish lifecycle for " .. bundle)
+end
 local ok, err = factory.support("com.example.Chat")
 equal(ok, false, "do not infer a chat app's new-window behavior")
 equal(err, "unsupported-application", "unsupported reason")
@@ -88,10 +110,16 @@ equal(calls, 1, "complete exactly once")
 for _, case in ipairs({
   { "com.apple.finder", "make new Finder window" },
   { "com.apple.Safari", 'make new document with properties {URL:"about:blank"}' },
+  { "com.barebones.bbedit", "make new text window" },
+  { "com.google.Chrome", "set createdWindow to make new window" },
 }) do
   reset()
   factory.create(case[1], options, complete)
   equal(tasks[1].arguments[2]:find(case[2], 1, true) ~= nil, true, "fixed window API for " .. case[1])
+  if case[1] == "com.google.Chrome" then
+    equal(tasks[1].arguments[2]:find('set URL of active tab of createdWindow to "about:blank"', 1, true) ~= nil, true, "blank only the newly created Chrome window")
+    equal(tasks[1].arguments[2]:find("window 1", 1, true), nil, "never navigate the existing front browser window")
+  end
   tasks[1]:finish(0, "created")
 end
 for _, case in ipairs({
@@ -157,6 +185,72 @@ reset()
 factory.create("com.example.Chat", options, complete)
 equal(#tasks, 0, "unsupported apps never receive a generic shortcut")
 equal(result.reason, "unsupported-application", "unsupported create is safe")
+
+for _, bundle in ipairs({ "com.openai.codex", "com.openai.chat" }) do
+  reset()
+  identity = bundle
+  job = factory.create(bundle, options, complete)
+  equal(job.finished, false, "menu dispatch is asynchronous")
+  equal(#menuCalls, 0, "no premature menu selection")
+  drain()
+  equal(menuCalls[1], "File/New Window", "dispatch only an independent-window command")
+  equal(#tasks, 0, "menu creation does not run AppleScript or synthesize keys")
+  equal(result.ok, true, "menu selection accepted; orchestrator still verifies the new window")
+  equal(result.reason, nil, "successful menu has no failure reason")
+  equal(calls, 1, "menu completion exactly once")
+end
+for _, case in ipairs({
+  { "missing", "new-window-command-unavailable" },
+  { "disabled", "new-window-menu-disabled" },
+  { "lookup", "new-window-command-unavailable" },
+  { "selection", "window-command-failed" },
+  { "not-running", "application-not-running" },
+  { "identity", "application-identity-mismatch" },
+  { "space", "active-space-changed" },
+  { "declined", "window-command-failed" },
+}) do
+  reset()
+  if case[1] == "missing" then menuItem = nil
+  elseif case[1] == "disabled" then menuItem.enabled = false
+  elseif case[1] == "not-running" then app = nil
+  elseif case[1] == "identity" then identity = "com.example.Other"
+  elseif case[1] == "declined" then menuSelected = nil
+  else menuError = case[1] end
+  factory.create("com.openai.codex", options, complete)
+  drain()
+  equal(result.ok, false, "fail closed on menu " .. case[1])
+  equal(result.reason, case[2], "safe menu failure category")
+  equal(calls, 1, "no repeated menu callback")
+  equal(#menuCalls <= 1, true, "never retry or fall back to New Chat")
+end
+reset()
+job = factory.create("com.openai.codex", options, complete)
+job:cancel()
+drain()
+equal(#menuCalls, 0, "cancel before menu selection")
+equal(calls, 1, "menu cancellation completes once")
+reset()
+factory.create("com.openai.codex", options, complete)
+allowed = false
+drain()
+equal(#menuCalls, 0, "guard queued menu against Space change")
+equal(result.reason, "active-space-changed", "queued guard category")
+reset()
+failSchedule = true
+factory.create("com.openai.codex", options, complete)
+equal(result.reason, "could-not-schedule-window-check", "menu scheduling failure")
+equal(#menuCalls, 0, "failed menu scheduling has no side effect")
+reset()
+factory.create("com.anthropic.claudefordesktop", options, complete)
+equal(result.reason, "claude-new-window-unavailable", "Claude launch-only limitation is explicit")
+equal(#tasks, 0, "Claude never gets a guessed script")
+equal(#menuCalls, 0, "Claude never gets New Chat as a window fallback")
+factory.launch("com.anthropic.claudefordesktop", options, complete)
+equal(table.concat(tasks[1].arguments, " "), "-g -b com.anthropic.claudefordesktop", "Claude may launch to supply a default main window")
+reset()
+factory.launch("com.example.Unrequested", options, complete)
+equal(#tasks, 0, "direct launch remains allowlisted")
+equal(result.reason, "unsupported-application", "unlisted launch rejected")
 
 hs = previousHs
 print(string.format("window_factory: %d assertions passed", assertions))

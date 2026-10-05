@@ -1,6 +1,6 @@
 # Complete Keyboard Shortcut Reference
 
-2026-10-05.3
+2026-10-06.1
 
 Hyper = `Control + Option + Command`
 
@@ -114,12 +114,19 @@ closes it. Deletion has no undo. This adds no global shortcut.
 
 To establish a saved layout in the current Space, highlight it and press
 `Command + Return`, or right-click and choose **Establish here (create missing
-windows)**. Initial new-window support is Ghostty (1.3+ with AppleScript enabled),
-Finder, and Safari. Establish launches supported apps if needed, reuses local
+windows)**. Independent new-window support is Ghostty (1.3+ with AppleScript
+enabled), Finder, Safari, BBEdit, Chrome, and ChatGPT/OpenAI desktop with an
+enabled **File → New Window** menu. Claude can supply its launch-created main
+window when closed or reuse a local window; additional missing Claude windows
+are reported because no safe independent-window command is available.
+Establish launches supported apps if needed, reuses local
 windows, creates only missing slots, and verifies placement. It never borrows
 another Space's windows. Unsupported missing slots are reported. First use may
 request macOS Automation access; a timed-out command is not retried automatically.
-Repeat after a successful Establish to reapply geometry without duplicates.
+Cold launches allow up to about 15 seconds and count startup windows before
+requesting extras. ChatGPT uses Accessibility rather than AppleScript Automation;
+New Chat is never substituted for New Window. Repeat after a successful Establish
+to reapply geometry without duplicates.
 Keep this Space selected until completion. This is a chooser-local gesture,
 not another global Hyper binding; ordinary Return still performs Restore only.
 
