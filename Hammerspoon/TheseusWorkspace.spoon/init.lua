@@ -8,7 +8,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWorkspace"
-obj.version = "0.1.2"
+obj.version = "0.1.3"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -613,7 +613,22 @@ function obj:promptCaptureCurrentWorkspace()
   return self
 end
 
+local function closeRestoreChooser(controller)
+  local session = controller._restoreChooserSession
+  controller._restoreChooserSession = nil
+  controller._restoreChooser = nil
+  if not session then return end
+  local deleteHotkey = session.deleteHotkey
+  session.deleteHotkey = nil
+  if deleteHotkey then deleteHotkey:delete() end
+  if session.chooser then
+    session.chooser:cancel()
+    session.chooser:delete()
+  end
+end
+
 function obj:showRestoreChooser()
+  closeRestoreChooser(self)
   local choices, choicesErr = chooserChoices(self)
   if not choices then
     showAlert("WORKSPACE: " .. reasonText(choicesErr))
@@ -624,17 +639,83 @@ function obj:showRestoreChooser()
     return self
   end
 
-  if self._restoreChooser then
-    self._restoreChooser:cancel()
-  end
-  self._restoreChooser = hs.chooser.new(function(choice)
+  local session = {}
+  self._restoreChooserSession = session
+  local chooser = hs.chooser.new(function(choice)
+    if self._restoreChooserSession ~= session or session.confirming then return end
+    closeRestoreChooser(self)
     if choice and choice.workspaceName then
       self:restoreWorkspace(choice.workspaceName)
     end
   end)
-  self._restoreChooser
-    :placeholderText("Restore workspace in this Space")
+  session.chooser = chooser
+  self._restoreChooser = chooser
+
+  local function confirmDelete(choice)
+    if self._restoreChooserSession ~= session or session.confirming
+      or not chooser:isVisible() or not choice or not choice.workspaceName then
+      return
+    end
+    -- Freeze the target before dismissing the chooser. Filtered row numbers
+    -- are not indexes into the original, unfiltered choices table.
+    local name = choice.workspaceName
+    local query, selectedRow = chooser:query(), chooser:selectedRow()
+    session.confirming = true
+    chooser:hide()
+    local response = hs.dialog.blockAlert(
+      "Delete saved layout?",
+      string.format(
+        "Delete “%s”? Only the saved layout is removed. No windows, apps, or Spaces are changed. This cannot be undone.",
+        name
+      ),
+      "Cancel", "Delete", "warning"
+    )
+    -- A stopped Spoon or replacement chooser must invalidate an old prompt.
+    if self._restoreChooserSession ~= session then return end
+    session.confirming = false
+    if response == "Delete" then self:deleteWorkspace(name) end
+
+    local refreshed, refreshErr = chooserChoices(self)
+    if not refreshed or #refreshed == 0 then
+      closeRestoreChooser(self)
+      if refreshErr then showAlert("WORKSPACE: " .. reasonText(refreshErr)) end
+      return
+    end
+    chooser:choices(refreshed):query(query):show()
+    if response ~= "Delete" then chooser:selectedRow(selectedRow) end
+  end
+
+  session.deleteHotkey = hs.hotkey.new({ "cmd" }, "delete", function()
+    if self._restoreChooserSession ~= session or not chooser:isVisible() then return end
+    confirmDelete(chooser:selectedRowContents())
+  end)
+  chooser
+    :placeholderText("Restore in this Space · ⌘Delete or right-click to delete")
     :searchSubText(true)
+    :showCallback(function()
+      if self._restoreChooserSession == session and session.deleteHotkey then
+        session.deleteHotkey:enable()
+      end
+    end)
+    :hideCallback(function()
+      if session.deleteHotkey then session.deleteHotkey:disable() end
+    end)
+    :rightClickCallback(function(row)
+      if row == 0 or self._restoreChooserSession ~= session then return end
+      local choice = chooser:selectedRowContents(row)
+      if not choice.workspaceName then return end
+      local menu = hs.menubar.new(false)
+      if not menu then return end
+      local requested = false
+      menu:setMenu({ {
+        title = "Delete saved layout…",
+        fn = function() requested = true end,
+      } })
+      menu:popupMenu(hs.mouse.absolutePosition())
+      menu:delete()
+      -- Open the confirmation only after the context menu has closed.
+      if requested then confirmDelete(choice) end
+    end)
     :choices(choices)
     :show()
   return self
@@ -677,10 +758,7 @@ function obj:stop()
     operation.report.cancelled = true
     for _, job in ipairs(operation.jobs) do job:cancel() end
   end
-  if self._restoreChooser then
-    self._restoreChooser:cancel()
-    self._restoreChooser = nil
-  end
+  closeRestoreChooser(self)
   self:_unbindHotkeys()
   return self
 end

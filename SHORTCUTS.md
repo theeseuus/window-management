@@ -103,6 +103,13 @@ reference `Hammerspoon/init.lua` configuration.
 | --- | --- |
 | `Hyper + Shift + R` | Open capture dialog, freeze eligible windows, then name and save the snapshot |
 | `Hyper + R` | Choose a captured workspace and restore matching existing windows here |
+| `Command + Delete`, only in the restore chooser | Confirm deletion of the highlighted saved layout |
+
+Alternatively, right-click a layout in the chooser and choose **Delete saved
+layout…**. The confirmation names the exact layout and defaults to Cancel.
+Delete removes only the saved recipe, without moving or closing windows, apps,
+or Spaces. The chooser refreshes and keeps its search; deleting the final layout
+closes it. Deletion has no undo. This adds no global shortcut.
 
 Restore waits for verified frame placement before showing its completion
 notice. Missing or failed applications are named; shortcuts are unchanged.

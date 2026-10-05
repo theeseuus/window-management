@@ -180,7 +180,7 @@ local workspace = dofile(
 )
 
 equal(workspace.name, "TheseusWorkspace", "workspace Spoon name")
-equal(workspace.version, "0.1.2", "workspace Spoon version")
+equal(workspace.version, "0.1.3", "workspace Spoon version")
 equal(workspace.author, "Theeseuus", "workspace Spoon author")
 
 local recipe, captureReport = workspace:captureCurrentWorkspace(

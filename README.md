@@ -85,8 +85,8 @@ supports:
   while capture is in progress. An existing name requires explicit replacement
   confirmation.
 - `Hyper + R`: choose a saved workspace and restore its matching existing
-  windows in the current Space.
-- Named recipe listing and explicit deletion through the public Spoon API.
+  windows in the current Space, or delete a saved layout with confirmation.
+- Named recipe listing and direct deletion through the public Spoon API.
 - Normalized geometry, so a recipe is restored relative to the current screen's
   usable frame rather than an old absolute pixel rectangle.
 - Missing-window and extra-window reporting. Missing recipe slots are reported;
@@ -129,8 +129,16 @@ layout. Those capabilities require app adapters and a separately verified group
 transport state machine.
 
 Recipes are stored under the Hammerspoon settings key
-`TheseusWorkspaceRecipesV1`, outside this Git repository. The public API can
-also be used directly from the Hammerspoon Console:
+`TheseusWorkspaceRecipesV1`, outside this Git repository. To remove an old
+layout, open `Hyper + R`, highlight it and press `Command + Delete`, or
+right-click its row and choose **Delete saved layout…**. The confirmation names
+the exact layout and defaults to Cancel. Only explicit Delete removes the saved
+recipe; no windows, applications, or Spaces are moved, closed, or deleted. The
+chooser refreshes afterward, retaining its search; deleting the final layout
+closes it. There is no undo. `Command + Delete` is active only while this chooser
+is visible, not as a new global shortcut.
+
+The public API can also be used directly from the Hammerspoon Console:
 
 ```lua
 spoon.TheseusWorkspace:captureCurrentWorkspace("Project Atlas")
@@ -139,6 +147,9 @@ spoon.TheseusWorkspace:restoreWorkspace("Project Atlas")
 spoon.TheseusWorkspace:listWorkspaces()
 spoon.TheseusWorkspace:deleteWorkspace("Project Atlas")
 ```
+
+The direct `deleteWorkspace` API deletes immediately, without the chooser's
+confirmation; callers are responsible for confirming their target.
 
 The direct `captureCurrentWorkspace` API captures and saves synchronously when
 called; the shortcut uses the non-blocking capture/name/save dialog. Both store
@@ -400,6 +411,12 @@ cancel/close/stop cleanup, Space changes during collection, and failed discovery
 The frame-copy regression deliberately moves Ghostty's mocked geometry after
 capture and confirms that Save retains the original coordinates.
 
+Chooser tests cover named deletion confirmation, Cancel as the default,
+filtered keyboard and right-click selections, preserved search, stale targets,
+save failures, deleting the final recipe, and local-hotkey cleanup on selection,
+Escape, replacement, and Spoon stop. They use an in-memory catalog and reject
+any attempt by the deletion path to inspect windows or Spaces.
+
 The separated resize/move fallback was informed by Hammerspoon's
 [frame-setting timing discussion](https://github.com/Hammerspoon/hammerspoon/issues/3731).
 It uses non-blocking timers and verifies the outcome; no code from that
@@ -466,6 +483,14 @@ Validation levels are intentionally distinct:
       notice; if any app is named as failed, inspect `lastRestoreReport`.
 - [ ] Capture the same name again and confirm replacement requires an explicit
       confirmation rather than silently overwriting the recipe.
+- [ ] In `Hyper + R`, highlight a disposable recipe and press `Command + Delete`.
+      Confirm the dialog names it and defaults to Cancel. Cancel and verify the
+      recipe and search are unchanged; then explicitly Delete it and verify
+      only that recipe disappears, without moving or closing any windows.
+- [ ] Repeat deletion from the right-click menu while filtering the chooser.
+      Confirm the visible row is the named target, other recipes survive, and
+      deleting the last recipe closes the chooser. Outside the chooser,
+      `Command + Delete` must retain its normal application behavior.
 - [ ] Close one captured application window, restore the recipe, and confirm the
       result reports one missing slot without moving an unrelated replacement.
 - [ ] Add an unrelated extra window, restore the recipe, and confirm it remains

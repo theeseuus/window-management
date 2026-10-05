@@ -22,6 +22,7 @@ local luaFiles = {
   repositoryRoot .. "/tests/workspace_logic_spec.lua",
   repositoryRoot .. "/tests/workspace_runtime_spec.lua",
   repositoryRoot .. "/tests/workspace_capture_spec.lua",
+  repositoryRoot .. "/tests/workspace_chooser_spec.lua",
   repositoryRoot .. "/tests/frame_restore_spec.lua"
 }
 
@@ -41,5 +42,6 @@ dofile(repositoryRoot .. "/tests/spatial_focus_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_runtime_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_capture_spec.lua")
+dofile(repositoryRoot .. "/tests/workspace_chooser_spec.lua")
 dofile(repositoryRoot .. "/tests/frame_restore_spec.lua")
 print("validation: passed")
