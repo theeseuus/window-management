@@ -1,0 +1,554 @@
+----------------------------------------------------------------------
+-- TheseusWorkspace Spoon
+-- Capture and reconcile cross-application window layouts in the current
+-- ordinary user Space. This Spoon is independent of TheseusWindow.
+----------------------------------------------------------------------
+
+local obj = {}
+obj.__index = obj
+
+obj.name = "TheseusWorkspace"
+obj.version = "0.1"
+obj.author = "Theeseuus"
+obj.license = "MIT"
+
+-- User configuration
+obj.settingsKey = "TheseusWorkspaceRecipesV1"
+obj.animationDuration = 0
+obj.excludedBundleIDs = {}
+
+local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
+local workspaceLogic = dofile(sourcePath .. "workspace_logic.lua")
+
+local function showAlert(text, screen, duration)
+  screen = screen or hs.screen.mainScreen()
+  if not screen then return end
+  hs.alert.show(
+    text,
+    { strokeWidth = 0, fillColor = { alpha = 0.88 } },
+    screen,
+    duration or 1.8
+  )
+end
+
+local function reasonText(reason)
+  local reasons = {
+    ["empty-name"] = "enter a workspace name",
+    ["invalid-name"] = "workspace name must be text",
+    ["invalid-name-characters"] = "workspace name cannot contain control characters",
+    ["name-too-long"] = "workspace name must be 80 characters or fewer",
+    ["workspace-exists"] = "a workspace with that name already exists",
+    ["workspace-not-found"] = "workspace was not found",
+    ["no-windows"] = "no eligible windows are present in this Space",
+  }
+  return reasons[reason] or tostring(reason)
+end
+
+local function currentUserSpaceContext()
+  local focusedWindow = hs.window.focusedWindow()
+  local screen = focusedWindow and focusedWindow:screen() or hs.screen.mainScreen()
+  if not screen then
+    return nil, "no-screen"
+  end
+
+  local activeOK, spaceID, activeErr = pcall(hs.spaces.activeSpaceOnScreen, screen)
+  if not activeOK then
+    return nil, "could not read the active Space: " .. tostring(spaceID)
+  end
+  if not spaceID then
+    return nil, "could not read the active Space: " .. tostring(activeErr)
+  end
+
+  local typeOK, spaceType, typeErr = pcall(hs.spaces.spaceType, spaceID)
+  if not typeOK then
+    return nil, "could not read the active Space type: " .. tostring(spaceType)
+  end
+  if spaceType ~= "user" then
+    return nil, "the active Space is not an ordinary user Space: " .. tostring(typeErr or spaceType)
+  end
+
+  return {
+    screen = screen,
+    screenFrame = screen:frame(),
+    spaceID = spaceID,
+  }
+end
+
+local function describeWindow(controller, window, context)
+  local windowOK, recordOrReason = pcall(function()
+    if not window:isStandard() then return "non-standard" end
+    if not window:isVisible() then return "not-visible" end
+    if window:isMinimized() then return "minimized" end
+    if window:isFullScreen() then return "full-screen" end
+
+    local screen = window:screen()
+    if not screen or screen:id() ~= context.screen:id() then
+      return "other-screen"
+    end
+
+    local spaces, spacesErr = hs.spaces.windowSpaces(window)
+    if not spaces then
+      return "space-membership-unavailable:" .. tostring(spacesErr)
+    end
+    if #spaces ~= 1 or spaces[1] ~= context.spaceID then
+      return "not-exclusive-to-current-space"
+    end
+
+    local app = window:application()
+    if not app then return "missing-application" end
+    local bundleID = app:bundleID()
+    if type(bundleID) ~= "string" or bundleID == "" then
+      return "missing-bundle-id"
+    end
+    if controller.excludedBundleIDs[bundleID] then
+      return "excluded-application"
+    end
+
+    return {
+      id = window:id(),
+      bundleID = bundleID,
+      appName = app:title() or bundleID,
+      frame = window:frame(),
+      screenFrame = context.screenFrame,
+      window = window,
+    }
+  end)
+
+  if not windowOK then
+    return nil, "window-inspection-failed:" .. tostring(recordOrReason)
+  end
+  if type(recordOrReason) == "string" then
+    return nil, recordOrReason
+  end
+  return recordOrReason
+end
+
+local function collectCurrentWindows(controller, context)
+  local windowsOK, windowIDs, windowsErr = pcall(hs.spaces.windowsForSpace, context.spaceID)
+  if not windowsOK then
+    return nil, "could not enumerate windows in the active Space: " .. tostring(windowIDs)
+  end
+  if not windowIDs then
+    return nil, "could not enumerate windows in the active Space: " .. tostring(windowsErr)
+  end
+
+  local records = {}
+  local skipped = {}
+  for _, windowID in ipairs(windowIDs) do
+    local getOK, window = pcall(hs.window.get, windowID)
+    if getOK and window then
+      local record, reason = describeWindow(controller, window, context)
+      if record then
+        table.insert(records, record)
+      else
+        skipped[reason] = (skipped[reason] or 0) + 1
+      end
+    else
+      skipped["window-unavailable"] = (skipped["window-unavailable"] or 0) + 1
+    end
+  end
+
+  return records, {
+    enumerated = #windowIDs,
+    eligible = #records,
+    skipped = skipped,
+  }
+end
+
+local function loadCatalog(controller)
+  local getOK, catalog = pcall(hs.settings.get, controller.settingsKey)
+  if not getOK then
+    return nil, "could not load workspace settings: " .. tostring(catalog)
+  end
+  if catalog == nil then
+    return workspaceLogic.newCatalog()
+  end
+
+  local valid, catalogErr = workspaceLogic.validateCatalog(catalog)
+  if not valid then
+    return nil, "workspace settings are invalid: " .. tostring(catalogErr)
+  end
+  return catalog
+end
+
+local function saveCatalog(controller, catalog)
+  local valid, catalogErr = workspaceLogic.validateCatalog(catalog)
+  if not valid then
+    return nil, "refusing to save invalid workspace settings: " .. tostring(catalogErr)
+  end
+
+  local setOK, setErr = pcall(hs.settings.set, controller.settingsKey, catalog)
+  if not setOK then
+    return nil, "could not save workspace settings: " .. tostring(setErr)
+  end
+
+  local readOK, savedCatalog = pcall(hs.settings.get, controller.settingsKey)
+  if not readOK then
+    return nil, "could not verify saved workspace settings: " .. tostring(savedCatalog)
+  end
+  local savedValid, savedErr = workspaceLogic.validateCatalog(savedCatalog)
+  if not savedValid then
+    return nil, "saved workspace settings failed validation: " .. tostring(savedErr)
+  end
+  return true
+end
+
+local function chooserChoices(controller)
+  local workspaces, workspacesErr = controller:listWorkspaces()
+  if not workspaces then
+    return nil, workspacesErr
+  end
+
+  local choices = {}
+  for _, workspace in ipairs(workspaces) do
+    table.insert(choices, {
+      text = workspace.name,
+      subText = string.format(
+        "%d windows · %s · captured %s",
+        workspace.windowCount,
+        workspace.applications,
+        workspace.capturedAt
+      ),
+      workspaceName = workspace.name,
+    })
+  end
+  return choices
+end
+
+function obj:captureCurrentWorkspace(name, options)
+  options = options or {}
+  local normalizedName, nameErr = workspaceLogic.normalizeName(name)
+  if not normalizedName then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(nameErr)) end
+    return nil, nameErr
+  end
+
+  local catalog, catalogErr = loadCatalog(self)
+  if not catalog then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(catalogErr)) end
+    return nil, catalogErr
+  end
+  if catalog.recipes[normalizedName] and not options.replace then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText("workspace-exists")) end
+    return nil, "workspace-exists"
+  end
+
+  local context, contextErr = currentUserSpaceContext()
+  if not context then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(contextErr)) end
+    return nil, contextErr
+  end
+
+  local records, collection = collectCurrentWindows(self, context)
+  if not records then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(collection), context.screen) end
+    return nil, collection
+  end
+
+  local recipe, recipeErr = workspaceLogic.buildRecipe(
+    normalizedName,
+    records,
+    os.date("!%Y-%m-%dT%H:%M:%SZ")
+  )
+  if not recipe then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(recipeErr), context.screen) end
+    return nil, recipeErr
+  end
+
+  catalog.recipes[normalizedName] = recipe
+  local saved, saveErr = saveCatalog(self, catalog)
+  if not saved then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(saveErr), context.screen) end
+    return nil, saveErr
+  end
+
+  local report = {
+    name = normalizedName,
+    captured = #recipe.windows,
+    enumerated = collection.enumerated,
+    skippedCount = collection.enumerated - collection.eligible,
+    skipped = collection.skipped,
+    replaced = options.replace == true,
+  }
+  if not options.silent then
+    showAlert(
+      string.format(
+        "CAPTURED %s · %d windows · %d skipped",
+        normalizedName,
+        report.captured,
+        report.skippedCount
+      ),
+      context.screen
+    )
+  end
+  return recipe, report
+end
+
+function obj:restoreWorkspace(name, options)
+  options = options or {}
+  local normalizedName, nameErr = workspaceLogic.normalizeName(name)
+  if not normalizedName then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(nameErr)) end
+    return nil, nameErr
+  end
+
+  local catalog, catalogErr = loadCatalog(self)
+  if not catalog then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(catalogErr)) end
+    return nil, catalogErr
+  end
+  local recipe = catalog.recipes[normalizedName]
+  if not recipe then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText("workspace-not-found")) end
+    return nil, "workspace-not-found"
+  end
+
+  local context, contextErr = currentUserSpaceContext()
+  if not context then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(contextErr)) end
+    return nil, contextErr
+  end
+
+  local records, collectionErr = collectCurrentWindows(self, context)
+  if not records then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(collectionErr), context.screen) end
+    return nil, collectionErr
+  end
+
+  local candidates = {}
+  for _, record in ipairs(records) do
+    local normalizedFrame, frameErr = workspaceLogic.normalizeFrame(
+      record.frame,
+      record.screenFrame
+    )
+    if not normalizedFrame then
+      if not options.silent then showAlert("WORKSPACE: " .. reasonText(frameErr), context.screen) end
+      return nil, frameErr
+    end
+    table.insert(candidates, {
+      id = record.id,
+      bundleID = record.bundleID,
+      appName = record.appName,
+      frame = normalizedFrame,
+      window = record.window,
+    })
+  end
+
+  local matches, matchErr = workspaceLogic.matchWindows(recipe, candidates)
+  if not matches then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(matchErr), context.screen) end
+    return nil, matchErr
+  end
+
+  local report = {
+    name = normalizedName,
+    requested = #recipe.windows,
+    applied = 0,
+    missing = matches.missing,
+    extras = matches.extras,
+    failures = {},
+  }
+
+  for _, assignment in ipairs(matches.assignments) do
+    local targetFrame, frameErr = workspaceLogic.absoluteFrame(
+      assignment.target.frame,
+      context.screenFrame
+    )
+    if not targetFrame then
+      table.insert(report.failures, {
+        target = assignment.target,
+        reason = frameErr,
+      })
+    else
+      local frameOK, setErr = pcall(function()
+        assignment.candidate.window:setFrameInScreenBounds(
+          targetFrame,
+          math.max(0, tonumber(self.animationDuration) or 0)
+        )
+      end)
+      if frameOK then
+        report.applied = report.applied + 1
+      else
+        table.insert(report.failures, {
+          target = assignment.target,
+          reason = tostring(setErr),
+        })
+      end
+    end
+  end
+
+  if not options.silent then
+    showAlert(
+      string.format(
+        "RESTORED %s · %d placed · %d missing · %d extra · %d failed",
+        normalizedName,
+        report.applied,
+        #report.missing,
+        #report.extras,
+        #report.failures
+      ),
+      context.screen,
+      2.2
+    )
+  end
+  return report
+end
+
+function obj:listWorkspaces()
+  local catalog, catalogErr = loadCatalog(self)
+  if not catalog then return nil, catalogErr end
+
+  local workspaces = {}
+  for name, recipe in pairs(catalog.recipes) do
+    local applications, summaryErr = workspaceLogic.applicationSummary(recipe)
+    if not applications then return nil, summaryErr end
+    table.insert(workspaces, {
+      name = name,
+      capturedAt = recipe.capturedAt,
+      windowCount = #recipe.windows,
+      applications = applications,
+    })
+  end
+  table.sort(workspaces, function(left, right)
+    return left.name:lower() < right.name:lower()
+  end)
+  return workspaces
+end
+
+function obj:deleteWorkspace(name, options)
+  options = options or {}
+  local normalizedName, nameErr = workspaceLogic.normalizeName(name)
+  if not normalizedName then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(nameErr)) end
+    return nil, nameErr
+  end
+
+  local catalog, catalogErr = loadCatalog(self)
+  if not catalog then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(catalogErr)) end
+    return nil, catalogErr
+  end
+  if not catalog.recipes[normalizedName] then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText("workspace-not-found")) end
+    return nil, "workspace-not-found"
+  end
+
+  catalog.recipes[normalizedName] = nil
+  local saved, saveErr = saveCatalog(self, catalog)
+  if not saved then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(saveErr)) end
+    return nil, saveErr
+  end
+
+  if not options.silent then
+    showAlert("DELETED " .. normalizedName)
+  end
+  return true
+end
+
+function obj:promptCaptureCurrentWorkspace()
+  local button, name = hs.dialog.textPrompt(
+    "Capture workspace",
+    "Save eligible windows in the current Space. Window titles and document paths are not stored.",
+    "",
+    "Capture",
+    "Cancel"
+  )
+  if button ~= "Capture" then return self end
+
+  local normalizedName, nameErr = workspaceLogic.normalizeName(name)
+  if not normalizedName then
+    showAlert("WORKSPACE: " .. reasonText(nameErr))
+    return self
+  end
+
+  local catalog, catalogErr = loadCatalog(self)
+  if not catalog then
+    showAlert("WORKSPACE: " .. reasonText(catalogErr))
+    return self
+  end
+
+  local replace = false
+  if catalog.recipes[normalizedName] then
+    local response = hs.dialog.blockAlert(
+      "Replace workspace?",
+      string.format("A workspace named “%s” already exists.", normalizedName),
+      "Replace",
+      "Cancel",
+      "warning"
+    )
+    if response ~= "Replace" then return self end
+    replace = true
+  end
+
+  self:captureCurrentWorkspace(normalizedName, { replace = replace })
+  return self
+end
+
+function obj:showRestoreChooser()
+  local choices, choicesErr = chooserChoices(self)
+  if not choices then
+    showAlert("WORKSPACE: " .. reasonText(choicesErr))
+    return self
+  end
+  if #choices == 0 then
+    showAlert("WORKSPACE: no captured workspaces")
+    return self
+  end
+
+  if self._restoreChooser then
+    self._restoreChooser:cancel()
+  end
+  self._restoreChooser = hs.chooser.new(function(choice)
+    if choice and choice.workspaceName then
+      self:restoreWorkspace(choice.workspaceName)
+    end
+  end)
+  self._restoreChooser
+    :placeholderText("Restore workspace in this Space")
+    :searchSubText(true)
+    :choices(choices)
+    :show()
+  return self
+end
+
+function obj:_unbindHotkeys()
+  if not self._hotkeys then return end
+  for _, hotkey in pairs(self._hotkeys) do
+    hotkey:delete()
+  end
+  self._hotkeys = nil
+end
+
+function obj:bindHotkeys(mapping)
+  mapping = mapping or {}
+  self:_unbindHotkeys()
+  self._hotkeys = {}
+
+  local actions = {
+    capture = function() self:promptCaptureCurrentWorkspace() end,
+    restore = function() self:showRestoreChooser() end,
+  }
+  for _, actionName in ipairs({ "capture", "restore" }) do
+    local keySpec = mapping[actionName]
+    if keySpec then
+      self._hotkeys[actionName] = hs.hotkey.bindSpec(keySpec, actions[actionName])
+    end
+  end
+  return self
+end
+
+function obj:start()
+  return self
+end
+
+function obj:stop()
+  if self._restoreChooser then
+    self._restoreChooser:cancel()
+    self._restoreChooser = nil
+  end
+  self:_unbindHotkeys()
+  return self
+end
+
+return obj

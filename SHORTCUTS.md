@@ -1,6 +1,6 @@
 # Complete Keyboard Shortcut Reference
 
-2026-10-05.2
+2026-10-05.3
 
 Hyper = `Control + Option + Command`
 
@@ -93,3 +93,18 @@ single owner.
 The enabled menu-bar Space indicator has no shortcut. It renders the current
 user-Space ordinal as `[n]`, `[?]` when unavailable, and `[—]` for a full-screen
 or tiled Space.
+
+## Workspace Management (Hammerspoon)
+
+These commands are supplied by the independent TheseusWorkspace Spoon in the
+reference `Hammerspoon/init.lua` configuration.
+
+| Shortcut | Action |
+| --- | --- |
+| `Hyper + Shift + R` | Name and capture eligible windows in the current user Space |
+| `Hyper + R` | Choose a captured workspace and restore matching existing windows here |
+
+Capture requires confirmation before replacing an existing name. Restore uses
+application identity and normalized geometry, reports missing recipe slots, and
+leaves extra windows untouched. This initial implementation does not launch
+applications, create missing windows, or move the whole group between Spaces.

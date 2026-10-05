@@ -1,13 +1,19 @@
-# TheseusWindow
+# Theseus Window and Workspace Management
 
-TheseusWindow is a Hammerspoon Spoon for deterministic macOS window placement,
-window switching, and native Space movement. The reference configuration keeps
-responsibilities separate:
+This repository contains two independent Hammerspoon Spoons:
+
+- **TheseusWindow** provides deterministic macOS window placement, window
+  switching, and native Space movement.
+- **TheseusWorkspace** captures and restores named, cross-application window
+  layouts in the current native user Space.
+
+Either Spoon can be installed and loaded without the other. The reference
+configuration keeps broader responsibilities separate:
 
 - Karabiner defines key semantics. Holding Tab emits Hyper
   (`Control + Option + Command`).
 - Raycast launches applications.
-- Hammerspoon and this Spoon manipulate windows.
+- Hammerspoon and these Spoons manipulate windows.
 - Native macOS `Control + Left/Right` moves only the user between Spaces.
 
 The complete reference map is in [SHORTCUTS.md](SHORTCUTS.md). Its application
@@ -16,18 +22,24 @@ Spoon.
 
 ## Requirements
 
-- macOS with native Mission Control `Control + Left/Right` shortcuts enabled.
+- For TheseusWindow move-and-follow, macOS with native Mission Control
+  `Control + Left/Right` shortcuts enabled.
 - Hammerspoon with Accessibility permission; version 1.1.1 is the tested
   release.
-- At least two ordinary user Spaces for move-and-follow commands.
+- At least two ordinary user Spaces for TheseusWindow move-and-follow commands.
+- An ordinary user Space for TheseusWorkspace capture and restore. Full-screen
+  and tiled Spaces are deliberately rejected.
 - A Hyper-key mapping if using the reference bindings. The supplied setup uses
   Karabiner-Elements to make held Tab emit
   `Control + Option + Command`; Karabiner configuration is not included.
 
 ## Installation
 
-1. Copy `Hammerspoon/TheseusWindow.spoon` into
-   `~/.hammerspoon/Spoons/TheseusWindow.spoon`.
+1. Copy either or both Spoon directories into `~/.hammerspoon/Spoons/`:
+
+   - `Hammerspoon/TheseusWindow.spoon`
+   - `Hammerspoon/TheseusWorkspace.spoon`
+
 2. Merge the following lines into your existing `~/.hammerspoon/init.lua`;
    do not overwrite unrelated Hammerspoon configuration:
 
@@ -35,22 +47,87 @@ Spoon.
    hs.loadSpoon("TheseusWindow")
    spoon.TheseusWindow.showSpaceIndicator = true
    spoon.TheseusWindow:bindHotkeys():start()
+
+   hs.loadSpoon("TheseusWorkspace")
+   spoon.TheseusWorkspace:bindHotkeys({
+     capture = { { "ctrl", "alt", "cmd", "shift" }, "r" },
+     restore = { { "ctrl", "alt", "cmd" }, "r" },
+   }):start()
    ```
 
+   Remove either block when that Spoon is not wanted. TheseusWorkspace does not
+   load or call TheseusWindow internally. The two Workspace bindings shown here
+   are the supplied reference map, not hard-coded defaults.
+
 3. Reload Hammerspoon and grant Accessibility access if macOS requests it.
-4. Work through the manual integration checklist below before relying on native
-   Space movement.
+4. Work through the manual integration checklist below before relying on live
+   window or Space operations.
 
 If dotfiles are managed by chezmoi or another configuration manager, add these
 files to its source state and deploy them through that manager.
 
-## Features
+## TheseusWindow
 
 TheseusWindow provides cross-app window switching, deterministic geometry
 cycles in both directions, stateless canonical size and position cycles,
 current-Space directional focus, stash/restore, accordion layout, a centred
 half-width layout, position-preserving horizontal centering, maximize/minimize,
 geometry restoration, width adjustments, and spatial arrow controls.
+
+## TheseusWorkspace
+
+TheseusWorkspace treats the eligible windows in the current native user Space
+as one cross-application project group. Its initial capture-and-reconcile slice
+supports:
+
+- `Hyper + Shift + R`: prompt for a name and capture the current workspace.
+  Capturing an existing name requires explicit replacement confirmation.
+- `Hyper + R`: choose a saved workspace and restore its matching existing
+  windows in the current Space.
+- Named recipe listing and explicit deletion through the public Spoon API.
+- Normalized geometry, so a recipe is restored relative to the current screen's
+  usable frame rather than an old absolute pixel rectangle.
+- Missing-window and extra-window reporting. Missing recipe slots are reported;
+  extra windows are intentionally left untouched.
+
+Capture includes normal, visible, non-minimized, non-full-screen windows that
+belong exclusively to the current ordinary user Space and selected screen.
+Sticky windows, panels, desktop elements, hidden/minimized windows, full-screen
+windows, and windows on another screen are skipped. The current implementation
+is intentionally single-monitor-first.
+
+Recipes identify a slot using the owning application's bundle identifier plus
+an ordinal. They do not store window titles, document paths, browser URLs,
+terminal working directories, or window contents. When an application has
+several windows, existing windows are paired with its saved slots by proximity
+to the normalized saved geometry. This preserves sensible placement without
+claiming that Hammerspoon can recover the original document or tab identity.
+
+The first slice reconciles only windows that already exist in the destination
+Space. It does **not yet** launch applications, create missing blank windows,
+move a group between Spaces, create or remove Spaces, or continuously enforce a
+layout. Those capabilities require app adapters and a separately verified group
+transport state machine.
+
+Recipes are stored under the Hammerspoon settings key
+`TheseusWorkspaceRecipesV1`, outside this Git repository. The public API can
+also be used directly from the Hammerspoon Console:
+
+```lua
+spoon.TheseusWorkspace:captureCurrentWorkspace("Project Atlas")
+spoon.TheseusWorkspace:captureCurrentWorkspace("Project Atlas", { replace = true })
+spoon.TheseusWorkspace:restoreWorkspace("Project Atlas")
+spoon.TheseusWorkspace:listWorkspaces()
+spoon.TheseusWorkspace:deleteWorkspace("Project Atlas")
+```
+
+`excludedBundleIDs` can omit an application from capture and restore matching:
+
+```lua
+spoon.TheseusWorkspace.excludedBundleIDs = {
+  ["com.example.Utility"] = true,
+}
+```
 
 ## Directional window focus
 
@@ -196,8 +273,16 @@ TheseusWindow runs locally and makes no network requests. It contains no
 telemetry, credentials, account identifiers, or persistent logging of window
 titles and frames.
 
-Hammerspoon's Accessibility permission is powerful: it allows this Spoon to
-inspect and manipulate windows and to synthesize mouse and keyboard events.
+TheseusWorkspace also runs locally and makes no network requests. It persists
+the user-supplied workspace name, capture timestamp, application names and
+bundle identifiers, per-application slot ordinals, and normalized window
+geometry through `hs.settings`. It deliberately does not inspect or persist
+window titles, paths, URLs, terminal working directories, or document content.
+Recipes are local runtime data and are not stored in this public repository.
+
+Hammerspoon's Accessibility permission is powerful: it allows these Spoons to
+inspect and manipulate windows and allows TheseusWindow to synthesize mouse and
+keyboard events.
 The native Space transport briefly moves the pointer to the focused window's
 title bar, holds that window, emits `Control + Left/Right`, releases the window,
 and restores the pointer. Review the source before granting Accessibility
@@ -248,13 +333,15 @@ The script compiles all Lua files and runs pure tests for ordered user-Space
 filtering, left/right selection, non-wrapping boundaries, ordinal lookup,
 forward/reverse stateful-cycle initialization, position-preserving horizontal
 centering, stateless canonical size/position selection, outward tie-breaking,
-and axis-aligned directional focus. In particular, the first press of a
-stateful reverse cycle starts at its final position, canonical forward/reverse
-cycles wrap correctly without hidden state, diagonal focus candidates are
-rejected, and horizontal centering changes only `x`. The validator deliberately
-does not invoke Hammerspoon's `hs` command-line client: on affected macOS
-versions that client can block before Lua evaluation while connecting to system
-services. No live window or Space is manipulated by these tests.
+axis-aligned directional focus, workspace-schema validation, normalized-frame
+round trips and clamping, deterministic workspace slot assignment, missing
+windows, and untouched extras. In particular, the first press of a stateful
+reverse cycle starts at its final position, canonical forward/reverse cycles
+wrap correctly without hidden state, diagonal focus candidates are rejected,
+and horizontal centering changes only `x`. The validator deliberately does not
+invoke Hammerspoon's `hs` command-line client: on affected macOS versions that
+client can block before Lua evaluation while connecting to system services. No
+live window, Space, or Hammerspoon settings store is manipulated by these tests.
 
 Validation levels are intentionally distinct:
 
@@ -300,6 +387,18 @@ Validation levels are intentionally distinct:
       width limits, horizontal containment, and unchanged height/y-position.
 - [ ] Traverse Spaces with native `Control + Left/Right`; confirm the menu-bar
       ordinal updates and that it creates no switching hotkeys.
+- [ ] In an ordinary project Space, press `Hyper + Shift + R`, capture a named
+      workspace, and confirm the alert reports the expected eligible count.
+- [ ] Move and resize those windows, press `Hyper + R`, choose the recipe, and
+      confirm all matching windows return to their captured relative frames.
+- [ ] Capture the same name again and confirm replacement requires an explicit
+      confirmation rather than silently overwriting the recipe.
+- [ ] Close one captured application window, restore the recipe, and confirm the
+      result reports one missing slot without moving an unrelated replacement.
+- [ ] Add an unrelated extra window, restore the recipe, and confirm it remains
+      untouched and is counted as extra.
+- [ ] Confirm capture in a full-screen/tiled Space fails cleanly and capture does
+      not include sticky, minimized, hidden, transient, or other-Space windows.
 - [ ] Reload Hammerspoon and inspect its Console for errors.
 
 ## Space-movement research and attribution
@@ -319,4 +418,4 @@ to be redistributed; the project is credited as the research source.
 
 ## License
 
-TheseusWindow is available under the [MIT License](LICENSE).
+Both Spoons are available under the [MIT License](LICENSE).
