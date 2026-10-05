@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
 -- TheseusWorkspace Spoon
--- Capture and reconcile cross-application window layouts in the current
+-- Capture, restore, and establish cross-application window layouts in the current
 -- ordinary user Space. This Spoon is independent of TheseusWindow.
 ----------------------------------------------------------------------
 
@@ -8,7 +8,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWorkspace"
-obj.version = "0.1.3"
+obj.version = "0.2.0"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -21,6 +21,8 @@ local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local workspaceLogic = dofile(sourcePath .. "workspace_logic.lua")
 local frameRestore = dofile(sourcePath .. "frame_restore.lua")
 local captureDialog = dofile(sourcePath .. "capture_dialog.lua")
+local windowFactory = dofile(sourcePath .. "window_factory.lua")
+local workspaceEstablish = dofile(sourcePath .. "workspace_establish.lua")
 
 local function copyFrame(frame)
   return { x = frame.x, y = frame.y, w = frame.w, h = frame.h }
@@ -46,7 +48,19 @@ local function reasonText(reason)
     ["workspace-exists"] = "a workspace with that name already exists",
     ["workspace-not-found"] = "workspace was not found",
     ["no-windows"] = "no eligible windows are present in this Space",
-    ["active-space-changed"] = "the active Space changed during capture; cancel and try again",
+    ["active-space-changed"] = "the active Space changed; try again in the intended Space",
+    ["unsupported-application"] = "missing-window creation is not supported for this app",
+    ["excluded-application"] = "this app is excluded from workspace management",
+    ["application-not-installed"] = "the app is not installed",
+    ["ghostty-requires-applescript-1.3"] = "Ghostty 1.3 or later with AppleScript support is required",
+    ["automation-not-authorized"] = "macOS automation access has not been granted",
+    ["window-command-timed-out"] = "the window command timed out; check any automation permission prompt before retrying",
+    ["new-window-not-in-destination-space"] = "no new eligible window appeared in this Space",
+    ["ambiguous-new-windows"] = "more than one new window appeared; left them untouched",
+    ["application-did-not-launch"] = "the app did not become ready before the launch timeout",
+    ["new-window-command-unavailable"] = "this app's new-window scripting command is unavailable",
+    ["window-command-failed"] = "the native app window command failed",
+    ["windows-disappeared-during-establish"] = "windows closed during Establish; no extra replacements were requested",
   }
   return reasons[reason] or tostring(reason)
 end
@@ -190,6 +204,43 @@ local function loadCatalog(controller)
     return nil, "workspace settings are invalid: " .. tostring(catalogErr)
   end
   return catalog
+end
+
+-- Establish enumerates only the apps named in the recipe, not the whole
+-- desktop. Retain all observed IDs so an old hidden/minimized window cannot
+-- be mistaken for a newly created one when it becomes visible.
+local function collectRecipeWindows(controller, recipe, context)
+  local records, seenIDs, bundles = {}, {}, {}
+  for _, slot in ipairs(recipe.windows) do bundles[slot.bundleID] = true end
+  local ordered = {}
+  for bundleID in pairs(bundles) do table.insert(ordered, bundleID) end
+  table.sort(ordered)
+  for _, bundleID in ipairs(ordered) do
+    if not controller.excludedBundleIDs[bundleID] then
+      local ok, windows = pcall(function()
+        local app = hs.application.get(bundleID)
+        return app and app:allWindows() or {}
+      end)
+      if not ok or type(windows) ~= "table" then
+        return nil, "could-not-enumerate-workspace-windows"
+      end
+      for _, window in ipairs(windows) do
+        local idOK, id = pcall(function() return window:id() end)
+        if not idOK or not id then return nil, "could-not-read-window-id" end
+        if not seenIDs[id] then
+          seenIDs[id] = true
+          local record = describeWindow(controller, window, context)
+          if record and record.bundleID == bundleID then
+            local frame, err = workspaceLogic.normalizeFrame(record.frame, context.screenFrame)
+            if not frame then return nil, err end
+            record.frame = frame
+            table.insert(records, record)
+          end
+        end
+      end
+    end
+  end
+  return records, nil, seenIDs
 end
 
 local function saveCatalog(controller, catalog)
@@ -344,6 +395,10 @@ end
 
 function obj:restoreWorkspace(name, options)
   options = options or {}
+  if self._establishOperation then
+    if not options.silent then showAlert("WORKSPACE: Establish is already in progress") end
+    return nil, "establish-in-progress"
+  end
   if self._restoreOperation then
     if not options.silent then showAlert("WORKSPACE: a restore is already in progress") end
     return nil, "restore-in-progress"
@@ -500,6 +555,98 @@ function obj:restoreWorkspace(name, options)
   return report
 end
 
+function obj:establishWorkspace(name, options)
+  options = options or {}
+  local busy = self._establishOperation and "establish-in-progress"
+    or (self._restoreOperation and "restore-in-progress")
+  if busy then
+    if not options.silent then showAlert("WORKSPACE: an operation is already in progress") end
+    return nil, busy
+  end
+  local normalizedName, err = workspaceLogic.normalizeName(name)
+  local catalog
+  if normalizedName then catalog, err = loadCatalog(self) end
+  local recipe = catalog and catalog.recipes[normalizedName]
+  if catalog and not recipe then err = "workspace-not-found" end
+  if not recipe then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(err)) end
+    return nil, err
+  end
+  local context, contextErr = currentUserSpaceContext()
+  if not context then
+    if not options.silent then showAlert("WORKSPACE: " .. reasonText(contextErr)) end
+    return nil, contextErr
+  end
+
+  local session = {}
+  self._establishOperation = session
+  local function guard()
+    if session.cancelled then return false, "establish-cancelled" end
+    local ok, active = pcall(hs.spaces.activeSpaceOnScreen, context.screen)
+    return ok and active == context.spaceID, "active-space-changed"
+  end
+  if not options.silent then showAlert("ESTABLISHING " .. normalizedName, context.screen) end
+  session.job = workspaceEstablish.start(recipe, {
+    guard = guard,
+    scheduleAfter = hs.timer.doAfter,
+    collect = function() return collectRecipeWindows(self, recipe, context) end,
+    isRunning = function(bundleID) return hs.application.get(bundleID) ~= nil end,
+    support = function(bundleID)
+      if self.excludedBundleIDs[bundleID] then return false, "excluded-application" end
+      return windowFactory.support(bundleID)
+    end,
+    launch = function(bundleID, complete)
+      return windowFactory.launch(bundleID, { guard = guard }, complete)
+    end,
+    create = function(bundleID, complete)
+      return windowFactory.create(bundleID, { guard = guard }, complete)
+    end,
+    place = function(assignment, complete)
+      local target = assert(workspaceLogic.absoluteFrame(assignment.target.frame, context.screenFrame))
+      local window = assignment.candidate.window
+      return frameRestore.place(window, target, {
+        animationDuration = tonumber(self.animationDuration),
+        scheduleAfter = hs.timer.doAfter,
+        guard = function()
+          local allowed, reason = guard()
+          if not allowed then return false, reason end
+          local record, recordErr = describeWindow(self, window, context)
+          if not record or record.id ~= assignment.candidate.id then
+            return false, recordErr or "window-no-longer-available"
+          end
+          return true
+        end,
+      }, complete)
+    end,
+  }, function(report)
+    if self._establishOperation == session then self._establishOperation = nil end
+    self.lastEstablishReport = report
+    if not options.silent and not report.cancelled then
+      local message = string.format(
+        "ESTABLISHED %s · %d placed · %d new · %d missing · %d failed",
+        normalizedName, report.applied, report.created, #report.missing, #report.failures
+      )
+      if report.reason then message = "ESTABLISH stopped · " .. reasonText(report.reason) end
+      for _, failure in ipairs(report.creationFailures) do
+        message = message .. "\n" .. failure.appName .. ": " .. reasonText(failure.reason)
+      end
+      local failedNames, seen = {}, {}
+      for _, failure in ipairs(report.failures) do
+        local appName = failure.target.appName
+        if not seen[appName] then table.insert(failedNames, appName); seen[appName] = true end
+      end
+      table.sort(failedNames)
+      if #failedNames > 0 then message = message .. "\nFailed placement: " .. table.concat(failedNames, ", ") end
+      showAlert(message, context.screen, 5)
+    end
+    if type(options.onComplete) == "function" then
+      local ok, callbackErr = pcall(options.onComplete, report)
+      if not ok then report.callbackError = tostring(callbackErr) end
+    end
+  end)
+  return session.job.report
+end
+
 function obj:listWorkspaces()
   local catalog, catalogErr = loadCatalog(self)
   if not catalog then return nil, catalogErr end
@@ -619,8 +766,11 @@ local function closeRestoreChooser(controller)
   controller._restoreChooser = nil
   if not session then return end
   local deleteHotkey = session.deleteHotkey
+  local establishHotkey = session.establishHotkey
   session.deleteHotkey = nil
+  session.establishHotkey = nil
   if deleteHotkey then deleteHotkey:delete() end
+  if establishHotkey then establishHotkey:delete() end
   if session.chooser then
     session.chooser:cancel()
     session.chooser:delete()
@@ -650,6 +800,14 @@ function obj:showRestoreChooser()
   end)
   session.chooser = chooser
   self._restoreChooser = chooser
+
+  local function establishSelected(choice)
+    if self._restoreChooserSession ~= session or session.confirming
+      or not chooser:isVisible() or not choice or not choice.workspaceName then return end
+    local name = choice.workspaceName
+    closeRestoreChooser(self)
+    self:establishWorkspace(name)
+  end
 
   local function confirmDelete(choice)
     if self._restoreChooserSession ~= session or session.confirming
@@ -685,20 +843,27 @@ function obj:showRestoreChooser()
     if response ~= "Delete" then chooser:selectedRow(selectedRow) end
   end
 
+  session.establishHotkey = hs.hotkey.new({ "cmd" }, "return", function()
+    establishSelected(chooser:selectedRowContents())
+  end)
   session.deleteHotkey = hs.hotkey.new({ "cmd" }, "delete", function()
     if self._restoreChooserSession ~= session or not chooser:isVisible() then return end
     confirmDelete(chooser:selectedRowContents())
   end)
   chooser
-    :placeholderText("Restore in this Space · ⌘Delete or right-click to delete")
+    :placeholderText("Restore · ⌘Return: Establish here · ⌘Delete: Delete · right-click actions")
     :searchSubText(true)
     :showCallback(function()
       if self._restoreChooserSession == session and session.deleteHotkey then
         session.deleteHotkey:enable()
       end
+      if self._restoreChooserSession == session and session.establishHotkey then
+        session.establishHotkey:enable()
+      end
     end)
     :hideCallback(function()
       if session.deleteHotkey then session.deleteHotkey:disable() end
+      if session.establishHotkey then session.establishHotkey:disable() end
     end)
     :rightClickCallback(function(row)
       if row == 0 or self._restoreChooserSession ~= session then return end
@@ -706,15 +871,16 @@ function obj:showRestoreChooser()
       if not choice.workspaceName then return end
       local menu = hs.menubar.new(false)
       if not menu then return end
-      local requested = false
-      menu:setMenu({ {
-        title = "Delete saved layout…",
-        fn = function() requested = true end,
-      } })
+      local requested
+      menu:setMenu({
+        { title = "Establish here (create missing windows)", fn = function() requested = "establish" end },
+        { title = "Delete saved layout…", fn = function() requested = "delete" end },
+      })
       menu:popupMenu(hs.mouse.absolutePosition())
       menu:delete()
       -- Open the confirmation only after the context menu has closed.
-      if requested then confirmDelete(choice) end
+      if requested == "delete" then confirmDelete(choice)
+      elseif requested == "establish" then establishSelected(choice) end
     end)
     :choices(choices)
     :show()
@@ -753,6 +919,11 @@ end
 
 function obj:stop()
   if self._captureDialog then self._captureDialog:close() end
+  if self._establishOperation then
+    local session = self._establishOperation
+    session.cancelled = true
+    if session.job then session.job:cancel() end
+  end
   if self._restoreOperation then
     local operation = self._restoreOperation
     operation.report.cancelled = true

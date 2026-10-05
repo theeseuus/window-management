@@ -180,7 +180,7 @@ local workspace = dofile(
 )
 
 equal(workspace.name, "TheseusWorkspace", "workspace Spoon name")
-equal(workspace.version, "0.1.3", "workspace Spoon version")
+equal(workspace.version, "0.2.0", "workspace Spoon version")
 equal(workspace.author, "Theeseuus", "workspace Spoon author")
 
 local recipe, captureReport = workspace:captureCurrentWorkspace(
@@ -317,6 +317,109 @@ local missingRestore, missingRestoreErr = workspace:restoreWorkspace(
 equal(missingRestore, nil, "deleted workspace cannot restore")
 equal(missingRestoreErr, "workspace-not-found", "deleted workspace restore error")
 equal(#alerts, 2, "only non-silent restores produce alerts")
+
+-- Establish uses scoped app discovery, never the global enumeration used by
+-- capture/Restore. Its commands are mocked; no desktop apps are launched.
+local createCalls, settingsWrites = 0, 0
+local applications = { [safari:bundleID()] = safari, [ghostty:bundleID()] = ghostty, [finder:bundleID()] = finder }
+for _, app in pairs(applications) do
+  function app:allWindows()
+    local result = {}
+    for _, window in pairs(windows) do
+      if window:application() == self then table.insert(result, window) end
+    end
+    return result
+  end
+end
+hs.application = {
+  get = function(bundleID) return applications[bundleID] end,
+  infoForBundleID = function() return { CFBundleShortVersionString = "1.3.1", OSAScriptingDefinition = "Ghostty.sdef" } end,
+}
+hs.task = { new = function(executable, callback, arguments)
+  equal(executable, "/usr/bin/osascript", "running app needs no launch")
+  equal(arguments[2]:find('application id "com.mitchellh.ghostty"', 1, true) ~= nil, true, "target exact supported app")
+  local task = {}
+  function task:isRunning() return self.running end
+  function task:terminate() self.running = false; self.terminated = true end
+  function task:start()
+    self.running = true
+    hs.timer.doAfter(0.01, function()
+      if self.terminated then return end
+      createCalls = createCalls + 1
+      windows[71] = makeWindow(71, ghostty, { x = 100, y = 50, w = 400, h = 500 })
+      self.running = false
+      callback(0, "created\n", "")
+    end)
+    return self
+  end
+  return task
+end }
+hs.window.allWindows = function() error("Establish must not enumerate the whole desktop") end
+hs.settings.set = function() settingsWrites = settingsWrites + 1 end
+settings.TheseusWorkspaceRecipesV1 = { schemaVersion = 1, recipes = { Pilot = {
+  schemaVersion = 1, name = "Pilot", capturedAt = "2026-10-06T00:00:00Z", windows = {
+    { bundleID = "com.apple.Safari", appName = "Safari", ordinal = 1, frame = { x = 0, y = 0, w = 0.5, h = 1 } },
+    { bundleID = "com.mitchellh.ghostty", appName = "Ghostty", ordinal = 1, frame = { x = 0.5, y = 0, w = 0.5, h = 1 } },
+  },
+} } }
+windows[21].memberships = { 902 }
+local otherProjectSetCount = windows[21].setCount
+completedCount = 0
+local establishReport = workspace:establishWorkspace("Pilot", { silent = true, onComplete = function()
+  completedCount = completedCount + 1
+end })
+equal(establishReport.finished, false, "Establish waits for creation and geometry")
+local overlap, overlapErr = workspace:restoreWorkspace("Pilot", { silent = true })
+equal(overlap, nil, "Restore cannot overlap Establish")
+equal(overlapErr, "establish-in-progress", "Restore overlap reason")
+overlap, overlapErr = workspace:establishWorkspace("Pilot", { silent = true })
+equal(overlap, nil, "Establish cannot overlap itself")
+equal(overlapErr, "establish-in-progress", "Establish overlap reason")
+drainTimers()
+equal(establishReport.applied, 2, "Establish verifies both frames")
+equal(establishReport.created, 1, "Establish creates exactly the missing Ghostty")
+equal(establishReport.reused, 1, "Establish reuses local Safari")
+equal(createCalls, 1, "one genuine new-window request")
+equal(#establishReport.missing, 0, "no missing slots after creation")
+equal(#establishReport.failures, 0, "no frame failures")
+equal(completedCount, 1, "API completion runs once")
+equal(workspace.lastEstablishReport, establishReport, "retain final in-memory report")
+equal(workspace._establishOperation, nil, "release operation lock")
+equal(windows[21].setCount, otherProjectSetCount, "other project Ghostty untouched")
+near(windows[71].currentFrame.x, 900, "new Ghostty placed at saved x")
+near(windows[71].currentFrame.h, 1000, "new Ghostty placed at saved height")
+local repeated = workspace:establishWorkspace("Pilot", { silent = true })
+drainTimers()
+equal(createCalls, 1, "second Establish creates no duplicate")
+equal(repeated.created, 0, "second Establish has no new windows")
+equal(repeated.reused, 2, "second Establish reuses both")
+equal(settingsWrites, 0, "Establish never mutates personal recipes")
+
+windows[71] = nil
+local stopped = workspace:establishWorkspace("Pilot", { silent = true })
+workspace:stop()
+drainTimers()
+equal(stopped.cancelled, true, "Spoon stop cancels Establish")
+equal(stopped.finished, true, "Spoon stop finishes report")
+equal(createCalls, 1, "Spoon stop cancels pending creation command")
+equal(workspace._establishOperation, nil, "Spoon stop releases Establish lock")
+workspace.excludedBundleIDs[ghostty:bundleID()] = true
+local excluded = workspace:establishWorkspace("Pilot", { silent = true })
+drainTimers()
+equal(createCalls, 1, "excluded app receives no new-window command")
+equal(excluded.creationFailures[1].reason, "excluded-application", "honor exclusions during creation")
+workspace.excludedBundleIDs[ghostty:bundleID()] = nil
+local absent, absentErr = workspace:establishWorkspace("Absent", { silent = true })
+equal(absent, nil, "missing recipe creates no operation")
+equal(absentErr, "workspace-not-found", "missing recipe error")
+settings.TheseusWorkspaceRecipesV1.schemaVersion = 999
+equal(workspace:establishWorkspace("Pilot", { silent = true }), nil, "invalid settings refuse creation")
+equal(settingsWrites, 0, "all Establish paths leave settings unchanged")
+workspace._restoreOperation = {}
+overlap, overlapErr = workspace:establishWorkspace("Pilot", { silent = true })
+equal(overlap, nil, "Establish cannot overlap Restore")
+equal(overlapErr, "restore-in-progress", "reverse overlap reason")
+workspace._restoreOperation = nil
 
 hs = previousHs
 

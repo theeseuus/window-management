@@ -14,6 +14,8 @@ local luaFiles = {
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/workspace_logic.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/frame_restore.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/capture_dialog.lua",
+  repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/window_factory.lua",
+  repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/workspace_establish.lua",
   repositoryRoot .. "/tests/canonical_layout_spec.lua",
   repositoryRoot .. "/tests/cycle_logic_spec.lua",
   repositoryRoot .. "/tests/geometry_logic_spec.lua",
@@ -23,7 +25,9 @@ local luaFiles = {
   repositoryRoot .. "/tests/workspace_runtime_spec.lua",
   repositoryRoot .. "/tests/workspace_capture_spec.lua",
   repositoryRoot .. "/tests/workspace_chooser_spec.lua",
-  repositoryRoot .. "/tests/frame_restore_spec.lua"
+  repositoryRoot .. "/tests/frame_restore_spec.lua",
+  repositoryRoot .. "/tests/window_factory_spec.lua",
+  repositoryRoot .. "/tests/workspace_establish_spec.lua"
 }
 
 for _, path in ipairs(luaFiles) do
@@ -44,4 +48,6 @@ dofile(repositoryRoot .. "/tests/workspace_runtime_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_capture_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_chooser_spec.lua")
 dofile(repositoryRoot .. "/tests/frame_restore_spec.lua")
+dofile(repositoryRoot .. "/tests/window_factory_spec.lua")
+dofile(repositoryRoot .. "/tests/workspace_establish_spec.lua")
 print("validation: passed")

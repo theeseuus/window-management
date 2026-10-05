@@ -4,15 +4,16 @@ This repository contains two independent Hammerspoon Spoons:
 
 - **TheseusWindow** provides deterministic macOS window placement, window
   switching, and native Space movement.
-- **TheseusWorkspace** captures and restores named, cross-application window
-  layouts in the current native user Space.
+- **TheseusWorkspace** captures, restores, and establishes named,
+  cross-application window layouts in the current native user Space.
 
 Either Spoon can be installed and loaded without the other. The reference
 configuration keeps broader responsibilities separate:
 
 - Karabiner defines key semantics. Holding Tab emits Hyper
   (`Control + Option + Command`).
-- Raycast launches applications.
+- Raycast owns the general application-launch shortcuts. TheseusWorkspace can
+  launch supported apps only when filling missing saved-layout slots.
 - Hammerspoon and these Spoons manipulate windows.
 - Native macOS `Control + Left/Right` moves only the user between Spaces.
 
@@ -29,6 +30,9 @@ Spoon.
 - At least two ordinary user Spaces for TheseusWindow move-and-follow commands.
 - An ordinary user Space for TheseusWorkspace capture and restore. Full-screen
   and tiled Spaces are deliberately rejected.
+- For **Establish here**, macOS Automation permission for each supported app
+  being controlled. Ghostty creation requires version 1.3 or later with its
+  AppleScript support enabled. Finder and Safari use their native scripting APIs.
 - A Hyper-key mapping if using the reference bindings. The supplied setup uses
   Karabiner-Elements to make held Tab emit
   `Control + Option + Command`; Karabiner configuration is not included.
@@ -77,15 +81,16 @@ geometry restoration, width adjustments, and spatial arrow controls.
 ## TheseusWorkspace
 
 TheseusWorkspace treats the eligible windows in the current native user Space
-as one cross-application project group. Its initial capture-and-reconcile slice
-supports:
+as one cross-application layout. It supports:
 
 - `Hyper + Shift + R`: open the capture dialog immediately, freeze the current
   workspace, then name and save that snapshot. Naming and Save stay disabled
   while capture is in progress. An existing name requires explicit replacement
   confirmation.
 - `Hyper + R`: choose a saved workspace and restore its matching existing
-  windows in the current Space, or delete a saved layout with confirmation.
+  windows in the current Space with Return. Use `Command + Return` to
+  **Establish here**, or delete a saved layout with confirmation. Both actions
+  are also available by right-clicking a layout.
 - Named recipe listing and direct deletion through the public Spoon API.
 - Normalized geometry, so a recipe is restored relative to the current screen's
   usable frame rather than an old absolute pixel rectangle.
@@ -109,7 +114,7 @@ snapshot, never another read of the live windows. Cancel, Escape, or closing the
 dialog discards the unsaved snapshot. Repeating the capture shortcut brings the
 existing dialog forward rather than starting another capture.
 
-Window discovery uses one application-window enumeration per operation instead
+Capture and Restore use one application-window enumeration per operation instead
 of a full scan for every window ID. Capture still reads macOS Accessibility
 information sequentially; it is not an atomic screenshot of the entire desktop
 at the instant the key is pressed. If the selected Space changes during
@@ -122,11 +127,45 @@ several windows, existing windows are paired with its saved slots by proximity
 to the normalized saved geometry. This preserves sensible placement without
 claiming that Hammerspoon can recover the original document or tab identity.
 
-The first slice reconciles only windows that already exist in the destination
-Space. It does **not yet** launch applications, create missing blank windows,
-move a group between Spaces, create or remove Spaces, or continuously enforce a
-layout. Those capabilities require app adapters and a separately verified group
-transport state machine.
+**Restore** still reconciles only windows that already exist in the destination
+Space. It never launches apps or creates windows.
+
+**Establish here** reuses eligible windows already in the current Space, launches
+supported apps if needed, and creates only the missing slots. Initial creation
+support is deliberately limited to:
+
+| App | New-window operation |
+| --- | --- |
+| Ghostty | Native `new window` with a default surface configuration |
+| Finder | Native `make new Finder window`, without a captured folder path |
+| Safari | Native new document at `about:blank`, not a tab or a captured URL |
+
+Windows belonging to other Spaces, other screens, or excluded apps are never
+borrowed. Unsupported apps can still have their existing local windows placed;
+their missing slots are reported without a generic `Command + N` fallback.
+Discovery is scoped to the apps named in the recipe. Its extra-window count
+therefore covers those apps, not unrelated apps elsewhere on the desktop.
+
+Establish waits for launch-created windows before asking for more. Each explicit
+creation must produce one new eligible window exclusively in the destination
+Space, then all matching frames must settle before they count as placed. A
+successful script alone is not proof of creation or placement. Repeat Establish
+after a successful run to reapply geometry without creating duplicate windows.
+Keep the destination Space selected and avoid opening or closing target-app
+windows until the completion notice. Ambiguous creations are left untouched.
+
+macOS may ask to let Hammerspoon control each app on first use. Approve only the
+access you want. A command can time out while the prompt awaits your decision;
+settle the permission and inspect any new windows before explicitly trying again.
+Denied, unavailable, wrong-Space, and timed-out creation is reported, never
+automatically retried. Switching Spaces or stopping the Spoon cancels further
+work, but does not close windows already created. Native app launch/session
+preferences may themselves reopen windows; this Spoon does not change those
+preferences or recover contents.
+
+TheseusWorkspace does **not yet** track live group membership, move a group
+between Spaces, create or remove Spaces, continuously enforce a layout, or
+restore browser tabs, Finder folders, terminal commands, or chats.
 
 Recipes are stored under the Hammerspoon settings key
 `TheseusWorkspaceRecipesV1`, outside this Git repository. To remove an old
@@ -136,7 +175,8 @@ the exact layout and defaults to Cancel. Only explicit Delete removes the saved
 recipe; no windows, applications, or Spaces are moved, closed, or deleted. The
 chooser refreshes afterward, retaining its search; deleting the final layout
 closes it. There is no undo. `Command + Delete` is active only while this chooser
-is visible, not as a new global shortcut.
+is visible, not as a new global shortcut. The same scope and cleanup apply to
+`Command + Return` for Establish.
 
 The public API can also be used directly from the Hammerspoon Console:
 
@@ -144,12 +184,21 @@ The public API can also be used directly from the Hammerspoon Console:
 spoon.TheseusWorkspace:captureCurrentWorkspace("Project Atlas")
 spoon.TheseusWorkspace:captureCurrentWorkspace("Project Atlas", { replace = true })
 spoon.TheseusWorkspace:restoreWorkspace("Project Atlas")
+spoon.TheseusWorkspace:establishWorkspace("Project Atlas")
 spoon.TheseusWorkspace:listWorkspaces()
 spoon.TheseusWorkspace:deleteWorkspace("Project Atlas")
 ```
 
 The direct `deleteWorkspace` API deletes immediately, without the chooser's
 confirmation; callers are responsible for confirming their target.
+
+`establishWorkspace` is asynchronous and accepts `silent` and `onComplete`
+options, like Restore. Its final report is held in `lastEstablishReport` and
+includes verified `applied`, `created`, and `reused` counts, `missing`, `extras`,
+placement `failures`, and categorical `creationFailures`. `pending`, `phase`,
+and `finished` describe progress; `reason`/`cancelled` describe an interrupted
+operation. These reports are memory-only. Restore and Establish reject
+overlapping operations and never rewrite the saved recipe.
 
 The direct `captureCurrentWorkspace` API captures and saves synchronously when
 called; the shortcut uses the non-blocking capture/name/save dialog. Both store
@@ -334,6 +383,11 @@ bundle identifiers, per-application slot ordinals, and normalized window
 geometry through `hs.settings`. It deliberately does not inspect or persist
 window titles, paths, URLs, terminal working directories, or document content.
 Recipes are local runtime data and are not stored in this public repository.
+Establish uses fixed, allowlisted native app scripts; recipe names, application
+names, and captured content are never interpolated into executable scripts.
+macOS app Automation access is broader than just window placement. Review the
+source before granting it. The adapters neither read contents nor send terminal
+input, and do not change app launch/session preferences.
 
 Hammerspoon's Accessibility permission is powerful: it allows these Spoons to
 inspect and manipulate windows and allows TheseusWindow to synthesize mouse and
@@ -417,6 +471,13 @@ save failures, deleting the final recipe, and local-hotkey cleanup on selection,
 Escape, replacement, and Spoon stop. They use an in-memory catalog and reject
 any attempt by the deletion path to inspect windows or Spaces.
 
+Establish tests cover existing-window reuse, exact missing-window counts,
+repeat-use idempotency, default windows created during launch, unsupported and
+excluded apps, denied automation, wrong-Space and ambiguous creations, bounded
+waits, safe categorical errors, cancellation, and verified placement. They
+also verify scoped app discovery, untouched other-Space windows, mutual
+exclusion with Restore, no settings writes, and chooser-local Establish cleanup.
+
 The separated resize/move fallback was informed by Hammerspoon's
 [frame-setting timing discussion](https://github.com/Hammerspoon/hammerspoon/issues/3731).
 It uses non-blocking timers and verifies the outcome; no code from that
@@ -493,6 +554,17 @@ Validation levels are intentionally distinct:
       `Command + Delete` must retain its normal application behavior.
 - [ ] Close one captured application window, restore the recipe, and confirm the
       result reports one missing slot without moving an unrelated replacement.
+- [ ] In an empty ordinary Space, use `Hyper + R`, highlight a layout, and press
+      `Command + Return`, or right-click and choose **Establish here (create
+      missing windows)**. Settle any requested app Automation permission, then
+      retry explicitly if the first command timed out. Verify only supported
+      missing slots get new windows, no other project windows are moved, and
+      `lastEstablishReport` confirms settled frames and destination membership.
+- [ ] Establish the same layout again; confirm no new windows are created.
+      Leave an extra window and include an unsupported app to check extra/missing
+      reporting. Switch Spaces during an operation and confirm further work
+      stops without closing already-created windows. Outside the chooser,
+      `Command + Return` must retain its normal application behavior.
 - [ ] Add an unrelated extra window, restore the recipe, and confirm it remains
       untouched and is counted as extra.
 - [ ] Confirm capture in a full-screen/tiled Space fails cleanly and capture does

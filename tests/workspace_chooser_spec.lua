@@ -19,7 +19,8 @@ local function clone(value)
 end
 
 local catalog, settingsWrites, failSave
-local choosers, hotkeys, menus, alerts, prompts, restores = {}, {}, {}, {}, {}, {}
+local choosers, hotkeys, menus, alerts, prompts, restores, establishes = {}, {}, {}, {}, {}, {}, {}
+local menuAction, duringMenu = 2, nil
 local response, duringPrompt, chooseMenu = "Cancel", nil, true
 local completeOnHide, failHotkey, failMenu = false, false, false
 local menuOpen = false
@@ -125,7 +126,8 @@ hs = {
       function menu:popupMenu(point)
         self.point = point
         menuOpen = true
-        if chooseMenu then self.items[1].fn() end
+        if chooseMenu then self.items[menuAction].fn() end
+        if duringMenu then duringMenu() end
         menuOpen = false
         return self
       end
@@ -150,11 +152,16 @@ hs = {
 
 local workspace = dofile(spoonPath .. "init.lua")
 workspace.restoreWorkspace = function(_, name) table.insert(restores, name) end
+workspace.establishWorkspace = function(_, name)
+  equal(menuOpen, false, "close context menu before Establish")
+  table.insert(establishes, name)
+end
 
 local function open(names)
   workspace:stop()
   resetCatalog(names)
   response, duringPrompt, chooseMenu, completeOnHide = "Cancel", nil, true, false
+  menuAction, duringMenu = 2, nil
   workspace:showRestoreChooser()
   return choosers[#choosers], hotkeys[#hotkeys]
 end
@@ -218,7 +225,7 @@ equal(menus[#menus].deleted, true, "release dismissed context menu")
 chooseMenu, response = true, "Delete"
 chooser:query("Zeta")
 chooser.onRightClick(1)
-equal(menus[#menus].items[1].title, "Delete saved layout…", "label context action")
+equal(menus[#menus].items[2].title, "Delete saved layout…", "label context action")
 equal(menus[#menus].deleted, true, "release selected context menu")
 equal(catalog.recipes.Zeta, nil, "right-click uses filtered visible row")
 equal(catalog.recipes.Alpha ~= nil, true, "right-click preserves other layouts")
@@ -312,6 +319,47 @@ workspace:showRestoreChooser()
 equal(#choosers, chooserCount, "invalid catalog creates no chooser")
 equal(alerts[#alerts]:find("workspace settings are invalid", 1, true) ~= nil, true, "report invalid catalog")
 equal(#restores, 1, "only explicit normal selection invoked restore")
+
+chooser, hotkey = open()
+local establishHotkey = hotkeys[#hotkeys - 1]
+equal(establishHotkey.modifiers[1], "cmd", "chooser-local Establish modifier")
+equal(establishHotkey.key, "return", "chooser-local Establish key")
+equal(establishHotkey.enabled, true, "Establish key enabled only in chooser")
+equal(chooser.placeholder:find("Establish here", 1, true) ~= nil, true, "discover Establish action")
+chooser:query("Zeta")
+completeOnHide = true
+establishHotkey.callback()
+equal(establishes[1], "Zeta", "Establish uses filtered highlighted layout")
+equal(settingsWrites, 0, "Establish does not delete or update recipes")
+equal(#restores, 1, "Establish never also runs normal Restore")
+equal(hotkey.deleted, true, "Establish releases deletion hotkey")
+equal(establishHotkey.deleted, true, "Establish releases its own hotkey")
+equal(chooser.deleted, true, "Establish releases chooser before creating windows")
+establishHotkey.callback()
+equal(#establishes, 1, "stale local Establish callback is inert")
+
+chooser, hotkey = open()
+establishHotkey = hotkeys[#hotkeys - 1]
+menuAction = 1
+chooser:query("Zeta")
+chooser.onRightClick(1)
+equal(establishes[2], "Zeta", "context Establish uses filtered visible row")
+equal(menus[#menus].items[1].title, "Establish here (create missing windows)", "context action describes creation")
+equal(menus[#menus].deleted, true, "release Establish context menu")
+equal(establishHotkey.deleted, true, "context Establish removes local hotkeys")
+
+chooser, hotkey = open()
+establishHotkey = hotkeys[#hotkeys - 1]
+chooser:hide()
+equal(establishHotkey.enabled, false, "hide disables Establish binding")
+establishHotkey.callback()
+equal(#establishes, 2, "hidden chooser cannot establish a layout")
+chooser:show()
+menuAction = 1
+duringMenu = function() workspace:stop() end
+chooser.onRightClick(1)
+equal(#establishes, 2, "stop during menu invalidates Establish action")
+equal(establishHotkey.deleted, true, "Spoon stop cleans up local Establish binding")
 
 hs = previousHs
 print(string.format("workspace_chooser: %d assertions passed", assertions))

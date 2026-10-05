@@ -103,6 +103,7 @@ reference `Hammerspoon/init.lua` configuration.
 | --- | --- |
 | `Hyper + Shift + R` | Open capture dialog, freeze eligible windows, then name and save the snapshot |
 | `Hyper + R` | Choose a captured workspace and restore matching existing windows here |
+| `Command + Return`, only in the workspace chooser | Establish here: reuse local windows and create supported missing slots |
 | `Command + Delete`, only in the restore chooser | Confirm deletion of the highlighted saved layout |
 
 Alternatively, right-click a layout in the chooser and choose **Delete saved
@@ -110,6 +111,17 @@ layout…**. The confirmation names the exact layout and defaults to Cancel.
 Delete removes only the saved recipe, without moving or closing windows, apps,
 or Spaces. The chooser refreshes and keeps its search; deleting the final layout
 closes it. Deletion has no undo. This adds no global shortcut.
+
+To establish a saved layout in the current Space, highlight it and press
+`Command + Return`, or right-click and choose **Establish here (create missing
+windows)**. Initial new-window support is Ghostty (1.3+ with AppleScript enabled),
+Finder, and Safari. Establish launches supported apps if needed, reuses local
+windows, creates only missing slots, and verifies placement. It never borrows
+another Space's windows. Unsupported missing slots are reported. First use may
+request macOS Automation access; a timed-out command is not retried automatically.
+Repeat after a successful Establish to reapply geometry without duplicates.
+Keep this Space selected until completion. This is a chooser-local gesture,
+not another global Hyper binding; ordinary Return still performs Restore only.
 
 Restore waits for verified frame placement before showing its completion
 notice. Missing or failed applications are named; shortcuts are unchanged.
@@ -121,5 +133,6 @@ snapshot; repeating the shortcut brings the existing dialog forward.
 
 Capture requires confirmation before replacing an existing name. Restore uses
 application identity and normalized geometry, reports missing recipe slots, and
-leaves extra windows untouched. This initial implementation does not launch
-applications, create missing windows, or move the whole group between Spaces.
+leaves extra windows untouched. Restore does not launch apps or create windows;
+those actions belong only to the explicit Establish operation. Neither operation
+moves the whole group between Spaces or restores window contents.
