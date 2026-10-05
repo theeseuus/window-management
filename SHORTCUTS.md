@@ -104,6 +104,9 @@ reference `Hammerspoon/init.lua` configuration.
 | `Hyper + Shift + R` | Name and capture eligible windows in the current user Space |
 | `Hyper + R` | Choose a captured workspace and restore matching existing windows here |
 
+Restore waits for verified frame placement before showing its completion
+notice. Missing or failed applications are named; shortcuts are unchanged.
+
 Capture requires confirmation before replacing an existing name. Restore uses
 application identity and normalized geometry, reports missing recipe slots, and
 leaves extra windows untouched. This initial implementation does not launch

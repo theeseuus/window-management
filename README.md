@@ -89,6 +89,10 @@ supports:
   usable frame rather than an old absolute pixel rectangle.
 - Missing-window and extra-window reporting. Missing recipe slots are reported;
   extra windows are intentionally left untouched.
+- Verified placement: wait for each frame to settle before counting it as
+  placed, retry a quiet no-op, then try a separated resize/move if necessary.
+  A request that still does not reach its saved frame is reported as failed,
+  with the application named in the completion notice.
 
 Capture includes normal, visible, non-minimized, non-full-screen windows that
 belong exclusively to the current ordinary user Space and selected screen.
@@ -120,6 +124,27 @@ spoon.TheseusWorkspace:restoreWorkspace("Project Atlas")
 spoon.TheseusWorkspace:listWorkspaces()
 spoon.TheseusWorkspace:deleteWorkspace("Project Atlas")
 ```
+
+Restoration is asynchronous. The returned report has `finished` and `pending`
+fields; it remains unfinished while frame checks are pending. Its `applied`
+count includes only frames verified within two screen points of the target.
+Use `onComplete` when consuming the result:
+
+```lua
+spoon.TheseusWorkspace:restoreWorkspace("Project Atlas", {
+  onComplete = function(report)
+    print(report.applied, #report.missing, #report.failures)
+  end,
+})
+```
+
+The latest completed report is also available as
+`spoon.TheseusWorkspace.lastRestoreReport` until Hammerspoon reloads. Its
+`failures` entries include an application slot and a reason such as
+`frame-not-restored`. These diagnostic reports are not persisted with recipes.
+An overlapping restore is rejected, and retries stop if the window becomes
+ineligible, the active Space changes, or the Spoon stops. Placement does not
+activate applications or steal focus.
 
 `excludedBundleIDs` can omit an application from capture and restore matching:
 
@@ -343,6 +368,17 @@ invoke Hammerspoon's `hs` command-line client: on affected macOS versions that
 client can block before Lua evaluation while connecting to system services. No
 live window, Space, or Hammerspoon settings store is manipulated by these tests.
 
+Mocked-runtime tests also reject false-success reports for quietly ignored
+frame requests and exercise delayed placement, post-call frame reversion,
+bounded full-frame retries, separated resize/move fallback, cancellation,
+visibility changes, and Space changes. They do not prove that a particular
+application will accept a live macOS frame request.
+
+The separated resize/move fallback was informed by Hammerspoon's
+[frame-setting timing discussion](https://github.com/Hammerspoon/hammerspoon/issues/3731).
+It uses non-blocking timers and verifies the outcome; no code from that
+discussion was copied.
+
 Validation levels are intentionally distinct:
 
 - **Syntax:** every Lua file compiles.
@@ -390,7 +426,9 @@ Validation levels are intentionally distinct:
 - [ ] In an ordinary project Space, press `Hyper + Shift + R`, capture a named
       workspace, and confirm the alert reports the expected eligible count.
 - [ ] Move and resize those windows, press `Hyper + R`, choose the recipe, and
-      confirm all matching windows return to their captured relative frames.
+      confirm all matching windows return to their captured relative frames,
+      including background Ghostty windows. Wait for the verified completion
+      notice; if any app is named as failed, inspect `lastRestoreReport`.
 - [ ] Capture the same name again and confirm replacement requires an explicit
       confirmation rather than silently overwriting the recipe.
 - [ ] Close one captured application window, restore the recipe, and confirm the

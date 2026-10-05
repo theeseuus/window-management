@@ -8,7 +8,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWorkspace"
-obj.version = "0.1"
+obj.version = "0.1.1"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -19,6 +19,7 @@ obj.excludedBundleIDs = {}
 
 local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local workspaceLogic = dofile(sourcePath .. "workspace_logic.lua")
+local frameRestore = dofile(sourcePath .. "frame_restore.lua")
 
 local function showAlert(text, screen, duration)
   screen = screen or hs.screen.mainScreen()
@@ -286,6 +287,10 @@ end
 
 function obj:restoreWorkspace(name, options)
   options = options or {}
+  if self._restoreOperation then
+    if not options.silent then showAlert("WORKSPACE: a restore is already in progress") end
+    return nil, "restore-in-progress"
+  end
   local normalizedName, nameErr = workspaceLogic.normalizeName(name)
   if not normalizedName then
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(nameErr)) end
@@ -347,7 +352,47 @@ function obj:restoreWorkspace(name, options)
     missing = matches.missing,
     extras = matches.extras,
     failures = {},
+    pending = #matches.assignments,
+    finished = false,
   }
+
+  local operation = { jobs = {}, report = report, launching = true }
+  self._restoreOperation = operation
+
+  local function finishIfReady()
+    if operation.launching or report.pending ~= 0 or report.finished then return end
+    report.finished = true
+    self._restoreOperation = nil
+    self.lastRestoreReport = report
+    if not options.silent and not report.cancelled then
+      local message = string.format(
+        "RESTORED %s · %d placed · %d missing · %d extra · %d failed",
+        normalizedName, report.applied, #report.missing, #report.extras, #report.failures
+      )
+      for _, category in ipairs({
+        { label = "Missing", slots = report.missing },
+        { label = "Failed", slots = report.failures },
+      }) do
+        local names, seen = {}, {}
+        for _, entry in ipairs(category.slots) do
+          local name = (entry.target or entry).appName
+          if not seen[name] then
+            table.insert(names, name)
+            seen[name] = true
+          end
+        end
+        table.sort(names)
+        if #names > 0 then
+          message = message .. "\n" .. category.label .. ": " .. table.concat(names, ", ")
+        end
+      end
+      showAlert(message, context.screen, #report.failures > 0 and 5 or 4)
+    end
+    if type(options.onComplete) == "function" then
+      local ok, err = pcall(options.onComplete, report)
+      if not ok then report.callbackError = tostring(err) end
+    end
+  end
 
   for _, assignment in ipairs(matches.assignments) do
     local targetFrame, frameErr = workspaceLogic.absoluteFrame(
@@ -359,38 +404,42 @@ function obj:restoreWorkspace(name, options)
         target = assignment.target,
         reason = frameErr,
       })
+      report.pending = report.pending - 1
     else
-      local frameOK, setErr = pcall(function()
-        assignment.candidate.window:setFrameInScreenBounds(
-          targetFrame,
-          math.max(0, tonumber(self.animationDuration) or 0)
-        )
+      local window = assignment.candidate.window
+      local job = frameRestore.place(window, targetFrame, {
+        animationDuration = tonumber(self.animationDuration),
+        scheduleAfter = hs.timer.doAfter,
+        guard = function()
+          local activeOK, activeSpace = pcall(hs.spaces.activeSpaceOnScreen, context.screen)
+          if not activeOK or activeSpace ~= context.spaceID then
+            return false, "active-space-changed"
+          end
+          local record, reason = describeWindow(self, window, context)
+          if not record or record.id ~= assignment.candidate.id then
+            return false, reason or "window-no-longer-available"
+          end
+          return true
+        end,
+      }, function(success, reason, actual)
+        if success then
+          report.applied = report.applied + 1
+        else
+          table.insert(report.failures, {
+            target = assignment.target,
+            reason = reason,
+            actualFrame = actual,
+          })
+        end
+        report.pending = report.pending - 1
+        finishIfReady()
       end)
-      if frameOK then
-        report.applied = report.applied + 1
-      else
-        table.insert(report.failures, {
-          target = assignment.target,
-          reason = tostring(setErr),
-        })
-      end
+      table.insert(operation.jobs, job)
     end
   end
 
-  if not options.silent then
-    showAlert(
-      string.format(
-        "RESTORED %s · %d placed · %d missing · %d extra · %d failed",
-        normalizedName,
-        report.applied,
-        #report.missing,
-        #report.extras,
-        #report.failures
-      ),
-      context.screen,
-      2.2
-    )
-  end
+  operation.launching = false
+  finishIfReady()
   return report
 end
 
@@ -543,6 +592,11 @@ function obj:start()
 end
 
 function obj:stop()
+  if self._restoreOperation then
+    local operation = self._restoreOperation
+    operation.report.cancelled = true
+    for _, job in ipairs(operation.jobs) do job:cancel() end
+  end
   if self._restoreChooser then
     self._restoreChooser:cancel()
     self._restoreChooser = nil

@@ -12,13 +12,15 @@ local luaFiles = {
   repositoryRoot .. "/Hammerspoon/TheseusWindow.spoon/spatial_focus_logic.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/init.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/workspace_logic.lua",
+  repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/frame_restore.lua",
   repositoryRoot .. "/tests/canonical_layout_spec.lua",
   repositoryRoot .. "/tests/cycle_logic_spec.lua",
   repositoryRoot .. "/tests/geometry_logic_spec.lua",
   repositoryRoot .. "/tests/space_logic_spec.lua",
   repositoryRoot .. "/tests/spatial_focus_logic_spec.lua",
   repositoryRoot .. "/tests/workspace_logic_spec.lua",
-  repositoryRoot .. "/tests/workspace_runtime_spec.lua"
+  repositoryRoot .. "/tests/workspace_runtime_spec.lua",
+  repositoryRoot .. "/tests/frame_restore_spec.lua"
 }
 
 for _, path in ipairs(luaFiles) do
@@ -36,4 +38,5 @@ dofile(repositoryRoot .. "/tests/space_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/spatial_focus_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_runtime_spec.lua")
+dofile(repositoryRoot .. "/tests/frame_restore_spec.lua")
 print("validation: passed")

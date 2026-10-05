@@ -60,7 +60,7 @@ local function makeWindow(id, application, frame, memberships)
   }
   function window:id() return id end
   function window:isStandard() return true end
-  function window:isVisible() return true end
+  function window:isVisible() return self.visible ~= false end
   function window:isMinimized() return false end
   function window:isFullScreen() return false end
   function window:screen() return screen end
@@ -74,13 +74,28 @@ local function makeWindow(id, application, frame, memberships)
     }
   end
   function window:setFrameInScreenBounds(frame)
+    self.setCount = self.setCount + 1
+    if self.ignoreFrameRequests then return self end
     self.currentFrame = {
       x = frame.x,
       y = frame.y,
       w = frame.w,
       h = frame.h,
     }
-    self.setCount = self.setCount + 1
+    return self
+  end
+  function window:setSize(size)
+    if not self.ignoreFrameRequests then
+      self.currentFrame.w = size.w
+      self.currentFrame.h = size.h
+    end
+    return self
+  end
+  function window:setTopLeft(point)
+    if not self.ignoreFrameRequests then
+      self.currentFrame.x = point.x
+      self.currentFrame.y = point.y
+    end
     return self
   end
   function window:title()
@@ -108,6 +123,18 @@ local currentWindowIDs = { 11, 21, 41 }
 local focusedWindow = windows[11]
 local settings = {}
 local alerts = {}
+local timers = {}
+local currentSpaceID = 901
+
+local function drainTimers()
+  local steps = 0
+  while #timers > 0 do
+    steps = steps + 1
+    if steps > 100 then error("restore timers must be bounded") end
+    local timer = table.remove(timers, 1)
+    if not timer.stopped then timer.callback() end
+  end
+end
 
 local previousHs = hs
 hs = {
@@ -124,7 +151,7 @@ hs = {
     get = function(id) return windows[id] end,
   },
   spaces = {
-    activeSpaceOnScreen = function() return 901 end,
+    activeSpaceOnScreen = function() return currentSpaceID end,
     spaceType = function() return "user" end,
     windowsForSpace = function() return currentWindowIDs end,
     windowSpaces = function(window) return window.memberships end,
@@ -133,6 +160,14 @@ hs = {
     get = function(key) return settings[key] end,
     set = function(key, value) settings[key] = value end,
   },
+  timer = {
+    doAfter = function(delay, callback)
+      local timer = { delay = delay, callback = callback }
+      function timer:stop() self.stopped = true end
+      table.insert(timers, timer)
+      return timer
+    end,
+  },
 }
 
 local workspace = dofile(
@@ -140,7 +175,7 @@ local workspace = dofile(
 )
 
 equal(workspace.name, "TheseusWorkspace", "workspace Spoon name")
-equal(workspace.version, "0.1", "workspace Spoon version")
+equal(workspace.version, "0.1.1", "workspace Spoon version")
 equal(workspace.author, "Theeseuus", "workspace Spoon author")
 
 local recipe, captureReport = workspace:captureCurrentWorkspace(
@@ -170,7 +205,25 @@ windows[11].currentFrame = { x = 900, y = 550, w = 400, h = 500 }
 windows[21].currentFrame = { x = 100, y = 50, w = 400, h = 500 }
 currentWindowIDs = { 11, 21, 31, 41 }
 
-local restoreReport = workspace:restoreWorkspace("Project Atlas", { silent = true })
+local completedCount = 0
+local restoreReport = workspace:restoreWorkspace("Project Atlas", {
+  silent = true,
+  onComplete = function(report)
+    completedCount = completedCount + 1
+    equal(report.finished, true, "callback sees a completed report")
+  end,
+})
+equal(restoreReport.applied, 0, "requests are not counted before verification")
+equal(restoreReport.pending, 2, "restore checks are pending")
+equal(restoreReport.finished, false, "restore initially remains in progress")
+local concurrent, concurrentErr = workspace:restoreWorkspace("Project Atlas", { silent = true })
+equal(concurrent, nil, "reject an overlapping restore")
+equal(concurrentErr, "restore-in-progress", "overlapping restore error")
+drainTimers()
+equal(completedCount, 1, "complete the batch exactly once")
+equal(restoreReport.finished, true, "restore finishes after frame checks")
+equal(restoreReport.pending, 0, "restore has no pending checks")
+equal(workspace.lastRestoreReport, restoreReport, "retain the last completion report")
 equal(restoreReport.applied, 2, "restore matching windows")
 equal(#restoreReport.missing, 0, "restore has no missing windows")
 equal(#restoreReport.extras, 1, "restore reports unrelated extra window")
@@ -182,12 +235,66 @@ near(windows[21].currentFrame.w, 800, "restore Ghostty width")
 equal(windows[31].setCount, 0, "leave extra Finder window untouched")
 equal(windows[41].setCount, 0, "leave sticky Finder window untouched")
 
+windows[21].currentFrame = { x = 100, y = 50, w = 400, h = 500 }
+windows[21].ignoreFrameRequests = true
+local ignoredReport = workspace:restoreWorkspace("Project Atlas")
+equal(#alerts, 0, "do not announce success before frame checks")
+drainTimers()
+equal(ignoredReport.applied, 1, "an ignored Ghostty move is not reported as placed")
+equal(#ignoredReport.failures, 1, "an ignored Ghostty move is reported as a failure")
+equal(ignoredReport.failures[1].reason, "frame-not-restored", "ignored frame failure reason")
+equal(ignoredReport.failures[1].target.appName, "Ghostty", "name the failing application")
+equal(alerts[1]:find("Failed: Ghostty", 1, true) ~= nil, true, "alert names Ghostty")
+near(windows[21].currentFrame.x, 100, "quietly ignored requests leave Ghostty unchanged")
+windows[21].ignoreFrameRequests = false
+
 currentWindowIDs = { 11, 31, 41 }
 local partialReport = workspace:restoreWorkspace("Project Atlas", { silent = true })
+drainTimers()
 equal(partialReport.applied, 1, "partial restore applies available window")
 equal(#partialReport.missing, 1, "partial restore reports missing slot")
 equal(partialReport.missing[1].bundleID, "com.mitchellh.ghostty", "missing Ghostty slot")
 equal(#partialReport.extras, 1, "partial restore retains Finder extra")
+
+currentWindowIDs = { 31, 41 }
+local allMissingReport = workspace:restoreWorkspace("Project Atlas")
+equal(allMissingReport.finished, true, "a batch with no candidates finishes immediately")
+equal(allMissingReport.pending, 0, "a batch with no candidates has no timers")
+equal(allMissingReport.applied, 0, "a missing-only batch places no windows")
+equal(#allMissingReport.missing, 2, "a missing-only batch reports both slots")
+equal(alerts[2]:find("Missing: Ghostty, Safari", 1, true) ~= nil, true, "name missing apps")
+equal(windows[31].setCount, 0, "missing-only restore still leaves the extra untouched")
+
+currentWindowIDs = { 11, 21, 31, 41 }
+local cancelledReport = workspace:restoreWorkspace("Project Atlas", { silent = true })
+workspace:stop()
+drainTimers()
+equal(cancelledReport.finished, true, "stopping finishes the cancellation report")
+equal(cancelledReport.cancelled, true, "stopping marks the restore as cancelled")
+equal(cancelledReport.pending, 0, "stopping clears all pending work")
+equal(#cancelledReport.failures, 2, "stopping cancels both unverified placements")
+
+local spaceChangedReport = workspace:restoreWorkspace("Project Atlas", { silent = true })
+currentSpaceID = 902
+local setCountBefore = windows[21].setCount
+drainTimers()
+equal(spaceChangedReport.applied, 0, "do not verify a restore after leaving its Space")
+equal(#spaceChangedReport.failures, 2, "Space change stops remaining checks")
+equal(spaceChangedReport.failures[1].reason, "active-space-changed", "Space change reason")
+equal(windows[21].setCount, setCountBefore, "do not retry in the wrong Space")
+currentSpaceID = 901
+
+windows[21].ignoreFrameRequests = true
+windows[21].currentFrame = { x = 100, y = 50, w = 400, h = 500 }
+local hiddenReport = workspace:restoreWorkspace("Project Atlas", { silent = true })
+windows[21].visible = false
+setCountBefore = windows[21].setCount
+drainTimers()
+equal(hiddenReport.applied, 1, "available Safari can still complete")
+equal(hiddenReport.failures[1].reason, "not-visible", "recheck visibility before retry")
+equal(windows[21].setCount, setCountBefore, "do not retry a now-hidden Ghostty window")
+windows[21].visible = true
+windows[21].ignoreFrameRequests = false
 
 local listed = workspace:listWorkspaces()
 equal(#listed, 1, "list captured workspace")
@@ -203,7 +310,7 @@ local missingRestore, missingRestoreErr = workspace:restoreWorkspace(
 )
 equal(missingRestore, nil, "deleted workspace cannot restore")
 equal(missingRestoreErr, "workspace-not-found", "deleted workspace restore error")
-equal(#alerts, 0, "silent runtime operations show no alerts")
+equal(#alerts, 2, "only non-silent restores produce alerts")
 
 hs = previousHs
 
