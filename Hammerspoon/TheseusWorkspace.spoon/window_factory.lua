@@ -23,7 +23,7 @@ local function run(path, arguments, options, complete, script)
   local job = { finished = false }
   local task, timer
   local ticks = 0
-  local function finish(success, reason, windowID)
+  local function finish(success, reason)
     if job.finished then return end
     job.finished = true
     if timer then timer:stop(); timer = nil end
@@ -32,7 +32,7 @@ local function run(path, arguments, options, complete, script)
       if runningOK and running then pcall(function() task:terminate() end) end
       task = nil
     end
-    complete(success, reason, windowID)
+    complete(success, reason)
   end
   function job:cancel() finish(false, "establish-cancelled") end
 
@@ -60,13 +60,6 @@ local function run(path, arguments, options, complete, script)
           ["-1708"] = "new-window-command-unavailable",
         }
         finish(false, reasons[errorCode] or "window-command-failed")
-      elseif script == "window-id" then
-        local windowID = tonumber(tostring(stdout):match("^created:(%d+)%s*$"))
-        if windowID and windowID > 0 and windowID <= 4294967295 then
-          finish(true, nil, windowID)
-        else
-          finish(false, "unexpected-window-command-result")
-        end
       elseif tostring(stdout):match("^created%s*$") then
         finish(true)
       else
@@ -159,35 +152,15 @@ function factory.launch(bundleID, options, complete)
   return run("/usr/bin/open", { "-g", "-b", bundleID }, options, complete, false)
 end
 
-local function wrappedScript(script)
-  return "with timeout of 10 seconds\ntry\n" .. script
-    .. '\nreturn "created"\non error message number errorNumber\n'
-    .. 'return "ERROR:" & errorNumber\nend try\nend timeout'
-end
-
 function factory.create(bundleID, options, complete)
   local adapter = adapters[bundleID]
   if not adapter then return rejected("unsupported-application", complete) end
   if adapter.kind == "menu" then return selectNewWindow(bundleID, adapter.menu, options, complete) end
   if adapter.kind == "launch-only" then return rejected(adapter.reason, complete) end
-  return run("/usr/bin/osascript", { "-e", wrappedScript(adapter.script) },
-    options, complete, adapter.resultKind or true)
-end
-
-function factory.navigateCreated(bundleID, windowID, options, complete)
-  local adapter = adapters[bundleID]
-  if not adapter or not adapter.navigationScript then
-    return rejected("new-window-navigation-unavailable", complete)
-  end
-  -- The only dynamic script value is a bounded native ID from the creation
-  -- receipt, checked against the independently discovered window. No recipe
-  -- name, URL, title or arbitrary text reaches this transport.
-  if type(windowID) ~= "number" or windowID < 1 or windowID > 4294967295
-    or windowID % 1 ~= 0 then
-    return rejected("new-window-identity-mismatch", complete)
-  end
-  return run("/usr/bin/osascript", { "-e", wrappedScript(adapter.navigationScript(windowID)) },
-    options, complete, true)
+  local script = "with timeout of 10 seconds\ntry\n" .. adapter.script
+    .. '\nreturn "created"\non error message number errorNumber\n'
+    .. 'return "ERROR:" & errorNumber\nend try\nend timeout'
+  return run("/usr/bin/osascript", { "-e", script }, options, complete, true)
 end
 
 return factory

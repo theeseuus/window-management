@@ -21,9 +21,7 @@ and the current app list.
   provides guarded, cancellable background launch and script/menu dispatch.
 - [workspace_establish.lua](../Hammerspoon/TheseusWorkspace.spoon/workspace_establish.lua)
   counts launch-created windows, fills missing slots, and verifies new window
-  identity, destination membership, and settled geometry. An optional native
-  identity receipt lets it defer fixed new-window navigation until the complete
-  layout has settled; it contains no app-specific commands.
+  identity, destination membership, and settled geometry.
 
 Ordinary additions should change the registry and its tests, not these shared
 engines. Scripts are fixed source; names and frames from recipes must never be
@@ -68,23 +66,21 @@ interpolated into executable commands.
    the Mac. In the owner's normal workflow after that reboot, blank creation
    worked, bare `make new document` failed again, and explicitly opening
    `https://www.creativetension.co` also switched Spaces and was reported very
-   slow. The URL-at-creation trial was withdrawn and blank creation restored. This
+   slow. The real-page trial is withdrawn and blank creation restored. This
    implicates more than Safari's Start Page; the underlying mechanism remains
    unproven. Do not infer that a command works from a scripted pilot alone.
+   A later two-stage experiment kept blank creation, added native ID receipts,
+   and deferred page navigation until the complete layout was placed. The
+   owner's normal Browsing test again switched from Space 6 to Space 3, created
+   one visible Safari window, and was reported very slow. Its report stopped
+   during `creating` with `active-space-changed`, zero verified new windows,
+   zero placements, and zero page navigations. The deferred page stage never
+   ran, so this failure cannot be attributed to page loading alone. The trial,
+   including its extra creation identity checks and shared navigation lifecycle,
+   was withdrawn; the simple blank-window baseline is restored. That rollback
+   is not proof that the current desktop state has recovered.
    Test creation from a Space without Safari windows while another Space has
    Safari open. Do not change preferences or navigate existing windows.
-   The current owner-directed experiment separates blank creation/placement
-   from loading Creative Tension. Safari compares native window IDs before and
-   after creation and returns `created:<id>` only for one new window, with
-   `resultKind = "window-id"`. The engine requires that receipt to match its
-   independently discovered destination window. The installed Safari 27.0.1
-   scripting dictionary exposes window IDs and tab URLs; a read-only live check
-   on this Mac confirmed that scripting IDs match Hammerspoon window IDs.
-   After all creation and frame verification succeeds, `navigationScript(id)`
-   addresses only that exact new window, requires one still-blank tab, and sets
-   the fixed owner-requested URL. Reused and launch-created windows have no
-   receipt and are never navigated. This is experimental and awaits the owner's
-   normal Establish test; the identity check alone is not native creation proof.
 5. If a new failure category is needed, add its friendly wording in `init.lua`
    and exercise it in tests. Do not expose raw app-returned errors or stderr.
 
@@ -104,11 +100,6 @@ Run `mise run validate`. Update:
 
 These tests do not execute AppleScript or create macOS windows. An installed
 dictionary proves available terminology, not successful native behaviour.
-For the Safari experiment, `navigated` counts acknowledged guarded URL assignments,
-not rendered pages. `navigationFailures` is separate from placement failures;
-`stoppedDuring` identifies the phase if the destination Space changes. All frame
-checks finish before the first page call. Space change, cancellation, or a page
-failure stops remaining navigation without retrying or closing created windows.
 After arranging a disposable pilot with the owner:
 
 1. Use an empty ordinary Space and temporary, unsaved windows. Do not quit apps

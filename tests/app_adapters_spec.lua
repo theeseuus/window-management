@@ -15,11 +15,6 @@ for bundleID, adapter in pairs(adapters) do
   equal(adapter.name ~= "", true, "nonempty adapter label")
   equal(adapter.kind == "applescript" or adapter.kind == "menu" or adapter.kind == "launch-only", true, "known transport")
   equal(adapter.checkInstalled == nil or type(adapter.checkInstalled) == "function", true, "optional installed-metadata check")
-  equal(adapter.resultKind == nil or adapter.resultKind == "window-id", true, "optional native identity receipt")
-  equal(adapter.navigationScript == nil or type(adapter.navigationScript) == "function", true, "optional fixed new-window navigation")
-  if adapter.navigationScript then
-    equal(adapter.resultKind, "window-id", "navigation requires an explicit native identity receipt")
-  end
   if adapter.kind == "applescript" then
     equal(type(adapter.script), "string", "fixed native script")
     equal(adapter.script:find('tell application id "' .. bundleID .. '"', 1, true) ~= nil, true, "script targets the registry's exact app")
