@@ -9,16 +9,17 @@ end
 local previousHs = hs
 local info, tasks, timers, allowed, failNew, failStart, failSchedule
 local result, calls
-local app, menuItem, menuCalls, menuError, menuSelected, identity
+local app, menuItem, menuCalls, menuError, menuSelected, identity, expectedMenu
 local function reset()
   info = { CFBundleShortVersionString = "1.3.1", OSAScriptingDefinition = "Ghostty.sdef" }
   tasks, timers, allowed = {}, {}, true
   failNew, failStart, failSchedule, result, calls = false, false, false, nil, 0
   menuItem, menuCalls, menuError, menuSelected, identity = { enabled = true }, {}, nil, true, nil
+  expectedMenu = "File/New Window"
   app = {
     bundleID = function() return identity or "com.openai.codex" end,
     findMenuItem = function(_, menu)
-      equal(table.concat(menu, "/"), "File/New Window", "exact genuine menu path")
+      equal(table.concat(menu, "/"), expectedMenu, "exact genuine menu path")
       if menuError == "lookup" then error("private application text") end
       return menuItem
     end,
@@ -76,6 +77,18 @@ equal(factory.support("com.mitchellh.ghostty"), true, "Ghostty scripting capabil
 for _, bundle in ipairs({ "com.google.Chrome", "com.barebones.bbedit", "com.openai.chat", "com.openai.codex", "com.anthropic.claudefordesktop" }) do
   equal(factory.support(bundle), true, "allowlisted Establish lifecycle for " .. bundle)
 end
+local newApps = {
+  "com.microsoft.Excel", "com.microsoft.Word", "com.microsoft.Powerpoint",
+  "com.apple.iWork.Keynote", "com.apple.iWork.Pages", "com.apple.iWork.Numbers", "com.apple.mail",
+}
+for _, bundle in ipairs(newApps) do
+  equal(factory.support(bundle), true, "new installed adapter for " .. bundle)
+end
+for _, bundle in ipairs({ "com.apple.iCal", "com.apple.Preview", "com.microsoft.PowerPoint" }) do
+  local supported, reason = factory.support(bundle)
+  equal(supported, false, "do not guess a missing adapter for " .. bundle)
+  equal(reason, "unsupported-application", "explicit unsupported capability")
+end
 local ok, err = factory.support("com.example.Chat")
 equal(ok, false, "do not infer a chat app's new-window behavior")
 equal(err, "unsupported-application", "unsupported reason")
@@ -112,15 +125,27 @@ for _, case in ipairs({
   { "com.apple.Safari", 'make new document with properties {URL:"about:blank"}' },
   { "com.barebones.bbedit", "make new text window" },
   { "com.google.Chrome", "set createdWindow to make new window" },
+  { "com.microsoft.Excel", "make new workbook" },
+  { "com.microsoft.Word", "make new document" },
+  { "com.microsoft.Powerpoint", "make new presentation" },
+  { "com.apple.iWork.Keynote", "make new document" },
+  { "com.apple.iWork.Pages", "make new document" },
+  { "com.apple.iWork.Numbers", "make new document" },
 }) do
   reset()
   factory.create(case[1], options, complete)
+  equal(#tasks, 1, "one command per missing slot")
+  equal(tasks[1].executable, "/usr/bin/osascript", "shared guarded scripting transport")
+  equal(tasks[1].arguments[2]:find('tell application id "' .. case[1] .. '"', 1, true) ~= nil, true, "exact application identity")
   equal(tasks[1].arguments[2]:find(case[2], 1, true) ~= nil, true, "fixed window API for " .. case[1])
+  equal(tasks[1].arguments[2]:find("activate", 1, true), nil, "creation never activates an existing window")
   if case[1] == "com.google.Chrome" then
     equal(tasks[1].arguments[2]:find('set URL of active tab of createdWindow to "about:blank"', 1, true) ~= nil, true, "blank only the newly created Chrome window")
     equal(tasks[1].arguments[2]:find("window 1", 1, true), nil, "never navigate the existing front browser window")
   end
   tasks[1]:finish(0, "created")
+  equal(result.ok, true, "successful native dispatch")
+  equal(calls, 1, "complete native dispatch once")
 end
 for _, case in ipairs({
   { "ERROR:-1743", "automation-not-authorized" },
@@ -146,6 +171,19 @@ equal(tasks[1].executable, "/usr/bin/open", "background app launch")
 equal(table.concat(tasks[1].arguments, " "), "-g -b com.apple.Safari", "launch without focusing an old window")
 tasks[1]:finish(0)
 equal(result.ok, true, "launch task result is separate from window verification")
+for _, bundle in ipairs(newApps) do
+  reset()
+  factory.launch(bundle, options, complete)
+  equal(tasks[1].executable, "/usr/bin/open", "shared cold-launch transport")
+  equal(table.concat(tasks[1].arguments, " "), "-g -b " .. bundle, "background launch of exact app")
+  tasks[1]:finish(0)
+  equal(result.ok, true, "launch command accepted; windows still need verification")
+  reset()
+  allowed = false
+  factory.launch(bundle, options, complete)
+  equal(#tasks, 0, "guard each new app before launch")
+  equal(result.reason, "active-space-changed", "new app launch fails closed after Space change")
+end
 
 reset()
 allowed = false
@@ -186,18 +224,34 @@ factory.create("com.example.Chat", options, complete)
 equal(#tasks, 0, "unsupported apps never receive a generic shortcut")
 equal(result.reason, "unsupported-application", "unsupported create is safe")
 
-for _, bundle in ipairs({ "com.openai.codex", "com.openai.chat" }) do
+for _, bundle in ipairs({ "com.openai.codex", "com.openai.chat", "com.apple.mail" }) do
   reset()
   identity = bundle
+  expectedMenu = bundle == "com.apple.mail" and "File/New Viewer Window" or "File/New Window"
   job = factory.create(bundle, options, complete)
   equal(job.finished, false, "menu dispatch is asynchronous")
   equal(#menuCalls, 0, "no premature menu selection")
   drain()
-  equal(menuCalls[1], "File/New Window", "dispatch only an independent-window command")
+  equal(menuCalls[1], expectedMenu, "dispatch only an independent-window command")
   equal(#tasks, 0, "menu creation does not run AppleScript or synthesize keys")
   equal(result.ok, true, "menu selection accepted; orchestrator still verifies the new window")
   equal(result.reason, nil, "successful menu has no failure reason")
   equal(calls, 1, "menu completion exactly once")
+end
+for _, failure in ipairs({ "missing", "disabled", "identity", "space", "cancel" }) do
+  reset()
+  identity, expectedMenu = "com.apple.mail", "File/New Viewer Window"
+  if failure == "missing" then menuItem = nil
+  elseif failure == "disabled" then menuItem.enabled = false
+  elseif failure == "identity" then identity = "com.example.Other"
+  elseif failure == "space" then allowed = false end
+  job = factory.create("com.apple.mail", options, complete)
+  if failure == "cancel" then job:cancel() end
+  drain()
+  equal(result.ok, false, "Mail fails safely on " .. failure)
+  equal(#menuCalls, 0, "Mail cannot fall back to a new message")
+  equal(#tasks, 0, "Mail cannot fall back to scripting")
+  equal(calls, 1, "complete Mail failure once")
 end
 for _, case in ipairs({
   { "missing", "new-window-command-unavailable" },

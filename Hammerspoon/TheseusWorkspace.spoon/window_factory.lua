@@ -2,58 +2,15 @@
 -- in an unsupported app that could replace a chat, document, tab, or session.
 local factory = {}
 
-local commands = {
-  ["com.mitchellh.ghostty"] = [[
-tell application id "com.mitchellh.ghostty"
-  set config to new surface configuration
-  new window with configuration config
-end tell]],
-  ["com.apple.finder"] = [[
-tell application id "com.apple.finder"
-  make new Finder window
-end tell]],
-  ["com.apple.Safari"] = [[
-tell application id "com.apple.Safari"
-  make new document with properties {URL:"about:blank"}
-end tell]],
-  ["com.barebones.bbedit"] = [[
-tell application id "com.barebones.bbedit"
-  make new text window
-end tell]],
-  ["com.google.Chrome"] = [[
-tell application id "com.google.Chrome"
-  set createdWindow to make new window
-  set URL of active tab of createdWindow to "about:blank"
-end tell]],
-}
-
--- The OpenAI desktop app has used both identifiers. Never substitute one for
--- the other in a recipe: invoke only this exact app's genuine New Window menu.
-local menus = {
-  ["com.openai.chat"] = { "File", "New Window" },
-  ["com.openai.codex"] = { "File", "New Window" },
-}
--- Claude can supply a launch-created main window, or reuse a local window.
--- Its New Chat command is navigation, not a verified independent-window API.
-local launchOnly = {
-  ["com.anthropic.claudefordesktop"] = "claude-new-window-unavailable",
-}
-local function known(bundleID)
-  return commands[bundleID] or menus[bundleID] or launchOnly[bundleID]
-end
+local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
+local adapters = dofile(sourcePath .. "app_adapters.lua")
 
 function factory.support(bundleID)
-  if not known(bundleID) then return false, "unsupported-application" end
+  local adapter = adapters[bundleID]
+  if not adapter then return false, "unsupported-application" end
   local ok, info = pcall(hs.application.infoForBundleID, bundleID)
   if not ok or type(info) ~= "table" then return false, "application-not-installed" end
-  if bundleID == "com.mitchellh.ghostty" then
-    local major, minor = tostring(info.CFBundleShortVersionString):match("^(%d+)%.(%d+)")
-    if not major or (tonumber(major) < 1)
-      or (tonumber(major) == 1 and tonumber(minor) < 3)
-      or not info.OSAScriptingDefinition then
-      return false, "ghostty-requires-applescript-1.3"
-    end
-  end
+  if adapter.checkInstalled then return adapter.checkInstalled(info) end
   return true
 end
 
@@ -191,17 +148,16 @@ local function selectNewWindow(bundleID, menu, options, complete)
 end
 
 function factory.launch(bundleID, options, complete)
-  if not known(bundleID) then return rejected("unsupported-application", complete) end
+  if not adapters[bundleID] then return rejected("unsupported-application", complete) end
   return run("/usr/bin/open", { "-g", "-b", bundleID }, options, complete, false)
 end
 
 function factory.create(bundleID, options, complete)
-  if menus[bundleID] then return selectNewWindow(bundleID, menus[bundleID], options, complete) end
-  local command = commands[bundleID]
-  if not command then
-    return rejected(launchOnly[bundleID] or "unsupported-application", complete)
-  end
-  local script = "with timeout of 10 seconds\ntry\n" .. command
+  local adapter = adapters[bundleID]
+  if not adapter then return rejected("unsupported-application", complete) end
+  if adapter.kind == "menu" then return selectNewWindow(bundleID, adapter.menu, options, complete) end
+  if adapter.kind == "launch-only" then return rejected(adapter.reason, complete) end
+  local script = "with timeout of 10 seconds\ntry\n" .. adapter.script
     .. '\nreturn "created"\non error message number errorNumber\n'
     .. 'return "ERROR:" & errorNumber\nend try\nend timeout'
   return run("/usr/bin/osascript", { "-e", script }, options, complete, true)

@@ -17,6 +17,7 @@ local luaFiles = {
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/panel_controller.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/workspace_panel.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/window_factory.lua",
+  repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/app_adapters.lua",
   repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/workspace_establish.lua",
   repositoryRoot .. "/tests/canonical_layout_spec.lua",
   repositoryRoot .. "/tests/cycle_logic_spec.lua",
@@ -32,6 +33,7 @@ local luaFiles = {
   repositoryRoot .. "/tests/workspace_chooser_spec.lua",
   repositoryRoot .. "/tests/frame_restore_spec.lua",
   repositoryRoot .. "/tests/window_factory_spec.lua",
+  repositoryRoot .. "/tests/app_adapters_spec.lua",
   repositoryRoot .. "/tests/workspace_establish_spec.lua"
 }
 
@@ -55,5 +57,6 @@ dofile(repositoryRoot .. "/tests/panel_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_chooser_spec.lua")
 dofile(repositoryRoot .. "/tests/frame_restore_spec.lua")
 dofile(repositoryRoot .. "/tests/window_factory_spec.lua")
+dofile(repositoryRoot .. "/tests/app_adapters_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_establish_spec.lua")
 print("validation: passed")

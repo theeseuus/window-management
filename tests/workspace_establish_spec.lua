@@ -144,6 +144,32 @@ equal(report.created, 0, "repeat has no new windows")
 equal(report.reused, 4, "repeat reuses all four windows")
 equal(report.applied, 4, "repeat re-establishes geometry")
 
+-- Every new adapter follows the same lifecycle: count a cold-launch default
+-- before requesting another window, then reuse both on repeat Establish.
+for _, bundle in ipairs({
+  "com.microsoft.Excel", "com.microsoft.Word", "com.microsoft.Powerpoint",
+  "com.apple.iWork.Keynote", "com.apple.iWork.Pages", "com.apple.iWork.Numbers", "com.apple.mail",
+}) do
+  env = environment()
+  env.running[bundle], env.launchWindow = false, true
+  local remote = env:add(bundle, { destination = false })
+  local twoSlots = recipe({ bundle, bundle })
+  report = env:start(twoSlots)
+  env:drain()
+  equal(#env.launches, 1, "launch closed app once: " .. bundle)
+  equal(#env.creates, 1, "count startup window before filling second slot: " .. bundle)
+  equal(report.created, 2, "verify default and explicit new windows: " .. bundle)
+  equal(report.applied, 2, "place both new-app windows: " .. bundle)
+  equal(#report.missing, 0, "both app slots established: " .. bundle)
+  equal(remote.placed, nil, "protect other-Space app window: " .. bundle)
+  report = env:start(twoSlots)
+  env:drain()
+  equal(#env.launches, 1, "no relaunch on repeat: " .. bundle)
+  equal(#env.creates, 1, "no duplicate app window on repeat: " .. bundle)
+  equal(report.reused, 2, "reuse both local windows: " .. bundle)
+  equal(report.created, 0, "repeat creates nothing: " .. bundle)
+end
+
 env = environment()
 local existing = env:add("Ghostty")
 local extra = env:add("Ghostty", { frame = { x = 0.8, y = 0.8, w = 0.1, h = 0.1 } })

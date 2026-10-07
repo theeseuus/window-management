@@ -30,10 +30,10 @@ Spoon.
 - At least two ordinary user Spaces for TheseusWindow move-and-follow commands.
 - An ordinary user Space for TheseusWorkspace capture and restore. Full-screen
   and tiled Spaces are deliberately rejected.
-- For **Establish here**, macOS Automation permission for the scripting adapters
-  (Ghostty, Finder, Safari, BBEdit, and Chrome). Ghostty requires version 1.3 or
-  later with AppleScript enabled. ChatGPT's menu adapter uses the existing
-  Accessibility permission and requires an enabled **File → New Window** menu.
+- For **Establish here**, macOS Automation permission for each scripting adapter
+  used (listed below). Ghostty requires version 1.3 or later with AppleScript
+  enabled. ChatGPT and Mail use the existing Accessibility permission and
+  require their exact, enabled new-window menus.
 - A Hyper-key mapping if using the reference bindings. The supplied setup uses
   Karabiner-Elements to make held Tab emit
   `Control + Option + Command`; Karabiner configuration is not included.
@@ -152,6 +152,26 @@ supported apps if needed, and creates only the missing slots. The adapters are:
 | Chrome | Native new window; set only that new window's active tab to `about:blank` |
 | ChatGPT / OpenAI desktop | Exact **File → New Window** menu, without activating an old window or substituting **New Chat** |
 | Claude desktop | Launch-created main window and existing local-window reuse only; no verified additional-window command |
+| Microsoft Excel | Native new unsaved workbook using the app's default |
+| Microsoft Word | Native new unsaved document using the app's default |
+| Microsoft PowerPoint | Native new unsaved presentation using the app's default |
+| Keynote | Native new unsaved document using the app's default theme |
+| Pages | Native new unsaved document using the app's default template |
+| Numbers | Native new unsaved document using the app's default template |
+| Mail | Exact **File → New Viewer Window** menu; never a new message/draft |
+
+The six document-app adapters create default documents, not the files originally
+open when captured. They do not change template or tab preferences. If an app
+creates a tab or chooser instead of a new eligible window, Establish reports the
+missing slot rather than changing preferences or accepting a false success.
+Calendar and Preview have no automatic launch/creation adapter; their existing
+eligible windows can still be captured, restored, and reused.
+
+Exact app operations live in one `app_adapters.lua` registry; shared launch,
+dispatch, Space checks, and verified placement remain separate. To extend it,
+follow [Adding an application adapter](docs/app-adapters.md). The same guide is
+linked from the agent entry point; ordinary additions need no new hotkeys,
+recipe format, or plugin framework.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
@@ -529,6 +549,10 @@ waits, safe categorical errors, cancellation, and verified placement. They
 also verify scoped app discovery, untouched other-Space windows, mutual
 exclusion with Restore and no settings writes. Native panel interaction and
 visual evidence are recorded separately in [design-qa.md](design-qa.md).
+Adapter tests check every registry entry and each fixed command/menu, including
+the Office/iWork adapters, Mail viewer-only behaviour, and explicit unsupported
+Calendar/Preview creation. Mocked cold starts exercise two-window startup counting
+and repeat-use idempotency for each new app; these are not native app pilots.
 
 The separated resize/move fallback was informed by Hammerspoon's
 [frame-setting timing discussion](https://github.com/Hammerspoon/hammerspoon/issues/3731).
@@ -621,6 +645,11 @@ Validation levels are intentionally distinct:
       Confirm each missing slot becomes a separate window, not a tab, document,
       or replacement chat. Chrome's new tabs should be blank; existing browser
       tabs, chats, and text documents must remain unchanged.
+- [ ] Pilot Excel, Word, PowerPoint, Keynote, Pages, and Numbers with two
+      disposable unsaved documents per app. Confirm separate normal windows,
+      not tabs or a template chooser; no captured files are reopened. Pilot Mail
+      with two viewer windows and confirm no draft/message is created. Keep
+      another window of the app in a different Space and verify it is untouched.
 - [ ] With an app that can safely be closed already quit by the owner, Establish
       its layout. Confirm startup windows are counted before requesting extras;
       repeat after success and confirm no duplicate windows. App-controlled
