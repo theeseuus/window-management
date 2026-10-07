@@ -1,6 +1,12 @@
 # Adding an application adapter
 
 This is the shared maintainer/agent route for adding **Establish here** support.
+
+The shared engine prepares apps sequentially and places each app's matching
+windows once its creation phase ends, while preparing later apps. Launch and
+creation discovery is scoped to the current app; all same-app slots are matched
+together. Adapters should report command completion without adding placement
+delays; the engine verifies window discovery and geometry separately.
 Capture, Restore, and existing-window reuse already identify ordinary windows
 generically. An adapter is needed only to launch an app or create missing
 windows. See the [README](../README.md#theseusworkspace) for user-facing behaviour

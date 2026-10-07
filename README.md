@@ -105,6 +105,9 @@ as one cross-application layout. It supports:
   placed, retry a quiet no-op, then try a separated resize/move if necessary.
   A request that still does not reach its saved frame is reported as failed,
   with the application named in the completion notice.
+- Windows already at their saved geometry are verified without issuing another
+  resize/move request. If they drift after matching, placement recovers them
+  through the same bounded retries.
 
 Capture includes normal, visible, non-minimized, non-full-screen windows that
 belong exclusively to the current ordinary user Space and selected screen.
@@ -192,11 +195,16 @@ borrowed. Unsupported apps can still have their existing local windows placed;
 their missing slots are reported without a generic `Command + N` fallback.
 Discovery is scoped to the apps named in the recipe. Its extra-window count
 therefore covers those apps, not unrelated apps elsewhere on the desktop.
+During launch and creation, discovery checks only the app currently being
+prepared, avoiding repeated inspection of the other recipe apps.
 
 Establish allows up to about 15 seconds for a cold launch and observes stable
 launch-created windows before asking for more. Each explicit
 creation must produce one new eligible window exclusively in the destination
-Space, then all matching frames must settle before they count as placed. A
+Space. Once an app's creation phase ends, its eligible matching windows are
+placed while subsequent apps are prepared, rather than waiting for the final
+app. Same-app slots are matched together before placement. All matching frames
+must settle before they count as placed. A
 successful script alone is not proof of creation or placement. Repeat Establish
 after a successful run to reapply geometry without creating duplicate windows.
 Keep the destination Space selected and avoid opening or closing target-app

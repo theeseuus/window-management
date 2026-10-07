@@ -69,6 +69,7 @@ local function fixture()
   function state:start(duration)
     self.job = restore.place(self.window, target, {
       animationDuration = duration or 0,
+      initialFrame = self.initialFrame,
       scheduleAfter = self.schedule,
       guard = function() return self.eligible, "window-no-longer-eligible" end,
     }, function(success, reason, actual)
@@ -90,6 +91,22 @@ equal(direct.fullRequests, 1, "do not retry a successful placement")
 equal(direct.sizeRequests, 0, "do not use fallback unnecessarily")
 equal(direct.actual.x, target.x, "read back the actual frame")
 equal(direct.now, 0.25, "allow a zero-duration request to settle")
+
+local unchanged = fixture()
+unchanged.frame, unchanged.initialFrame = copy(target), copy(target)
+unchanged:start()
+equal(unchanged.completions, 0, "already placed windows still require verification")
+equal(unchanged.fullRequests, 0, "do not move an already placed window")
+unchanged:drain()
+equal(unchanged.success, true, "verify an unchanged layout")
+equal(unchanged.fullRequests, 0, "unchanged layout needs no frame writes")
+
+local drifted = fixture()
+drifted.initialFrame = copy(target)
+drifted:start()
+drifted:drain()
+equal(drifted.success, true, "recover drift since initial matching")
+equal(drifted.fullRequests, 1, "stale matching cannot silently skip placement")
 
 local retry = fixture()
 retry.fullSetter = function(frame)

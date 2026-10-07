@@ -1,4 +1,4 @@
--- Sequential, bounded creation followed by verified placement. The injected
+-- Sequential, bounded creation with placement as each app becomes ready. The injected
 -- operations make the lifecycle testable without touching the desktop.
 local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local logic = dofile(sourcePath .. "workspace_logic.lua")
@@ -9,10 +9,11 @@ function establish.start(recipe, options, complete)
   local report = {
     name = recipe.name, requested = #recipe.windows, applied = 0, created = 0,
     reused = 0, missing = {}, extras = {}, failures = {}, creationFailures = {},
-    pending = #recipe.windows, finished = false, phase = "preparing",
+    pending = 0, finished = false, phase = "preparing",
   }
   local job = { report = report, children = {} }
   local timer, approvedIDs, createdIDs = nil, {}, {}
+  local creationFinished = false
   local finish, guard, later
 
   finish = function(reason)
@@ -50,9 +51,9 @@ function establish.start(recipe, options, complete)
     else timer = scheduled end
   end
 
-  local function collect()
+  local function collect(bundleID)
     if not guard() then return nil end
-    local ok, candidates, err, seenIDs = pcall(options.collect)
+    local ok, candidates, err, seenIDs = pcall(options.collect, bundleID)
     if not ok or not candidates then
       finish(ok and err or "could-not-enumerate-workspace-windows")
       return nil
@@ -106,20 +107,20 @@ function establish.start(recipe, options, complete)
   end
   table.sort(apps, function(a, b) return a.bundleID < b.bundleID end)
 
-  local function placeAll()
-    local candidates = collect()
+  local function ready()
+    if creationFinished and not report.finished and report.pending == 0 then finish() end
+  end
+
+  local function placeApp(bundleID)
+    local candidates = collect(bundleID)
     if not candidates then return end
-    local matched = matches(candidates)
-    report.missing, report.extras = matched.missing, matched.extras
-    for _, candidate in ipairs(candidates) do
-      if not approvedIDs[candidate.id] then table.insert(report.extras, candidate) end
+    local assignments = {}
+    for _, assignment in ipairs(matches(candidates).assignments) do
+      if assignment.target.bundleID == bundleID then table.insert(assignments, assignment) end
     end
-    report.phase, report.pending = "placing", #matched.assignments
+    report.pending = report.pending + #assignments
     local starting = true
-    local function ready()
-      if not starting and not report.finished and report.pending == 0 then finish() end
-    end
-    for _, assignment in ipairs(matched.assignments) do
+    for _, assignment in ipairs(assignments) do
       if not guard() then break end
       keep(options.place(assignment, function(success, reason, actual)
         if report.finished then return end
@@ -132,10 +133,22 @@ function establish.start(recipe, options, complete)
           })
         end
         report.pending = report.pending - 1
-        ready()
+        if not starting then ready() end
       end))
     end
     starting = false
+    ready()
+  end
+
+  local function finishCreation()
+    local candidates = collect()
+    if not candidates then return end
+    local matched = matches(candidates)
+    report.missing, report.extras = matched.missing, matched.extras
+    for _, candidate in ipairs(candidates) do
+      if not approvedIDs[candidate.id] then table.insert(report.extras, candidate) end
+    end
+    creationFinished, report.phase = true, "placing"
     ready()
   end
 
@@ -143,10 +156,16 @@ function establish.start(recipe, options, complete)
   local nextApp
   nextApp = function()
     if not guard() then return end
+    -- Only match once all slots for this app have been discovered. Moving a
+    -- partial same-app set could change proximity matching for later slots.
+    if apps[appIndex] then
+      placeApp(apps[appIndex].bundleID)
+      if report.finished then return end
+    end
     appIndex = appIndex + 1
     local app = apps[appIndex]
-    if not app then placeAll(); return end
-    local candidates = collect()
+    if not app then finishCreation(); return end
+    local candidates = collect(app.bundleID)
     if not candidates then return end
     local missing = missingFor(candidates, app.bundleID)
     if #missing == 0 then nextApp(); return end
@@ -158,7 +177,7 @@ function establish.start(recipe, options, complete)
     local remainingRequests = #missing
     local createOne
     createOne = function()
-      local current, baseline = collect()
+      local current, baseline = collect(app.bundleID)
       if not current then return end
       if #missingFor(current, app.bundleID) == 0 then nextApp(); return end
       if remainingRequests == 0 then
@@ -173,7 +192,7 @@ function establish.start(recipe, options, complete)
         if not success then creationFailure(app, createErr); nextApp(); return end
         local ticks = 0
         local function awaitWindow()
-          local discovered = collect()
+          local discovered = collect(app.bundleID)
           if not discovered then return end
           local new = {}
           for _, candidate in ipairs(discovered) do
@@ -201,14 +220,14 @@ function establish.start(recipe, options, complete)
 
     if options.isRunning(app.bundleID) then createOne(); return end
     report.phase = "launching"
-    local _, baseline = collect()
+    local _, baseline = collect(app.bundleID)
     if not baseline then return end
     keep(options.launch(app.bundleID, function(success, launchErr)
       if not guard() then return end
       if not success then creationFailure(app, launchErr); nextApp(); return end
       local ticks, stableTicks, lastCount = 0, 0, -1
       local function awaitLaunch()
-        local discovered = collect()
+        local discovered = collect(app.bundleID)
         if not discovered then return end
         local count = 0
         for _, candidate in ipairs(discovered) do

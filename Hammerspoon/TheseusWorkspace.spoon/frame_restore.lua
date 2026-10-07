@@ -108,7 +108,13 @@ function restore.place(window, target, options, complete)
     end
   end
 
-  fullFrame()
+  -- Matching already observed this frame. Avoid a redundant resize/move when
+  -- reapplying a layout, but still verify later and recover any intervening drift.
+  if matches(options.initialFrame, target, 2) then
+    if permitted() then later(function() verify(false) end) end
+  else
+    fullFrame()
+  end
   return job
 end
 

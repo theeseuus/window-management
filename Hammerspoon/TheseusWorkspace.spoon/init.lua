@@ -111,7 +111,7 @@ local function operationContext(options)
   return context
 end
 
-local function describeWindow(controller, window, context)
+local function describeWindow(controller, window, context, eligibilityOnly)
   local windowOK, recordOrReason = pcall(function()
     if not window:isStandard() then return "non-standard" end
     if not window:isVisible() then return "not-visible" end
@@ -145,7 +145,7 @@ local function describeWindow(controller, window, context)
       id = window:id(),
       bundleID = bundleID,
       appName = app:title() or bundleID,
-      frame = copyFrame(window:frame()),
+      frame = not eligibilityOnly and copyFrame(window:frame()) or nil,
       screenFrame = context.screenFrame,
       window = window,
     }
@@ -227,9 +227,11 @@ end
 -- Establish enumerates only the apps named in the recipe, not the whole
 -- desktop. Retain all observed IDs so an old hidden/minimized window cannot
 -- be mistaken for a newly created one when it becomes visible.
-local function collectRecipeWindows(controller, recipe, context)
+local function collectRecipeWindows(controller, recipe, context, onlyBundleID)
   local records, seenIDs, bundles = {}, {}, {}
-  for _, slot in ipairs(recipe.windows) do bundles[slot.bundleID] = true end
+  for _, slot in ipairs(recipe.windows) do
+    if not onlyBundleID or slot.bundleID == onlyBundleID then bundles[slot.bundleID] = true end
+  end
   local ordered = {}
   for bundleID in pairs(bundles) do table.insert(ordered, bundleID) end
   table.sort(ordered)
@@ -517,6 +519,7 @@ function obj:restoreWorkspace(name, options)
     else
       local window = assignment.candidate.window
       local job = frameRestore.place(window, targetFrame, {
+        initialFrame = workspaceLogic.absoluteFrame(assignment.candidate.frame, context.screenFrame),
         animationDuration = tonumber(self.animationDuration),
         scheduleAfter = hs.timer.doAfter,
         guard = function()
@@ -524,7 +527,7 @@ function obj:restoreWorkspace(name, options)
           if not activeOK or activeSpace ~= context.spaceID then
             return false, "active-space-changed"
           end
-          local record, reason = describeWindow(self, window, context)
+          local record, reason = describeWindow(self, window, context, true)
           if not record or record.id ~= assignment.candidate.id then
             return false, reason or "window-no-longer-available"
           end
@@ -586,7 +589,7 @@ function obj:establishWorkspace(name, options)
   session.job = workspaceEstablish.start(recipe, {
     guard = guard,
     scheduleAfter = hs.timer.doAfter,
-    collect = function() return collectRecipeWindows(self, recipe, context) end,
+    collect = function(bundleID) return collectRecipeWindows(self, recipe, context, bundleID) end,
     isRunning = function(bundleID) return hs.application.get(bundleID) ~= nil end,
     support = function(bundleID)
       if self.excludedBundleIDs[bundleID] then return false, "excluded-application" end
@@ -602,12 +605,13 @@ function obj:establishWorkspace(name, options)
       local target = assert(workspaceLogic.absoluteFrame(assignment.target.frame, context.screenFrame))
       local window = assignment.candidate.window
       return frameRestore.place(window, target, {
+        initialFrame = workspaceLogic.absoluteFrame(assignment.candidate.frame, context.screenFrame),
         animationDuration = tonumber(self.animationDuration),
         scheduleAfter = hs.timer.doAfter,
         guard = function()
           local allowed, reason = guard()
           if not allowed then return false, reason end
-          local record, recordErr = describeWindow(self, window, context)
+          local record, recordErr = describeWindow(self, window, context, true)
           if not record or record.id ~= assignment.candidate.id then
             return false, recordErr or "window-no-longer-available"
           end

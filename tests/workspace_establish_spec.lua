@@ -23,6 +23,7 @@ local function environment()
   local env = {
     windows = {}, timers = {}, launches = {}, creates = {}, placements = {},
     running = {}, unsupported = {}, active = true, nextID = 100, completes = 0,
+    collections = {}, events = {},
   }
   function env:add(bundle, properties)
     self.nextID = self.nextID + 1
@@ -55,7 +56,8 @@ local function environment()
   env.options = {
     scheduleAfter = schedule,
     guard = function() return env.active, "active-space-changed" end,
-    collect = function()
+    collect = function(bundleID)
+      table.insert(env.collections, bundleID or "all")
       if env.failCollect then return nil, "enumeration-failed" end
       if env.launchChecks then
         env.launchChecks = env.launchChecks + 1
@@ -64,8 +66,10 @@ local function environment()
       end
       local candidates, seenIDs = {}, {}
       for _, window in ipairs(env.windows) do
-        seenIDs[window.id] = true
-        if window.destination and not window.hidden then table.insert(candidates, window) end
+        if not bundleID or window.bundleID == bundleID then
+          seenIDs[window.id] = true
+          if window.destination and not window.hidden then table.insert(candidates, window) end
+        end
       end
       return candidates, nil, seenIDs
     end,
@@ -82,6 +86,7 @@ local function environment()
       end)
     end,
     create = function(bundle, callback)
+      table.insert(env.events, "create:" .. bundle)
       table.insert(env.creates, bundle)
       return child(function()
         if env.createError then callback(false, env.createError); return end
@@ -94,6 +99,7 @@ local function environment()
       end)
     end,
     place = function(assignment, callback)
+      table.insert(env.events, "place:" .. assignment.target.bundleID)
       table.insert(env.placements, assignment)
       return child(function()
         assignment.candidate.placed = true
@@ -137,6 +143,12 @@ equal(#report.missing, 0, "no missing slots")
 equal(#report.failures, 0, "no placement failures")
 equal(#report.creationFailures, 0, "no creation failures")
 equal(report.pending, 0, "no pending checks")
+equal(env.events[3], "place:Finder", "place the first app before creating the next app")
+equal(env.events[4], "place:Finder", "match both same-app slots before placement")
+equal(env.events[5], "create:Ghostty", "creation proceeds while previous placements verify")
+local allScans = 0
+for _, scope in ipairs(env.collections) do if scope == "all" then allScans = allScans + 1 end end
+equal(allScans, 2, "scan the whole recipe only at start and final reconciliation")
 report = env:start(layout)
 env:drain()
 equal(#env.creates, 4, "repeat establishment creates no duplicates")
