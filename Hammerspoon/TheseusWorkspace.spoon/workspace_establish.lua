@@ -202,7 +202,13 @@ function establish.start(recipe, options, complete)
           end
           if #new == 1 then
             rememberNew(new, baseline, app.bundleID)
-            createOne()
+            if options.createdWindowReady then
+              keep(options.createdWindowReady(new[1], function(success, readyErr)
+                if not guard() then return end
+                if success then createOne()
+                else creationFailure(app, readyErr); nextApp() end
+              end))
+            else createOne() end
           elseif #new > 1 then
             creationFailure(app, "ambiguous-new-windows")
             nextApp()

@@ -323,4 +323,34 @@ report = env:start(recipe({ "Ghostty" }))
 env:drain()
 equal(report.reason, "could-not-schedule-window-check", "timer allocation fails safely")
 
+env = environment()
+local prepared = {}
+env.options.createdWindowReady = function(candidate, callback)
+  prepared[#prepared + 1] = candidate.id
+  equal(candidate.destination, true, "prepare only a destination-Space window")
+  local timer = { callback = function() callback(true) end }
+  function timer:stop() self.stopped = true end
+  table.insert(env.timers, timer)
+  return { cancel = function() timer:stop() end }
+end
+env:start(recipe({ "Safari", "Safari" }))
+env:drain()
+equal(#prepared, 2, "prepare each verified new window before subsequent creation")
+equal(env.report.applied, 2, "place after new-window preparation")
+env:start(recipe({ "Safari", "Safari" }))
+env:drain()
+equal(#prepared, 2, "reused windows never receive new-window focus")
+env = environment()
+env.options.createdWindowReady = function(_, callback) callback(false, "new-window-not-focused") end
+env:start(recipe({ "Safari", "Safari" }))
+env:drain()
+equal(#env.creates, 1, "focus failure prevents the next creation")
+equal(env.report.creationFailures[1].reason, "new-window-not-focused", "preparation failure is explicit")
+env = environment()
+env.wrongSpace = true
+env.options.createdWindowReady = function() error("must not prepare a wrong-Space window") end
+env:start(recipe({ "Safari" }))
+env:drain()
+equal(env.report.created, 0, "wrong-Space windows are neither approved nor focused")
+
 print(string.format("workspace_establish: %d assertions passed", assertions))

@@ -63,8 +63,20 @@ interpolated into executable commands.
    its built-in Start Page explicitly. Bare `make new document` was observed to
    switch to an existing Safari Space during Establish on Safari 27.0.1; a test
    with Safari already in the destination Space did not reveal that failure.
+   The explicit URL alone also switched Spaces intermittently during repeated
+   four-window creation. Safari sets `focusNewWindow = true`: after discovery
+   verifies one genuinely new window in the destination Space, the factory
+   focuses that exact window and verifies its focus after 0.3 seconds before
+   requesting another. Reused windows and other-Space windows are never focused
+   by this hook. On Safari 27.0.1, an isolated pilot with this focus step passed
+   three consecutive four-window creation/cleanup cycles in Space 6, verifying
+   zero Safari windows there before every cycle and retaining the original Safari
+   window in Space 3. This establishes the creation behaviour, not the complete
+   panel workflow; that acceptance test must also pass before claiming the
+   user-facing failure is resolved.
    Test creation from a Space without Safari windows while another Space has
-   Safari open. Do not change preferences or navigate existing windows.
+   Safari open, including the normal panel entry point and repeated cycles.
+   Do not change preferences or navigate existing windows.
 5. If a new failure category is needed, add its friendly wording in `init.lua`
    and exercise it in tests. Do not expose raw app-returned errors or stderr.
 

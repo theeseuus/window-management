@@ -310,5 +310,47 @@ factory.launch("com.example.Unrequested", options, complete)
 equal(#tasks, 0, "direct launch remains allowlisted")
 equal(result.reason, "unsupported-application", "unlisted launch rejected")
 
+local focusCalls, focusedID = 0, 999
+local fresh = {
+  id = 123, bundleID = "com.apple.Safari",
+  window = {
+    id = function() return 123 end,
+    application = function() return { bundleID = function() return "com.apple.Safari" end } end,
+    focus = function() focusCalls = focusCalls + 1; focusedID = 123 end,
+  },
+}
+hs.window = { focusedWindow = function() return { id = function() return focusedID end } end }
+reset()
+factory.createdWindowReady(fresh, options, complete)
+equal(focusCalls, 1, "focus only the verified new Safari window")
+equal(calls, 0, "wait for the new window to become active")
+drain()
+equal(result.ok, true, "new window focus verified")
+reset()
+allowed = false
+factory.createdWindowReady(fresh, options, complete)
+equal(focusCalls, 1, "do not focus after the destination Space changes")
+equal(result.reason, "active-space-changed", "focus guard reason")
+reset()
+factory.createdWindowReady(fresh, options, complete)
+focusedID = 999
+drain()
+equal(result.reason, "new-window-not-focused", "old-window focus is never accepted")
+reset()
+job = factory.createdWindowReady(fresh, options, complete)
+job:cancel()
+drain()
+equal(calls, 1, "focus cancellation completes once")
+equal(result.reason, "establish-cancelled", "cancel focus wait")
+reset()
+fresh.id = 456
+factory.createdWindowReady(fresh, options, complete)
+equal(result.reason, "window-no-longer-available", "exact new-window identity required")
+fresh.id = 123
+reset()
+factory.createdWindowReady({ bundleID = "com.apple.finder" }, options, complete)
+equal(result.ok, true, "other adapters need no focus or delay")
+equal(#timers, 0, "other adapters retain immediate readiness")
+
 hs = previousHs
 print(string.format("window_factory: %d assertions passed", assertions))
