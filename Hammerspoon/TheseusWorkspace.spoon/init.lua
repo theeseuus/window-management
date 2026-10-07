@@ -8,7 +8,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "TheseusWorkspace"
-obj.version = "0.3.0"
+obj.version = "0.4.0"
 obj.author = "Theeseuus"
 obj.license = "MIT"
 
@@ -20,7 +20,7 @@ obj.excludedBundleIDs = {}
 local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local workspaceLogic = dofile(sourcePath .. "workspace_logic.lua")
 local frameRestore = dofile(sourcePath .. "frame_restore.lua")
-local captureDialog = dofile(sourcePath .. "capture_dialog.lua")
+local panelController = dofile(sourcePath .. "panel_controller.lua")
 local windowFactory = dofile(sourcePath .. "window_factory.lua")
 local workspaceEstablish = dofile(sourcePath .. "workspace_establish.lua")
 
@@ -49,6 +49,8 @@ local function reasonText(reason)
     ["workspace-not-found"] = "workspace was not found",
     ["no-windows"] = "no eligible windows are present in this Space",
     ["active-space-changed"] = "the active Space changed; try again in the intended Space",
+    ["establish-in-progress"] = "Establish is already in progress; wait for completion",
+    ["restore-in-progress"] = "Restore is already in progress; wait for completion",
     ["unsupported-application"] = "missing-window creation is not supported for this app",
     ["excluded-application"] = "this app is excluded from workspace management",
     ["application-not-installed"] = "the app is not installed",
@@ -97,6 +99,16 @@ local function currentUserSpaceContext()
     screenFrame = copyFrame(screen:frame()),
     spaceID = spaceID,
   }
+end
+
+local function operationContext(options)
+  if not options._context then return currentUserSpaceContext() end
+  local context = options._context
+  local ok, activeSpace = pcall(hs.spaces.activeSpaceOnScreen, context.screen)
+  if not ok or activeSpace ~= context.spaceID then return nil, "active-space-changed" end
+  local typeOK, spaceType = pcall(hs.spaces.spaceType, context.spaceID)
+  if not typeOK or spaceType ~= "user" then return nil, "active-space-changed" end
+  return context
 end
 
 local function describeWindow(controller, window, context)
@@ -149,6 +161,8 @@ local function describeWindow(controller, window, context)
 end
 
 local function collectCurrentWindows(controller, context, excludedWindowID)
+  local panel = controller._workspaceUI and controller._workspaceUI.session
+  excludedWindowID = excludedWindowID or (panel and panel:windowID())
   local windowsOK, windowIDs, windowsErr = pcall(hs.spaces.windowsForSpace, context.spaceID)
   if not windowsOK then
     return nil, "could not enumerate windows in the active Space: " .. tostring(windowIDs)
@@ -174,7 +188,7 @@ local function collectCurrentWindows(controller, context, excludedWindowID)
   for _, windowID in ipairs(windowIDs) do
     local window = windowsByID[windowID]
     if windowID == excludedWindowID then
-      skipped["capture-dialog"] = (skipped["capture-dialog"] or 0) + 1
+      skipped["workspace-panel"] = (skipped["workspace-panel"] or 0) + 1
     elseif window then
       local record, reason = describeWindow(controller, window, context)
       if record then
@@ -269,27 +283,6 @@ local function saveCatalog(controller, catalog)
   return true
 end
 
-local function chooserChoices(controller)
-  local workspaces, workspacesErr = controller:listWorkspaces()
-  if not workspaces then
-    return nil, workspacesErr
-  end
-
-  local choices = {}
-  for _, workspace in ipairs(workspaces) do
-    table.insert(choices, {
-      text = workspace.name,
-      subText = string.format(
-        "%d windows · %s · captured %s",
-        workspace.windowCount,
-        workspace.applications,
-        workspace.capturedAt
-      ),
-      workspaceName = workspace.name,
-    })
-  end
-  return choices
-end
 
 local function takeSnapshot(controller, context, excludedWindowID)
   local capturedAt = os.date("!%Y-%m-%dT%H:%M:%SZ")
@@ -424,7 +417,7 @@ function obj:restoreWorkspace(name, options)
     return nil, "workspace-not-found"
   end
 
-  local context, contextErr = currentUserSpaceContext()
+  local context, contextErr = operationContext(options)
   if not context then
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(contextErr)) end
     return nil, contextErr
@@ -576,7 +569,7 @@ function obj:establishWorkspace(name, options)
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(err)) end
     return nil, err
   end
-  local context, contextErr = currentUserSpaceContext()
+  local context, contextErr = operationContext(options)
   if not context then
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(contextErr)) end
     return nil, contextErr
@@ -703,191 +696,39 @@ function obj:deleteWorkspace(name, options)
   return true
 end
 
-function obj:promptCaptureCurrentWorkspace()
-  if self._captureDialog then
-    self._captureDialog:bringToFront()
-    return self
-  end
-  -- Select the original window's screen/Space before the dialog takes focus.
-  local context, contextErr = currentUserSpaceContext()
-  if not context then
-    showAlert("WORKSPACE: " .. reasonText(contextErr))
-    return self
-  end
-  local snapshot
-  local ok, sessionOrError = pcall(captureDialog.open, context.screenFrame, {
-    capture = function(session)
-      local snapshotErr
-      snapshot, snapshotErr = takeSnapshot(self, context, session:windowID())
-      if not snapshot then
-        session:failed("Capture failed: " .. reasonText(snapshotErr))
-        return
-      end
-      session:ready(string.format(
-        "Snapshot ready · %d %s. You can move windows now; name and save this snapshot.",
-        #snapshot.records, #snapshot.records == 1 and "window" or "windows"
-      ))
+local function workspaceUI(controller)
+  if controller._workspaceUI then return controller._workspaceUI end
+  controller._workspaceUI = panelController.new({
+    context = currentUserSpaceContext,
+    catalog = function() return loadCatalog(controller) end,
+    snapshot = function(context, excludedID) return takeSnapshot(controller, context, excludedID) end,
+    save = function(name, snapshot, replace)
+      return saveSnapshot(controller, name, snapshot, { replace = replace, silent = true })
     end,
-    save = function(session, name)
-      if not snapshot then return end
-      local normalizedName, nameErr = workspaceLogic.normalizeName(name)
-      if not normalizedName then session:ready(reasonText(nameErr)); return end
-      local catalog, catalogErr = loadCatalog(self)
-      if not catalog then session:ready(reasonText(catalogErr)); return end
-      local replace = false
-      if catalog.recipes[normalizedName] then
-        local response = hs.dialog.blockAlert(
-          "Replace workspace?",
-          string.format("A workspace named “%s” already exists.", normalizedName),
-          "Replace", "Cancel", "warning"
-        )
-        if session.closed then return end
-        if response ~= "Replace" then
-          session:ready("Replacement cancelled. Choose another name or cancel.")
-          return
-        end
-        replace = true
-      end
-      local recipe, saveErr = saveSnapshot(self, normalizedName, snapshot, { replace = replace })
-      if recipe then session:close() else session:ready(reasonText(saveErr)) end
+    delete = function(name) return controller:deleteWorkspace(name, { silent = true }) end,
+    apply = function(action, name, context)
+      if action == "restore" then controller:restoreWorkspace(name, { _context = context })
+      else controller:establishWorkspace(name, { _context = context }) end
     end,
-    closed = function(session)
-      snapshot = nil
-      if self._captureDialog == session then self._captureDialog = nil end
+    busy = function()
+      return controller._establishOperation and "establish-in-progress"
+        or (controller._restoreOperation and "restore-in-progress")
     end,
+    reason = reasonText,
+    alert = function(message) showAlert("WORKSPACE: " .. message) end,
   })
-  if ok then
-    self._captureDialog = sessionOrError
-  else
-    showAlert("WORKSPACE: could not open capture dialog: " .. tostring(sessionOrError), context.screen)
-  end
+  return controller._workspaceUI
+end
+
+function obj:showWorkspaces()
+  workspaceUI(self):show()
   return self
 end
 
-local function closeRestoreChooser(controller)
-  local session = controller._restoreChooserSession
-  controller._restoreChooserSession = nil
-  controller._restoreChooser = nil
-  if not session then return end
-  local deleteHotkey = session.deleteHotkey
-  local establishHotkey = session.establishHotkey
-  session.deleteHotkey = nil
-  session.establishHotkey = nil
-  if deleteHotkey then deleteHotkey:delete() end
-  if establishHotkey then establishHotkey:delete() end
-  if session.chooser then
-    session.chooser:cancel()
-    session.chooser:delete()
-  end
-end
-
-function obj:showRestoreChooser()
-  closeRestoreChooser(self)
-  local choices, choicesErr = chooserChoices(self)
-  if not choices then
-    showAlert("WORKSPACE: " .. reasonText(choicesErr))
-    return self
-  end
-  if #choices == 0 then
-    showAlert("WORKSPACE: no captured workspaces")
-    return self
-  end
-
-  local session = {}
-  self._restoreChooserSession = session
-  local chooser = hs.chooser.new(function(choice)
-    if self._restoreChooserSession ~= session or session.confirming then return end
-    closeRestoreChooser(self)
-    if choice and choice.workspaceName then
-      self:restoreWorkspace(choice.workspaceName)
-    end
-  end)
-  session.chooser = chooser
-  self._restoreChooser = chooser
-
-  local function establishSelected(choice)
-    if self._restoreChooserSession ~= session or session.confirming
-      or not chooser:isVisible() or not choice or not choice.workspaceName then return end
-    local name = choice.workspaceName
-    closeRestoreChooser(self)
-    self:establishWorkspace(name)
-  end
-
-  local function confirmDelete(choice)
-    if self._restoreChooserSession ~= session or session.confirming
-      or not chooser:isVisible() or not choice or not choice.workspaceName then
-      return
-    end
-    -- Freeze the target before dismissing the chooser. Filtered row numbers
-    -- are not indexes into the original, unfiltered choices table.
-    local name = choice.workspaceName
-    local query, selectedRow = chooser:query(), chooser:selectedRow()
-    session.confirming = true
-    chooser:hide()
-    local response = hs.dialog.blockAlert(
-      "Delete saved layout?",
-      string.format(
-        "Delete “%s”? Only the saved layout is removed. No windows, apps, or Spaces are changed. This cannot be undone.",
-        name
-      ),
-      "Cancel", "Delete", "warning"
-    )
-    -- A stopped Spoon or replacement chooser must invalidate an old prompt.
-    if self._restoreChooserSession ~= session then return end
-    session.confirming = false
-    if response == "Delete" then self:deleteWorkspace(name) end
-
-    local refreshed, refreshErr = chooserChoices(self)
-    if not refreshed or #refreshed == 0 then
-      closeRestoreChooser(self)
-      if refreshErr then showAlert("WORKSPACE: " .. reasonText(refreshErr)) end
-      return
-    end
-    chooser:choices(refreshed):query(query):show()
-    if response ~= "Delete" then chooser:selectedRow(selectedRow) end
-  end
-
-  session.establishHotkey = hs.hotkey.new({ "cmd" }, "return", function()
-    establishSelected(chooser:selectedRowContents())
-  end)
-  session.deleteHotkey = hs.hotkey.new({ "cmd" }, "delete", function()
-    if self._restoreChooserSession ~= session or not chooser:isVisible() then return end
-    confirmDelete(chooser:selectedRowContents())
-  end)
-  chooser
-    :placeholderText("Restore · ⌘Return: Establish here · ⌘Delete: Delete · right-click actions")
-    :searchSubText(true)
-    :showCallback(function()
-      if self._restoreChooserSession == session and session.deleteHotkey then
-        session.deleteHotkey:enable()
-      end
-      if self._restoreChooserSession == session and session.establishHotkey then
-        session.establishHotkey:enable()
-      end
-    end)
-    :hideCallback(function()
-      if session.deleteHotkey then session.deleteHotkey:disable() end
-      if session.establishHotkey then session.establishHotkey:disable() end
-    end)
-    :rightClickCallback(function(row)
-      if row == 0 or self._restoreChooserSession ~= session then return end
-      local choice = chooser:selectedRowContents(row)
-      if not choice.workspaceName then return end
-      local menu = hs.menubar.new(false)
-      if not menu then return end
-      local requested
-      menu:setMenu({
-        { title = "Establish here (create missing windows)", fn = function() requested = "establish" end },
-        { title = "Delete saved layout…", fn = function() requested = "delete" end },
-      })
-      menu:popupMenu(hs.mouse.absolutePosition())
-      menu:delete()
-      -- Open the confirmation only after the context menu has closed.
-      if requested == "delete" then confirmDelete(choice)
-      elseif requested == "establish" then establishSelected(choice) end
-    end)
-    :choices(choices)
-    :show()
+-- Keep existing integrations compatible; neither API opens a second window.
+function obj:showRestoreChooser() return self:showWorkspaces() end
+function obj:promptCaptureCurrentWorkspace()
+  workspaceUI(self):show(true)
   return self
 end
 
@@ -905,10 +746,11 @@ function obj:bindHotkeys(mapping)
   self._hotkeys = {}
 
   local actions = {
+    workspaces = function() self:showWorkspaces() end,
     capture = function() self:promptCaptureCurrentWorkspace() end,
-    restore = function() self:showRestoreChooser() end,
+    restore = function() self:showWorkspaces() end,
   }
-  for _, actionName in ipairs({ "capture", "restore" }) do
+  for _, actionName in ipairs({ "workspaces", "capture", "restore" }) do
     local keySpec = mapping[actionName]
     if keySpec then
       self._hotkeys[actionName] = hs.hotkey.bindSpec(keySpec, actions[actionName])
@@ -922,7 +764,7 @@ function obj:start()
 end
 
 function obj:stop()
-  if self._captureDialog then self._captureDialog:close() end
+  if self._workspaceUI then self._workspaceUI:close(); self._workspaceUI = nil end
   if self._establishOperation then
     local session = self._establishOperation
     session.cancelled = true
@@ -933,7 +775,6 @@ function obj:stop()
     operation.report.cancelled = true
     for _, job in ipairs(operation.jobs) do job:cancel() end
   end
-  closeRestoreChooser(self)
   self:_unbindHotkeys()
   return self
 end

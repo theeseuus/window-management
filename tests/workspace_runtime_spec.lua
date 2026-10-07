@@ -180,7 +180,7 @@ local workspace = dofile(
 )
 
 equal(workspace.name, "TheseusWorkspace", "workspace Spoon name")
-equal(workspace.version, "0.3.0", "workspace Spoon version")
+equal(workspace.version, "0.4.0", "workspace Spoon version")
 equal(workspace.author, "Theeseuus", "workspace Spoon author")
 
 local recipe, captureReport = workspace:captureCurrentWorkspace(
@@ -206,6 +206,23 @@ local duplicate, duplicateErr = workspace:captureCurrentWorkspace(
 )
 equal(duplicate, nil, "capture refuses implicit replacement")
 equal(duplicateErr, "workspace-exists", "implicit replacement error")
+
+local retainedContext = { screen = screen, screenFrame = screen:frame(), spaceID = 901 }
+local originalFocusedLookup = hs.window.focusedWindow
+hs.window.focusedWindow = function() error("closing the panel may change focused windows") end
+local retained = workspace:restoreWorkspace("Project Atlas", { silent = true, _context = retainedContext })
+drainTimers()
+equal(retained.applied, 2, "retained destination does not depend on post-close focus")
+local enumerationBeforeWrongSpace = enumerationCount
+currentSpaceID = 902
+for _, action in ipairs({ "restoreWorkspace", "establishWorkspace" }) do
+  local refused, reason = workspace[action](workspace, "Project Atlas", { silent = true, _context = retainedContext })
+  equal(refused, nil, action .. " rejects a stale destination before doing work")
+  equal(reason, "active-space-changed", action .. " explains a stale destination")
+end
+equal(enumerationCount, enumerationBeforeWrongSpace, "stale destination never enumerates windows")
+currentSpaceID = 901
+hs.window.focusedWindow = originalFocusedLookup
 
 windows[11].currentFrame = { x = 900, y = 550, w = 400, h = 500 }
 windows[21].currentFrame = { x = 100, y = 50, w = 400, h = 500 }

@@ -1,365 +1,118 @@
 local testPath = debug.getinfo(1, "S").source:match("^@(.*/)")
-local repositoryRoot = testPath:match("^(.*)/tests/$")
-local spoonPath = repositoryRoot .. "/Hammerspoon/TheseusWorkspace.spoon/"
-local logic = dofile(spoonPath .. "workspace_logic.lua")
-local assertions = 0
-
+local fixture = dofile(testPath .. "workspace_panel_fixture.lua")
+local previousHs, assertions = hs, 0
 local function equal(actual, expected, label)
   assertions = assertions + 1
-  if actual ~= expected then
-    error(string.format("%s: expected %s, got %s", label, tostring(expected), tostring(actual)), 2)
-  end
+  assert(actual == expected, label .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
 end
-
-local function clone(value)
-  if type(value) ~= "table" then return value end
-  local copy = {}
-  for key, item in pairs(value) do copy[key] = clone(item) end
-  return copy
-end
-
-local catalog, settingsWrites, failSave
-local choosers, hotkeys, menus, alerts, prompts, restores, establishes = {}, {}, {}, {}, {}, {}, {}
-local menuAction, duringMenu = 2, nil
-local response, duringPrompt, chooseMenu = "Cancel", nil, true
-local completeOnHide, failHotkey, failMenu = false, false, false
-local menuOpen = false
-
-local function resetCatalog(names)
-  catalog = logic.newCatalog()
-  settingsWrites, failSave = 0, false
-  for _, name in ipairs(names or { "Alpha", "Zeta" }) do
-    catalog.recipes[name] = assert(logic.buildRecipe(name, { {
-      bundleID = "com.example.Test",
-      appName = "Test",
-      frame = { x = 0, y = 0, w = 800, h = 600 },
-      screenFrame = { x = 0, y = 0, w = 1600, h = 1000 },
-    } }, "2026-10-05T00:00:00Z"))
-  end
-end
-
-local previousHs = hs
-hs = {
-  settings = {
-    get = function() return clone(catalog) end,
-    set = function(_, value)
-      if failSave then error("test save failure") end
-      settingsWrites = settingsWrites + 1
-      catalog = clone(value)
-    end,
-  },
-  screen = { mainScreen = function() return {} end },
-  alert = { show = function(message) table.insert(alerts, message) end },
-  window = setmetatable({}, { __index = function()
-    error("chooser deletion must not inspect or move any windows")
-  end }),
-  spaces = setmetatable({}, { __index = function()
-    error("chooser deletion must not inspect or change Spaces")
-  end }),
-  chooser = {
-    new = function(completion)
-      local chooser = { completion = completion, queryText = "", row = 1, visible = false }
-      function chooser:placeholderText(text) self.placeholder = text; return self end
-      function chooser:searchSubText(value) self.searchSubtext = value; return self end
-      function chooser:choices(values) self.values = values; return self end
-      function chooser:showCallback(callback) self.onShow = callback; return self end
-      function chooser:hideCallback(callback) self.onHide = callback; return self end
-      function chooser:rightClickCallback(callback) self.onRightClick = callback; return self end
-      function chooser:isVisible() return self.visible end
-      function chooser:show()
-        self.visible = true
-        if self.onShow then self.onShow() end
-        return self
-      end
-      function chooser:hide()
-        self.visible = false
-        if self.onHide then self.onHide() end
-        if completeOnHide then self.completion(nil) end
-        return self
-      end
-      function chooser:cancel() self:hide(); self.completion(nil); return self end
-      function chooser:delete() self.deleted = true end
-      function chooser:query(value)
-        if value == nil then return self.queryText end
-        self.queryText = value
-        return self
-      end
-      function chooser:selectedRow(value)
-        if value == nil then return self.row end
-        self.row = value
-        return self
-      end
-      function chooser:selectedRowContents(row)
-        local visible = {}
-        for _, choice in ipairs(self.values) do
-          local searchable = choice.text .. " " .. choice.subText
-          if searchable:lower():find(self.queryText:lower(), 1, true) then
-            table.insert(visible, choice)
-          end
-        end
-        return visible[row or self.row] or {}
-      end
-      table.insert(choosers, chooser)
-      return chooser
-    end,
-  },
-  hotkey = {
-    new = function(modifiers, key, callback)
-      if failHotkey then return nil end
-      local hotkey = { modifiers = modifiers, key = key, callback = callback, enabled = false }
-      function hotkey:enable() self.enabled = true; return self end
-      function hotkey:disable()
-        if self.deleted then error("must not disable an already deleted hotkey") end
-        self.enabled = false
-        return self
-      end
-      function hotkey:delete() self.enabled = false; self.deleted = true end
-      table.insert(hotkeys, hotkey)
-      return hotkey
-    end,
-  },
-  menubar = {
-    new = function(inMenuBar)
-      if failMenu then return nil end
-      local menu = { inMenuBar = inMenuBar }
-      function menu:setMenu(items) self.items = items; return self end
-      function menu:popupMenu(point)
-        self.point = point
-        menuOpen = true
-        if chooseMenu then self.items[menuAction].fn() end
-        if duringMenu then duringMenu() end
-        menuOpen = false
-        return self
-      end
-      function menu:delete() self.deleted = true end
-      table.insert(menus, menu)
-      return menu
-    end,
-  },
-  mouse = { absolutePosition = function() return { x = 40, y = 50 } end },
-  dialog = {
-    blockAlert = function(message, detail, first, second, style)
-      local chooser, hotkey = choosers[#choosers], hotkeys[#hotkeys]
-      equal(chooser:isVisible(), false, "hide chooser during confirmation")
-      if not failHotkey then equal(hotkey.enabled, false, "disable local hotkey during confirmation") end
-      equal(menuOpen, false, "close context menu before confirmation")
-      table.insert(prompts, { message = message, detail = detail, first = first, second = second, style = style })
-      if duringPrompt then duringPrompt() end
-      return response
-    end,
-  },
-}
-
-local workspace = dofile(spoonPath .. "init.lua")
-workspace.restoreWorkspace = function(_, name) table.insert(restores, name) end
-workspace.establishWorkspace = function(_, name)
-  equal(menuOpen, false, "close context menu before Establish")
-  table.insert(establishes, name)
-end
-
 local function open(names)
-  workspace:stop()
-  resetCatalog(names)
-  response, duringPrompt, chooseMenu, completeOnHide = "Cancel", nil, true, false
-  menuAction, duringMenu = 2, nil
-  workspace:showRestoreChooser()
-  return choosers[#choosers], hotkeys[#hotkeys]
+  local f = fixture.new(); f:seed(names)
+  f.workspace.restoreWorkspace = function(_, name, options) table.insert(f.restores, { name = name, context = options._context }) end
+  f.workspace.establishWorkspace = function(_, name, options) table.insert(f.establishes, { name = name, context = options._context }) end
+  return f, f:open()
 end
 
-local chooser, hotkey = open()
-equal(chooser:isVisible(), true, "open restore chooser")
-equal(#chooser.values, 2, "show saved layouts")
-equal(chooser.searchSubtext, true, "retain application search")
-equal(chooser.placeholder:find("right-click", 1, true) ~= nil, true, "discover deletion in chooser")
-equal(#hotkey.modifiers, 1, "no Hyper modifier on local deletion")
-equal(hotkey.modifiers[1], "cmd", "local Command modifier")
-equal(hotkey.key, "delete", "local Delete key")
-equal(hotkey.enabled, true, "enable only while chooser is open")
+local f, view = open()
+equal(f:session().state, "library", "open saved layouts")
+equal(#f:model().entries, 2, "show saved recipes")
+equal(f:model().entries[1].name, "Alpha", "sort library by name")
+equal(#f:model().entries[1].rectangles, 1, "existing recipes get previews without recapture")
+equal(f.enumerations, 0, "opening library never captures desktop")
+equal(f.writes, 0, "opening library never writes settings")
+equal(#f.hotkeys, 0, "no panel hotkeys registered globally")
+equal(view.content.name, "TheseusWorkspacePanel", "one local message bridge")
+f:open()
+equal(#f.views, 1, "repeat entry brings same native window forward")
+f:send("delete", "Zeta")
+equal(f:session().state, "confirm-delete", "deletion is inline")
+equal(f:model().message:find("“Zeta”", 1, true) ~= nil, true, "confirm exact selected name, not row index")
+equal(f.writes, 0, "requesting deletion does not delete")
+f:send("restore", "Alpha"); f:send("establish", "Alpha"); f:send("delete", "Alpha")
+equal(#f.restores, 0, "no restore while confirming")
+equal(#f.establishes, 0, "no establish while confirming")
+f:send("cancel")
+equal(f:session().state, "library", "Cancel returns to library")
+equal(f:model().selectedName, "Zeta", "Cancel retains selected target")
+equal(f:recipe("Zeta") ~= nil, true, "Cancel preserves recipe")
+f:send("delete", "Zeta"); f:send("confirm-delete")
+equal(f:recipe("Zeta"), nil, "confirmed deletion removes exact target")
+equal(f:recipe("Alpha") ~= nil, true, "confirmed deletion preserves sibling")
+equal(f.writes, 1, "one durable deletion")
+equal(#f:model().entries, 1, "refresh live previews after deletion")
+equal(f.enumerations, 0, "deletion never enumerates project windows")
+f:send("restore", "Alpha")
+equal(f.restores[1].name, "Alpha", "Restore routes to existing engine")
+equal(f.restores[1].context.spaceID, 901, "freeze operation destination before losing focus")
+equal(f:session(), nil, "restore closes panel")
+equal(view.deleted, true, "release native window")
+equal(#f.hotkeys, 0, "no local gesture leaks into other apps")
 
-chooser:query("Zeta"):selectedRow(1)
-hotkey.callback()
-equal(prompts[#prompts].detail:find("“Zeta”", 1, true) ~= nil, true, "name filtered selection in confirmation")
-equal(prompts[#prompts].first, "Cancel", "Cancel is the default confirmation action")
-equal(prompts[#prompts].second, "Delete", "Delete requires explicit selection")
-equal(settingsWrites, 0, "Cancel performs no settings write")
-equal(catalog.recipes.Zeta ~= nil, true, "Cancel keeps layout")
-equal(chooser:query(), "Zeta", "Cancel preserves search")
-equal(chooser:selectedRow(), 1, "Cancel preserves selection")
-equal(chooser:isVisible(), true, "Cancel reopens chooser")
-equal(hotkey.enabled, true, "Cancel restores local gesture")
-equal(#restores, 0, "Cancel never restores windows")
+f, view = open(); f:send("establish", "Zeta")
+equal(f.establishes[1].name, "Zeta", "Establish routes to existing engine")
+equal(#f.restores, 0, "Establish is not Restore")
+equal(f.enumerations, 0, "dispatch does not move any windows itself")
+equal(view.deleted, true, "Establish releases panel")
 
-response = "Delete"
-completeOnHide = true
-hotkey.callback()
-equal(catalog.recipes.Zeta, nil, "Delete removes filtered layout, not original row index")
-equal(catalog.recipes.Alpha ~= nil, true, "Delete preserves other layouts")
-equal(settingsWrites, 1, "Delete persists one catalog change")
-equal(#chooser.values, 1, "refresh chooser after deletion")
-equal(chooser:query(), "Zeta", "Delete retains search")
-equal(alerts[#alerts], "DELETED Zeta", "show deletion result")
-equal(#restores, 0, "hiding for confirmation never restores windows")
-local promptCount = #prompts
-hotkey.callback()
-equal(#prompts, promptCount, "ignore deletion when search has no selectable row")
+f, view = open({ 'Final "draft"' }); f:send("delete", 'Final "draft"'); f:send("confirm-delete")
+equal(next(f.settings.TheseusWorkspaceRecipesV1.recipes), nil, "delete final recipe")
+equal(f:session().state, "library", "keep empty window available for Capture")
+equal(#f:model().entries, 0, "empty-state model")
+equal(view.deleted, nil, "final deletion never closes or recreates the window")
+f:send("delete", "Missing")
+equal(f.writes, 1, "missing selection cannot delete anything")
+f:send("capture"); f:drain()
+equal(f:session().state, "ready", "capture from an empty catalog")
 
-completeOnHide = false
-chooser:query("")
-chooser.completion(chooser:selectedRowContents())
-equal(restores[#restores], "Alpha", "Return retains normal restore behavior")
-equal(workspace._restoreChooser, nil, "restore releases chooser")
-equal(chooser.deleted, true, "restore destroys chooser")
-equal(hotkey.deleted, true, "restore destroys local hotkey")
-equal(hotkey.enabled, false, "local gesture cannot leak into applications")
+f = open(); f:send("delete", "Alpha"); f:recipe("Alpha").windows[1].frame.x = .25
+f:send("confirm-delete")
+equal(f.writes, 0, "stale confirmation preserves changed recipe")
+equal(f:recipe("Alpha").windows[1].frame.x, .25, "preserve newer geometry")
+equal(f:session().state, "library", "stale confirmation returns to library")
+f:send("delete", "Alpha"); f.saveError = true; f:send("confirm-delete")
+equal(f.writes, 0, "failed deletion is not persisted")
+equal(f:recipe("Alpha") ~= nil, true, "failed write preserves saved recipe")
+equal(f:model().error:find("could not save", 1, true) ~= nil, true, "inline settings error")
 
-chooser, hotkey = open()
-promptCount = #prompts
-chooser.onRightClick(0)
-chooser.onRightClick(99)
-equal(#prompts, promptCount, "ignore right-click outside valid rows")
-chooseMenu = false
-chooser.onRightClick(2)
-equal(#prompts, promptCount, "dismissing context menu does not delete")
-equal(menus[#menus].inMenuBar, false, "context menu creates no menu-bar icon")
-equal(menus[#menus].deleted, true, "release dismissed context menu")
-chooseMenu, response = true, "Delete"
-chooser:query("Zeta")
-chooser.onRightClick(1)
-equal(menus[#menus].items[2].title, "Delete saved layout…", "label context action")
-equal(menus[#menus].deleted, true, "release selected context menu")
-equal(catalog.recipes.Zeta, nil, "right-click uses filtered visible row")
-equal(catalog.recipes.Alpha ~= nil, true, "right-click preserves other layouts")
-chooser:cancel()
-equal(workspace._restoreChooser, nil, "Escape releases chooser")
-equal(hotkey.deleted, true, "Escape releases local hotkey")
+f, view = open(); local stale = view.content.callback; local revision = f:session().revision
+f:send("delete", "Alpha"); f:send("confirm-delete", nil, revision)
+equal(f.writes, 0, "ignore event queued before confirmation")
+f.workspace:stop(); stale({ body = { action = "confirm-delete", revision = revision + 1 } })
+equal(f.writes, 0, "stale closed session cannot delete")
+equal(view.deleted, true, "stop releases window")
+f:open(); stale({ body = { action = "restore", name = "Alpha", revision = 0 } })
+equal(#f.restores, 0, "old session cannot operate replacement window")
+equal(f:session().state, "library", "replacement remains usable")
+f:send("close")
+equal(f:session(), nil, "Escape-style close releases session")
 
-chooser, hotkey = open()
-local staleChooser, staleHotkey = chooser, hotkey
-workspace:showRestoreChooser()
-equal(staleChooser.deleted, true, "replacement destroys previous chooser")
-equal(staleHotkey.deleted, true, "replacement destroys previous hotkey")
-promptCount = #prompts
-staleHotkey.callback()
-staleChooser.onRightClick(1)
-staleChooser.completion({ workspaceName = "Alpha" })
-equal(#prompts, promptCount, "stale callbacks cannot open deletion prompt")
-equal(settingsWrites, 0, "stale callbacks cannot delete")
-equal(#restores, 1, "stale callbacks cannot restore")
+f = open(); f.workspace._restoreOperation = { jobs = {}, report = {} }
+f:send("establish", "Alpha")
+equal(#f.establishes, 0, "reject overlapping Establish")
+equal(f:session().state, "library", "busy operation leaves library usable")
+f:send("capture")
+equal(f.enumerations, 0, "do not capture windows while placements are pending")
+f.workspace._restoreOperation = nil
+f.spaceType = "fullscreen"; f:send("restore", "Alpha")
+equal(#f.restores, 0, "reject incompatible destination before closing")
+equal(f:session().state, "library", "invalid destination keeps window")
 
-chooser, hotkey = open()
-response = "Delete"
-duringPrompt = function() workspace:stop() end
-hotkey.callback()
-equal(settingsWrites, 0, "stop invalidates pending deletion")
-equal(catalog.recipes.Alpha ~= nil, true, "stop keeps pending target")
-equal(hotkey.deleted, true, "stop destroys local hotkey")
-equal(chooser.deleted, true, "stop destroys hidden chooser")
-
-chooser, hotkey = open()
-response = "Delete"
-duringPrompt = function() workspace:showRestoreChooser() end
-hotkey.callback()
-equal(settingsWrites, 0, "replacement invalidates pending deletion")
-equal(workspace._restoreChooser ~= chooser, true, "retain replacement chooser")
-equal(workspace._restoreChooser:isVisible(), true, "replacement chooser remains usable")
-
-chooser, hotkey = open()
-response = "Delete"
-duringPrompt = function() catalog.recipes.Alpha = nil end
-hotkey.callback()
-equal(settingsWrites, 0, "missing target is not persisted as a deletion")
-equal(catalog.recipes.Zeta ~= nil, true, "missing target preserves surviving recipe")
-equal(alerts[#alerts], "WORKSPACE: workspace was not found", "report stale target")
-equal(#chooser.values, 1, "refresh stale catalog after prompt")
-
-chooser, hotkey = open()
-response, failSave = "Delete", true
-hotkey.callback()
-equal(settingsWrites, 0, "failed save performs no successful write")
-equal(catalog.recipes.Alpha ~= nil, true, "failed save retains layout")
-equal(alerts[#alerts]:find("could not save", 1, true) ~= nil, true, "report save failure")
-equal(chooser:isVisible(), true, "failed save reopens chooser")
-
-chooser, hotkey = open({ "Final \"draft\"" })
-response = "Delete"
-hotkey.callback()
-equal(prompts[#prompts].detail:find("Final \"draft\"", 1, true) ~= nil, true, "preserve punctuation in exact target name")
-equal(next(catalog.recipes), nil, "delete final layout")
-equal(workspace._restoreChooser, nil, "close empty chooser")
-equal(hotkey.deleted, true, "final deletion releases local gesture")
-equal(alerts[#alerts], "DELETED Final \"draft\"", "preserve final deletion notice")
-promptCount = #prompts
-hotkey.callback()
-equal(#prompts, promptCount, "released local gesture cannot open prompt")
-
-failHotkey = true
-chooser = open()
-response = "Delete"
-chooser.onRightClick(1)
-equal(catalog.recipes.Alpha, nil, "context action works if local hotkey cannot be allocated")
-failHotkey = false
-chooser, hotkey = open()
-failMenu = true
-promptCount = #prompts
-chooser.onRightClick(1)
-equal(#prompts, promptCount, "failed menu allocation does not delete")
-response = "Delete"
-hotkey.callback()
-equal(catalog.recipes.Alpha, nil, "keyboard action works without context menu")
-failMenu = false
-
-workspace:stop()
-resetCatalog({})
-local chooserCount = #choosers
-workspace:showRestoreChooser()
-equal(#choosers, chooserCount, "empty catalog creates no chooser or local hotkey")
-equal(alerts[#alerts], "WORKSPACE: no captured workspaces", "report empty catalog")
-catalog.schemaVersion = 999
-workspace:showRestoreChooser()
-equal(#choosers, chooserCount, "invalid catalog creates no chooser")
-equal(alerts[#alerts]:find("workspace settings are invalid", 1, true) ~= nil, true, "report invalid catalog")
-equal(#restores, 1, "only explicit normal selection invoked restore")
-
-chooser, hotkey = open()
-local establishHotkey = hotkeys[#hotkeys - 1]
-equal(establishHotkey.modifiers[1], "cmd", "chooser-local Establish modifier")
-equal(establishHotkey.key, "return", "chooser-local Establish key")
-equal(establishHotkey.enabled, true, "Establish key enabled only in chooser")
-equal(chooser.placeholder:find("Establish here", 1, true) ~= nil, true, "discover Establish action")
-chooser:query("Zeta")
-completeOnHide = true
-establishHotkey.callback()
-equal(establishes[1], "Zeta", "Establish uses filtered highlighted layout")
-equal(settingsWrites, 0, "Establish does not delete or update recipes")
-equal(#restores, 1, "Establish never also runs normal Restore")
-equal(hotkey.deleted, true, "Establish releases deletion hotkey")
-equal(establishHotkey.deleted, true, "Establish releases its own hotkey")
-equal(chooser.deleted, true, "Establish releases chooser before creating windows")
-establishHotkey.callback()
-equal(#establishes, 1, "stale local Establish callback is inert")
-
-chooser, hotkey = open()
-establishHotkey = hotkeys[#hotkeys - 1]
-menuAction = 1
-chooser:query("Zeta")
-chooser.onRightClick(1)
-equal(establishes[2], "Zeta", "context Establish uses filtered visible row")
-equal(menus[#menus].items[1].title, "Establish here (create missing windows)", "context action describes creation")
-equal(menus[#menus].deleted, true, "release Establish context menu")
-equal(establishHotkey.deleted, true, "context Establish removes local hotkeys")
-
-chooser, hotkey = open()
-establishHotkey = hotkeys[#hotkeys - 1]
-chooser:hide()
-equal(establishHotkey.enabled, false, "hide disables Establish binding")
-establishHotkey.callback()
-equal(#establishes, 2, "hidden chooser cannot establish a layout")
-chooser:show()
-menuAction = 1
-duringMenu = function() workspace:stop() end
-chooser.onRightClick(1)
-equal(#establishes, 2, "stop during menu invalidates Establish action")
-equal(establishHotkey.deleted, true, "Spoon stop cleans up local Establish binding")
+f = fixture.new(); f.openError = true; f:open()
+equal(f:session(), nil, "opening failure leaves no active session")
+equal(#f.alerts, 1, "opening failure has a useful alert")
+f = fixture.new(); f.renderError = { description = "render failed" }; f:open()
+equal(f:session().renderError, "render failed", "retain native JavaScript diagnostics")
+f.renderError = { code = 0 }; f:session():render()
+equal(f:session().renderError, nil, "native code-zero success clears stale diagnostics")
+f.renderError = { code = 4, localizedDescription = "JavaScript exception" }; f:session():render()
+equal(f:session().renderError, "JavaScript exception", "retain native localized error description")
+f.renderError = nil; f:session():render()
+equal(f:session().renderError, nil, "ordinary success clears stale diagnostics")
+f.workspace:bindHotkeys({ workspaces = { { "ctrl", "alt", "cmd" }, "r" } })
+equal(#f.hotkeys, 1, "only one reference global shortcut")
+f.hotkeys[1].callback()
+equal(#f.views, 1, "global command reuses panel")
+f.workspace:stop()
+equal(f.hotkeys[1].deleted, true, "stop cleans global entry shortcut")
 
 hs = previousHs
-print(string.format("workspace_chooser: %d assertions passed", assertions))
+print(string.format("workspace_panel_workflow_spec: %d assertions passed", assertions))

@@ -14,3 +14,6 @@ else
   echo "No Lua runtime found. Run 'mise install' or set VALIDATION_LUA_BIN." >&2
   exit 1
 fi
+
+node --check "$validation_root/Hammerspoon/TheseusWorkspace.spoon/workspace_panel.js"
+node "$validation_root/tests/workspace_panel_spec.cjs"

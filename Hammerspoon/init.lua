@@ -5,6 +5,5 @@ spoon.TheseusWindow:bindHotkeys():start()
 
 hs.loadSpoon("TheseusWorkspace")
 spoon.TheseusWorkspace:bindHotkeys({
-  capture = { { "ctrl", "alt", "cmd", "shift" }, "r" },
-  restore = { { "ctrl", "alt", "cmd" }, "r" },
+  workspaces = { { "ctrl", "alt", "cmd" }, "r" },
 }):start()

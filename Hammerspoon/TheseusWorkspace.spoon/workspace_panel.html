@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'; connect-src 'none'">
+<meta name="color-scheme" content="light dark"><title>Workspaces</title>
+<style>
+  :root { color-scheme: light dark; font: 14px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; --surface: rgba(37,39,45,.97); --text: #f3f4f6; --muted: #b9bdc8; --line: rgba(255,255,255,.15); --control: rgba(255,255,255,.10); --blue: #0a84ff; --selected: rgba(10,132,255,.17); --danger: #ff6961; }
+  @media (prefers-color-scheme: light) { :root { --surface: rgba(247,247,249,.97); --text: #202127; --muted: #606571; --line: rgba(0,0,0,.15); --control: rgba(0,0,0,.045); --selected: rgba(0,122,255,.10); --blue: #007aff; --danger: #c72c2c; } }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; background: var(--surface); color: var(--text); overflow: hidden; }
+  button, input { font: inherit; color: inherit; }
+  button { min-height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 5px 13px; background: var(--control); cursor: default; white-space: nowrap; }
+  button:hover:not(:disabled) { background: color-mix(in srgb, var(--control), var(--text) 7%); }
+  button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue), transparent 25%); outline-offset: 2px; }
+  button:disabled { opacity: .38; }
+  .primary { background: var(--blue); border-color: var(--blue); color: white; }
+  .primary:hover:not(:disabled) { background: color-mix(in srgb, var(--blue), white 8%); }
+  .destructive { background: var(--danger); border-color: var(--danger); color: white; }
+  [hidden] { display: none !important; }
+  header { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 9px 20px 12px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  h1 { font-size: 20px; font-weight: 650; line-height: 1.2; margin: 0 auto 0 0; letter-spacing: -.25px; }
+  .search { display: flex; align-items: center; gap: 8px; width: 220px; min-width: 100px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--control); }
+  .search img { width: 15px; height: 15px; }
+  .system-icon { filter: invert(1); opacity: .78; object-fit: contain; }
+  @media (prefers-color-scheme: light) { .system-icon { filter: none; } }
+  #search { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; font-size: 14px; }
+  #search::placeholder { color: var(--muted); opacity: 1; }
+  main { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px; }
+  #library { min-height: 100%; }
+  .layout-row { display: flex; align-items: center; gap: 20px; padding: 10px 12px; min-height: 99px; border: 1px solid transparent; border-radius: 10px; cursor: default; position: relative; }
+  .layout-row + .layout-row::before { content: ''; position: absolute; height: 1px; background: var(--line); top: -1px; left: 12px; right: 12px; }
+  .layout-row.selected { background: var(--selected); border-color: color-mix(in srgb, var(--blue), transparent 30%); }
+  .layout-row.selected::before, .layout-row.selected + .layout-row::before { display: none; }
+  .thumbnail { width: 145px; flex: 0 0 145px; }
+  .layout-preview { display: block; width: 100%; color: var(--muted); }
+  .selected .layout-preview { color: #bddaff; }
+  @media (prefers-color-scheme: light) { .selected .layout-preview { color: #326693; } }
+  .row-text { flex: 1; min-width: 0; }
+  .row-title { font-size: 17px; font-weight: 600; margin: 0 0 3px; overflow-wrap: anywhere; }
+  .row-count, .row-apps { margin: 0; color: var(--muted); line-height: 1.45; }
+  .row-apps { font-size: 13px; overflow-wrap: anywhere; }
+  .row-menu { border: 0; background: transparent; min-width: 30px; padding: 2px; font-size: 22px; color: var(--muted); }
+  .empty { padding: 60px 24px; text-align: center; color: var(--muted); }
+  .empty h2 { font-size: 18px; color: var(--text); margin: 0 0 10px; }
+  #capture { padding: 4px 10px; }
+  h2 { font-size: 21px; line-height: 1.3; font-weight: 600; margin: 0 0 6px; }
+  #capture-status { color: var(--muted); margin: 0 0 14px; min-height: 20px; }
+  .capture-summary { display: flex; align-items: center; gap: 30px; margin: 0 0 17px; }
+  #capture-preview { width: 260px; max-width: 54%; flex-shrink: 0; }
+  #capture-preview .layout-preview { max-height: 130px; }
+  .included h3 { font-size: 14px; font-weight: 600; margin: 0 0 7px; }
+  #included-apps { list-style: none; margin: 0; padding: 0; color: var(--muted); font-size: 14px; }
+  #included-apps li { margin-bottom: 2px; overflow-wrap: anywhere; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  #name { width: 100%; min-height: 34px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--control); }
+  #name:disabled { opacity: .45; }
+  .privacy { font-size: 12px; color: var(--muted); margin: 8px 0 0; line-height: 1.45; }
+  .error { margin: 0; padding: 8px 24px; color: var(--danger); font-size: 13px; overflow-wrap: anywhere; }
+  #confirmation { padding: 38px 22px; }
+  #confirm-detail { color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+  footer { display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; padding: 13px 20px 14px; border-top: 1px solid var(--line); min-height: 81px; }
+  .delete-control { display: flex; align-items: center; gap: 8px; min-height: 33px; padding: 5px 9px; }
+  .delete-control img { width: 16px; height: 16px; }
+  .delete-control kbd { border-left: 1px solid var(--line); padding-left: 8px; }
+  .actions { display: flex; gap: 12px; margin-left: auto; }
+  .action { display: flex; flex-direction: column; align-items: stretch; text-align: center; }
+  .action button { min-height: 35px; font-size: 14px; min-width: 158px; }
+  .action:last-child button { min-width: 185px; }
+  .action small { color: var(--muted); font-size: 11px; margin-top: 5px; }
+  kbd { font: inherit; color: var(--muted); margin-left: 7px; font-size: 12px; }
+  .primary kbd, .destructive kbd { color: inherit; opacity: .9; }
+  .context-menu { position: fixed; z-index: 2; min-width: 210px; padding: 5px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 5px 20px #0004; }
+  .context-menu button { display: block; width: 100%; text-align: left; background: transparent; border: 0; }
+  .context-menu button:hover, .context-menu button:focus-visible { background: var(--blue); color: white; outline: none; }
+  @media (max-width: 580px) { header { gap: 8px; padding-left: 14px; padding-right: 14px; } .search { width: 160px; } .thumbnail { width: 100px; flex-basis: 100px; } .layout-row { gap: 12px; } footer { padding-left: 14px; padding-right: 14px; } .action button { min-width: 125px; } .action:last-child button { min-width: 165px; } }
+</style></head><body>
+<header><h1>Workspaces</h1><div id="search-box" class="search"><img id="search-icon" class="system-icon" alt="" hidden><input id="search" type="search" placeholder="Search layouts" aria-label="Search layouts" autocomplete="off"></div><button id="capture-button" type="button">Capture…</button></header>
+<main>
+  <section id="library" aria-label="Saved layouts"><div id="rows" role="listbox" aria-label="Saved layouts"></div><div id="empty" class="empty" hidden><h2 id="empty-title"></h2><p id="empty-detail"></p></div></section>
+  <section id="capture" aria-labelledby="capture-title" hidden><h2 id="capture-title">Capture current Space</h2><p id="capture-status" role="status" aria-live="polite">Capturing windows…</p><div id="capture-summary" class="capture-summary" hidden><div id="capture-preview"></div><div class="included"><h3>Included apps</h3><ul id="included-apps"></ul></div></div><form id="capture-form"><label for="name">Workspace name</label><input id="name" type="text" maxlength="80" autocomplete="off" placeholder="Name this layout" disabled><p class="privacy">Only apps and window positions are saved.<br>Window titles and contents are not stored.</p></form></section>
+  <section id="confirmation" aria-labelledby="confirm-title" hidden><h2 id="confirm-title"></h2><p id="confirm-detail"></p></section>
+</main>
+<p id="error" class="error" role="alert" hidden></p>
+<footer><button id="delete" class="delete-control" type="button" aria-label="Delete selected saved layout" title="Delete saved layout…" disabled><img id="delete-icon" class="system-icon" alt="" hidden><span id="delete-label">Delete</span><kbd>⌘⌫</kbd></button><div class="actions"><div class="action"><button id="secondary" type="button">Restore<kbd>↩</kbd></button><small id="secondary-help">Arrange existing windows</small></div><div class="action"><button id="primary" class="primary" type="button">Establish here<kbd>⌘↩</kbd></button><small id="primary-help">Open missing apps and windows</small></div></div></footer>
+<div id="context-menu" class="context-menu" role="menu" hidden><button id="menu-restore" type="button" role="menuitem">Restore existing windows</button><button id="menu-establish" type="button" role="menuitem">Establish here</button><button id="menu-delete" type="button" role="menuitem">Delete saved layout…</button></div>
+<script>__PANEL_SCRIPT__</script></body></html>

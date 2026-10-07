@@ -1,6 +1,6 @@
 # Complete Keyboard Shortcut Reference
 
-2026-10-06.1
+2026-10-07.1
 
 Hyper = `Control + Option + Command`
 
@@ -101,20 +101,34 @@ reference `Hammerspoon/init.lua` configuration.
 
 | Shortcut | Action |
 | --- | --- |
-| `Hyper + Shift + R` | Open capture dialog, freeze eligible windows, then name and save the snapshot |
-| `Hyper + R` | Choose a captured workspace and restore matching existing windows here |
-| `Command + Return`, only in the workspace chooser | Establish here: reuse local windows and create supported missing slots |
-| `Command + Delete`, only in the restore chooser | Confirm deletion of the highlighted saved layout |
+| `Hyper + R` | Open or bring forward the unified Workspaces window |
+| `Up / Down`, in the layout library | Select the previous / next visible layout |
+| `Return`, from search or the layout list | Restore matching existing windows here |
+| `Command + Return`, in the layout library | Establish here: reuse local windows and create supported missing slots |
+| `Command + Delete`, in the layout library | Confirm deletion of the selected saved layout |
+| `Return`, in the ready capture name field | Save the captured layout after naming it |
+| `Escape`, in capture or confirmation | Cancel and return to the preceding view without saving or deleting |
+| `Escape`, in the layout library | Close Workspaces |
 
-Alternatively, right-click a layout in the chooser and choose **Delete saved
+**Capture…** opens the capture view in the same window. The former
+`Hyper + Shift + R` binding is no longer in the reference map. Search by layout
+name or app, click a row to select it, or double-click to Restore. The bottom
+bar has Restore and Establish buttons; a row's actions button or right-click
+offers the same operations and Delete. Previews are generated from each saved
+recipe's actual window geometry, including newly captured recipes.
+Focused buttons keep their normal keyboard activation; Return on a focused
+button performs its labelled action.
+
+Alternatively, right-click a layout in the library and choose **Delete saved
 layout…**. The confirmation names the exact layout and defaults to Cancel.
 Delete removes only the saved recipe, without moving or closing windows, apps,
-or Spaces. The chooser refreshes and keeps its search; deleting the final layout
-closes it. Deletion has no undo. This adds no global shortcut.
+or Spaces. The library refreshes and keeps its search; deleting the final layout
+leaves the empty library open with Capture available. Deletion has no undo.
+The confirmation is inline in the same window. This adds no global shortcut.
 
 To establish a saved layout in the current Space, highlight it and press
-`Command + Return`, or right-click and choose **Establish here (create missing
-windows)**. Independent new-window support is Ghostty (1.3+ with AppleScript
+`Command + Return`, click **Establish here**, or right-click and choose
+**Establish here**. Independent new-window support is Ghostty (1.3+ with AppleScript
 enabled), Finder, Safari, BBEdit, Chrome, and ChatGPT/OpenAI desktop with an
 enabled **File → New Window** menu. Claude can supply its launch-created main
 window when closed or reuse a local window; additional missing Claude windows
@@ -127,16 +141,17 @@ Cold launches allow up to about 15 seconds and count startup windows before
 requesting extras. ChatGPT uses Accessibility rather than AppleScript Automation;
 New Chat is never substituted for New Window. Repeat after a successful Establish
 to reapply geometry without duplicates.
-Keep this Space selected until completion. This is a chooser-local gesture,
+Keep this Space selected until completion. This is a panel-local gesture,
 not another global Hyper binding; ordinary Return still performs Restore only.
 
 Restore waits for verified frame placement before showing its completion
 notice. Missing or failed applications are named; shortcuts are unchanged.
 
-The capture dialog opens with naming and Save disabled. Keep windows still
-until **Snapshot ready** enables the name field. Moving windows after that point
-does not change what Save records. Cancel/Escape/close discards the unsaved
-snapshot; repeating the shortcut brings the existing dialog forward.
+The capture view opens with naming and Save disabled. Keep windows still until
+the captured count appears and the name field is enabled. Moving windows after
+that point does not change what Save records. Cancel/Escape discards the unsaved
+snapshot and returns to the library; closing the window also discards it.
+Repeating `Hyper + R` brings the same window forward without recapturing.
 
 Capture requires confirmation before replacing an existing name. Restore uses
 application identity and normalized geometry, reports missing recipe slots, and

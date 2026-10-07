@@ -55,14 +55,14 @@ Spoon.
 
    hs.loadSpoon("TheseusWorkspace")
    spoon.TheseusWorkspace:bindHotkeys({
-     capture = { { "ctrl", "alt", "cmd", "shift" }, "r" },
-     restore = { { "ctrl", "alt", "cmd" }, "r" },
+     workspaces = { { "ctrl", "alt", "cmd" }, "r" },
    }):start()
    ```
 
    Remove either block when that Spoon is not wanted. TheseusWorkspace does not
-   load or call TheseusWindow internally. The two Workspace bindings shown here
-   are the supplied reference map, not hard-coded defaults.
+   load or call TheseusWindow internally. The Workspace binding shown here is
+   the supplied reference map, not a hard-coded default. Copy the whole Spoon
+   directory, including its local HTML and JavaScript panel assets.
 
 3. Reload Hammerspoon and grant Accessibility access if macOS requests it.
 4. Work through the manual integration checklist below before relying on live
@@ -84,14 +84,18 @@ geometry restoration, width adjustments, and spatial arrow controls.
 TheseusWorkspace treats the eligible windows in the current native user Space
 as one cross-application layout. It supports:
 
-- `Hyper + Shift + R`: open the capture dialog immediately, freeze the current
-  workspace, then name and save that snapshot. Naming and Save stay disabled
-  while capture is in progress. An existing name requires explicit replacement
-  confirmation.
-- `Hyper + R`: choose a saved workspace and restore its matching existing
-  windows in the current Space with Return. Use `Command + Return` to
-  **Establish here**, or delete a saved layout with confirmation. Both actions
-  are also available by right-clicking a layout.
+- `Hyper + R`: open one compact **Workspaces** window for saved layouts and
+  capture. Search by layout name or application, select a row, then use the
+  bottom buttons, Return from search/the list for **Restore**, or `Command + Return` for
+  **Establish here**. Double-click also restores; right-click or the row's
+  actions button offers Restore, Establish, and Delete.
+- **Capture…**: freeze the current workspace, then name and save that snapshot
+  in the same window. Naming and Save stay disabled during capture. Saving
+  returns to the library with the new recipe selected; Cancel returns without
+  saving. An existing name requires explicit inline replacement confirmation.
+- Live-generated outline previews for every recipe, drawn from saved normalized
+  frames. Old and new recipes need no artwork or migration. Previews describe
+  the saved layout, not the continuously changing desktop.
 - Named recipe listing and direct deletion through the public Spoon API.
 - Normalized geometry, so a recipe is restored relative to the current screen's
   usable frame rather than an old absolute pixel rectangle.
@@ -108,18 +112,23 @@ Sticky windows, panels, desktop elements, hidden/minimized windows, full-screen
 windows, and windows on another screen are skipped. The current implementation
 is intentionally single-monitor-first.
 
-The dialog first shows **Capturing…**. Keep windows still until it shows
-**Snapshot ready** and enables the name field. You can then rearrange windows,
+The capture view first shows **Capturing windows…**. Keep windows still until
+it reports the captured count and enables the name field. You can then rearrange windows,
 switch Spaces, or take your time naming the layout: Save uses only the frozen
-snapshot, never another read of the live windows. Cancel, Escape, or closing the
-dialog discards the unsaved snapshot. Repeating the capture shortcut brings the
-existing dialog forward rather than starting another capture.
+snapshot, never another read of the live windows. Cancel or Escape discards the
+unsaved snapshot and returns to the library; closing the window discards it too.
+Repeating `Hyper + R` brings the existing panel forward rather than capturing
+again. Opening the library does not itself capture any windows.
 
 Capture and Restore use one application-window enumeration per operation instead
 of a full scan for every window ID. Capture still reads macOS Accessibility
 information sequentially; it is not an atomic screenshot of the entire desktop
 at the instant the key is pressed. If the selected Space changes during
-collection, capture fails without saving. The capture dialog itself is excluded.
+collection, capture fails without saving. The Workspaces panel itself is excluded.
+
+The panel uses a native macOS window with system typography, automatic light/dark
+appearance, and local-only assets. Its previews contain geometry and app names,
+not screenshots. No web service or generated image is needed at runtime.
 
 Recipes identify a slot using the owning application's bundle identifier plus
 an ordinal. They do not store window titles, document paths, browser URLs,
@@ -192,14 +201,17 @@ layout, open `Hyper + R`, highlight it and press `Command + Delete`, or
 right-click its row and choose **Delete saved layout…**. The confirmation names
 the exact layout and defaults to Cancel. Only explicit Delete removes the saved
 recipe; no windows, applications, or Spaces are moved, closed, or deleted. The
-chooser refreshes afterward, retaining its search; deleting the final layout
-closes it. There is no undo. `Command + Delete` is active only while this chooser
-is visible, not as a new global shortcut. The same scope and cleanup apply to
-`Command + Return` for Establish.
+library refreshes afterward, retaining its search; deleting the final layout
+leaves an empty library with Capture available. There is no undo. `Command + Delete`
+and `Command + Return` are handled only while the library has keyboard focus,
+not as global shortcuts. Delete and replacement confirmations stay in the same
+window and refuse to act if the target recipe has changed since confirmation
+opened.
 
 The public API can also be used directly from the Hammerspoon Console:
 
 ```lua
+spoon.TheseusWorkspace:showWorkspaces()
 spoon.TheseusWorkspace:captureCurrentWorkspace("Project Atlas")
 spoon.TheseusWorkspace:captureCurrentWorkspace("Project Atlas", { replace = true })
 spoon.TheseusWorkspace:restoreWorkspace("Project Atlas")
@@ -208,7 +220,7 @@ spoon.TheseusWorkspace:listWorkspaces()
 spoon.TheseusWorkspace:deleteWorkspace("Project Atlas")
 ```
 
-The direct `deleteWorkspace` API deletes immediately, without the chooser's
+The direct `deleteWorkspace` API deletes immediately, without the panel's
 confirmation; callers are responsible for confirming their target.
 
 `establishWorkspace` is asynchronous and accepts `silent` and `onComplete`
@@ -220,8 +232,14 @@ operation. These reports are memory-only. Restore and Establish reject
 overlapping operations and never rewrite the saved recipe.
 
 The direct `captureCurrentWorkspace` API captures and saves synchronously when
-called; the shortcut uses the non-blocking capture/name/save dialog. Both store
+called; the panel uses the non-blocking capture/name/save flow. Both store
 the same recipe schema, so existing recipes remain compatible.
+
+For existing custom configurations, `showRestoreChooser()` opens Workspaces and
+`promptCaptureCurrentWorkspace()` opens its capture view. The legacy `restore`
+and `capture` hotkey mappings are still accepted when explicitly configured;
+the reference setup now uses only `workspaces` on `Hyper + R` and no longer
+assigns `Hyper + Shift + R`.
 
 Restoration is asynchronous. The returned report has `finished` and `pending`
 fields; it remains unfinished while frame checks are pending. Its `applied`
@@ -454,11 +472,13 @@ mise install
 mise run validate
 ```
 
-The repository pins Lua 5.4.8 in `mise.toml`. You may also run
+The repository pins Lua 5.4.8 and Node 24.19.0 in `mise.toml`. Node is used only
+to check the local panel script and run dependency-free JavaScript tests; it is
+not needed by Hammerspoon at runtime. You may also run
 `./scripts/validate.sh` directly after installation, or set
 `VALIDATION_LUA_BIN` to a compatible Lua executable.
 
-The script compiles all Lua files and runs pure tests for ordered user-Space
+The script compiles all Lua files, checks JavaScript syntax, and runs pure tests for ordered user-Space
 filtering, left/right selection, non-wrapping boundaries, ordinal lookup,
 forward/reverse stateful-cycle initialization, position-preserving horizontal
 centering, stateless canonical size/position selection, outward tie-breaking,
@@ -478,18 +498,28 @@ bounded full-frame retries, separated resize/move fallback, cancellation,
 visibility changes, and Space changes. They do not prove that a particular
 application will accept a live macOS frame request.
 
-Capture-dialog tests cover disabled naming/Save until readiness, one window
+Unified-panel capture tests cover disabled naming/Save until readiness, one window
 enumeration, moves and screen changes after readiness, frozen geometry across
 replacement confirmation and save retries, catalog changes while naming,
 cancel/close/stop cleanup, Space changes during collection, and failed discovery.
 The frame-copy regression deliberately moves Ghostty's mocked geometry after
 capture and confirms that Save retains the original coordinates.
 
-Chooser tests cover named deletion confirmation, Cancel as the default,
-filtered keyboard and right-click selections, preserved search, stale targets,
-save failures, deleting the final recipe, and local-hotkey cleanup on selection,
-Escape, replacement, and Spoon stop. They use an in-memory catalog and reject
-any attempt by the deletion path to inspect windows or Spaces.
+Panel tests cover recipe-derived previews, filtering by name/application,
+selection, safe text handling, named inline confirmations, preserved search,
+changed confirmation targets, stale/closed-view events, save failures, empty
+libraries, and close/stop cleanup. Delete never enumerates windows or changes
+Spaces. Restore and Establish retain the intended destination before closing
+the panel; only the configured global entry shortcut is registered. In-memory
+catalogs and mocked bridges exercise these workflows without changing user data.
+
+For a safe native interface pilot, run
+`dofile("/absolute/repo/path/tests/manual_panel_pilot.lua")` in the Hammerspoon
+Console. It uses synthetic capture records, an in-memory catalog, and print-only
+Restore/Establish receipts. Save, replace, and delete do not touch real recipes;
+no app windows are created or moved. Close its window, then run
+`workspacePanelPilot = nil` when finished. The pilot deliberately does not bind
+any keyboard shortcut or prove live application placement.
 
 Establish tests cover existing-window reuse, exact missing-window counts,
 repeat-use idempotency, delayed cold-launch default windows, launch-only apps,
@@ -497,7 +527,8 @@ genuine new-window menus, missing/disabled menus, exact app identity, unsupporte
 excluded apps, denied automation, wrong-Space and ambiguous creations, bounded
 waits, safe categorical errors, cancellation, and verified placement. They
 also verify scoped app discovery, untouched other-Space windows, mutual
-exclusion with Restore, no settings writes, and chooser-local Establish cleanup.
+exclusion with Restore and no settings writes. Native panel interaction and
+visual evidence are recorded separately in [design-qa.md](design-qa.md).
 
 The separated resize/move fallback was informed by Hammerspoon's
 [frame-setting timing discussion](https://github.com/Hammerspoon/hammerspoon/issues/3731).
@@ -506,7 +537,7 @@ discussion was copied.
 
 Validation levels are intentionally distinct:
 
-- **Syntax:** every Lua file compiles.
+- **Syntax:** every Lua file compiles and the panel JavaScript parses.
 - **Pure logic:** Space selection, geometry, and directional-window ranking
   pass without desktop manipulation.
 - **Hammerspoon runtime/reload:** Hammerspoon evaluates the configuration and
@@ -548,36 +579,41 @@ Validation levels are intentionally distinct:
       width limits, horizontal containment, and unchanged height/y-position.
 - [ ] Traverse Spaces with native `Control + Left/Right`; confirm the menu-bar
       ordinal updates and that it creates no switching hotkeys.
-- [ ] In an ordinary project Space, press `Hyper + Shift + R`; confirm the
-      dialog opens with **Capturing…**, a disabled name field, and disabled Save.
-      Wait for **Snapshot ready**, name/save the workspace, and confirm the
-      completion notice reports the expected eligible count.
+- [ ] In an ordinary project Space, press `Hyper + R`; confirm one compact
+      library opens with a layout outline, name, count, and separated app summary
+      for each recipe. Search by name and app; use the arrow keys to select.
+- [ ] Choose **Capture…**; confirm the same window shows **Capturing windows…**
+      with naming and Save disabled until the captured count appears. Name/save
+      the layout, then confirm the library selects it and its preview matches
+      the saved window geometry.
 - [ ] Once the snapshot is ready but before saving, move a captured window.
       Save, then restore the recipe; confirm the window returns to the position
       from before naming, not the moved position. Repeat with replacement
       confirmation and verify it still uses the original snapshot.
-- [ ] Cancel a capturing or ready dialog, press Escape, close its window, and
-      repeat the capture shortcut while it is open; confirm no unsaved recipe
-      is persisted and no duplicate capture dialog is created.
-- [ ] Move and resize those windows, press `Hyper + R`, choose the recipe, and
+- [ ] Cancel a capturing or ready view with its button or Escape; confirm it
+      returns to the library without saving. Close the window and repeat
+      `Hyper + R` while capturing; confirm no unsaved recipe is persisted and
+      no second window or snapshot is created.
+- [ ] Move and resize those windows, press `Hyper + R`, select the recipe and
+      press Return (or double-click it), and
       confirm all matching windows return to their captured relative frames,
       including background Ghostty windows. Wait for the verified completion
       notice; if any app is named as failed, inspect `lastRestoreReport`.
 - [ ] Capture the same name again and confirm replacement requires an explicit
       confirmation rather than silently overwriting the recipe.
 - [ ] In `Hyper + R`, highlight a disposable recipe and press `Command + Delete`.
-      Confirm the dialog names it and defaults to Cancel. Cancel and verify the
+      Confirm the inline view names it and defaults to Cancel. Cancel and verify the
       recipe and search are unchanged; then explicitly Delete it and verify
       only that recipe disappears, without moving or closing any windows.
-- [ ] Repeat deletion from the right-click menu while filtering the chooser.
+- [ ] Repeat deletion from the right-click menu while filtering the library.
       Confirm the visible row is the named target, other recipes survive, and
-      deleting the last recipe closes the chooser. Outside the chooser,
+      deleting the last recipe leaves an empty library ready for Capture. Outside the panel,
       `Command + Delete` must retain its normal application behavior.
 - [ ] Close one captured application window, restore the recipe, and confirm the
       result reports one missing slot without moving an unrelated replacement.
 - [ ] In an empty ordinary Space, use `Hyper + R`, highlight a layout, and press
-      `Command + Return`, or right-click and choose **Establish here (create
-      missing windows)**. Settle any requested app Automation permission, then
+      `Command + Return`, click **Establish here**, or right-click and choose
+      **Establish here**. Settle any requested app Automation permission, then
       retry explicitly if the first command timed out. Verify only supported
       missing slots get new windows, no other project windows are moved, and
       `lastEstablishReport` confirms settled frames and destination membership.
@@ -596,7 +632,7 @@ Validation levels are intentionally distinct:
 - [ ] Establish the same layout again; confirm no new windows are created.
       Leave an extra window and include an unsupported app to check extra/missing
       reporting. Switch Spaces during an operation and confirm further work
-      stops without closing already-created windows. Outside the chooser,
+      stops without closing already-created windows. Outside the panel,
       `Command + Return` must retain its normal application behavior.
 - [ ] Add an unrelated extra window, restore the recipe, and confirm it remains
       untouched and is counted as extra.

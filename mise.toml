@@ -1,5 +1,6 @@
 [tools]
 lua = "5.4.8"
+node = "24.19.0"
 
 [tasks.validate]
 description = "Compile Lua sources and run pure logic tests"
