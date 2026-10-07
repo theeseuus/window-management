@@ -163,45 +163,4 @@ function factory.create(bundleID, options, complete)
   return run("/usr/bin/osascript", { "-e", script }, options, complete, true)
 end
 
--- Prepare only an exact new window already verified by Establish. Safari can
--- leave an older other-Space window active after its document command completes.
-function factory.createdWindowReady(candidate, options, complete)
-  local adapter = adapters[candidate.bundleID]
-  if not adapter or not adapter.focusNewWindow then
-    complete(true)
-    return { finished = true, cancel = function() end }
-  end
-  local job = { finished = false }
-  local timer
-  local function finish(success, reason)
-    if job.finished then return end
-    job.finished = true
-    if timer then timer:stop(); timer = nil end
-    complete(success, reason)
-  end
-  function job:cancel() finish(false, "establish-cancelled") end
-  local allowed, reason = permitted(options)
-  if not allowed then finish(false, reason); return job end
-  local window = candidate.window
-  local ok, valid = pcall(function()
-    return window:id() == candidate.id and window:application():bundleID() == candidate.bundleID
-  end)
-  if not ok or not valid then finish(false, "window-no-longer-available"); return job end
-  local focused = pcall(function() window:focus() end)
-  if not focused then finish(false, "new-window-not-focused"); return job end
-  local scheduledOK, scheduled = pcall(hs.timer.doAfter, 0.3, function()
-    timer = nil
-    if job.finished then return end
-    local stillAllowed, why = permitted(options)
-    if not stillAllowed then finish(false, why); return end
-    local focusOK, current = pcall(hs.window.focusedWindow)
-    local idOK, same = pcall(function() return current and current:id() == candidate.id end)
-    local success = focusOK and idOK and same == true
-    finish(success, not success and "new-window-not-focused" or nil)
-  end)
-  if not scheduledOK or not scheduled then finish(false, "could-not-schedule-window-check")
-  else timer = scheduled end
-  return job
-end
-
 return factory

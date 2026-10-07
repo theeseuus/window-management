@@ -150,7 +150,7 @@ supported apps if needed, and creates only the missing slots. The adapters are:
 | --- | --- |
 | Ghostty | Native `new window` with a default surface configuration |
 | Finder | Native `make new Finder window`, without a captured folder path |
-| Safari | Native new document with the built-in Start Page (`favorites://`); activate only each verified new window before creating the next |
+| Safari | Native new document explicitly opened to `about:blank`, without navigating an existing window |
 | BBEdit | Native `make new text window`, not a document added to an existing window |
 | Chrome | Native new window; set only that new window's active tab to `about:blank` |
 | ChatGPT / OpenAI desktop | Exact **File → New Window** menu, without activating an old window or substituting **New Chat** |

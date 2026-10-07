@@ -32,10 +32,9 @@ end tell]],
   ["com.apple.Safari"] = {
     name = "Safari",
     kind = "applescript",
-    focusNewWindow = true,
     script = [[
 tell application id "com.apple.Safari"
-  make new document with properties {URL:"favorites://"}
+  make new document with properties {URL:"about:blank"}
 end tell]],
   },
   ["com.barebones.bbedit"] = {

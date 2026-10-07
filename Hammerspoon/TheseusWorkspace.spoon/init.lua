@@ -62,7 +62,6 @@ local function reasonText(reason)
     ["application-did-not-launch"] = "the app did not become ready before the launch timeout",
     ["new-window-command-unavailable"] = "this app's genuine New Window command is unavailable",
     ["new-window-menu-disabled"] = "this app's New Window menu is disabled; no fallback was used",
-    ["new-window-not-focused"] = "the new window could not become active; stopped creating more windows",
     ["application-not-running"] = "the app is no longer running",
     ["application-identity-mismatch"] = "the running app does not match the saved bundle identifier",
     ["claude-new-window-unavailable"] = "Claude has no verified independent-window command; reuse a local window or launch it from closed",
@@ -601,16 +600,6 @@ function obj:establishWorkspace(name, options)
     end,
     create = function(bundleID, complete)
       return windowFactory.create(bundleID, { guard = guard }, complete)
-    end,
-    createdWindowReady = function(candidate, complete)
-      return windowFactory.createdWindowReady(candidate, {
-        guard = function()
-          local allowed, reason = guard()
-          if not allowed then return false, reason end
-          local record, err = describeWindow(self, candidate.window, context, true)
-          return record ~= nil and record.id == candidate.id, err or "window-no-longer-available"
-        end,
-      }, complete)
     end,
     place = function(assignment, complete)
       local target = assert(workspaceLogic.absoluteFrame(assignment.target.frame, context.screenFrame))
