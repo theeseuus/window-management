@@ -10,10 +10,13 @@ function establish.start(recipe, options, complete)
     name = recipe.name, requested = #recipe.windows, applied = 0, created = 0,
     reused = 0, missing = {}, extras = {}, failures = {}, creationFailures = {},
     pending = 0, finished = false, phase = "preparing",
+    navigated = 0, navigationFailures = {},
   }
   local job = { report = report, children = {} }
   local timer, approvedIDs, createdIDs = nil, {}, {}
   local creationFinished = false
+  local creationReceipts, navigationQueue = {}, {}
+  local navigationStarted = false
   local finish, guard, later
 
   finish = function(reason)
@@ -21,6 +24,7 @@ function establish.start(recipe, options, complete)
     report.finished = true
     report.pending = 0
     report.reason = reason
+    if reason then report.stoppedDuring = report.phase end
     report.phase = report.cancelled and "cancelled" or "finished"
     if timer then timer:stop(); timer = nil end
     -- Invalidate callbacks before terminating a task or frame-placement job.
@@ -108,7 +112,31 @@ function establish.start(recipe, options, complete)
   table.sort(apps, function(a, b) return a.bundleID < b.bundleID end)
 
   local function ready()
-    if creationFinished and not report.finished and report.pending == 0 then finish() end
+    if not creationFinished or report.finished or report.pending ~= 0 or navigationStarted then return end
+    navigationStarted = true
+    -- All creation and frame checks finish before any new window loads a page.
+    -- An incomplete layout stays blank so failures remain easy to distinguish.
+    if not options.navigateCreated or #report.missing > 0 or #report.failures > 0
+      or #report.creationFailures > 0 or #navigationQueue == 0 then finish(); return end
+    report.phase = "navigating"
+    local index = 0
+    local function nextNavigation()
+      if not guard() then return end
+      index = index + 1
+      local assignment = navigationQueue[index]
+      if not assignment then finish(); return end
+      keep(options.navigateCreated(assignment, creationReceipts[assignment.candidate.id], function(success, reason)
+        if not guard() then return end
+        if not success then
+          table.insert(report.navigationFailures, { target = assignment.target, reason = reason })
+          finish()
+          return
+        end
+        report.navigated = report.navigated + 1
+        nextNavigation()
+      end))
+    end
+    nextNavigation()
   end
 
   local function placeApp(bundleID)
@@ -127,6 +155,9 @@ function establish.start(recipe, options, complete)
         if success then
           report.applied = report.applied + 1
           if not createdIDs[assignment.candidate.id] then report.reused = report.reused + 1 end
+          if creationReceipts[assignment.candidate.id] then
+            table.insert(navigationQueue, assignment)
+          end
         else
           table.insert(report.failures, {
             target = assignment.target, reason = reason, actualFrame = actual,
@@ -187,7 +218,7 @@ function establish.start(recipe, options, complete)
       for _, candidate in ipairs(current) do baseline[candidate.id] = true end
       remainingRequests = remainingRequests - 1
       report.phase = "creating"
-      keep(options.create(app.bundleID, function(success, createErr)
+      keep(options.create(app.bundleID, function(success, createErr, windowID)
         if not guard() then return end
         if not success then creationFailure(app, createErr); nextApp(); return end
         local ticks = 0
@@ -201,7 +232,13 @@ function establish.start(recipe, options, complete)
             end
           end
           if #new == 1 then
+            if windowID ~= nil and windowID ~= new[1].id then
+              creationFailure(app, "new-window-identity-mismatch")
+              nextApp()
+              return
+            end
             rememberNew(new, baseline, app.bundleID)
+            creationReceipts[new[1].id] = windowID
             createOne()
           elseif #new > 1 then
             creationFailure(app, "ambiguous-new-windows")

@@ -59,6 +59,8 @@ local function reasonText(reason)
     ["window-command-timed-out"] = "the window command timed out; check any automation permission prompt before retrying",
     ["new-window-not-in-destination-space"] = "no new eligible window appeared in this Space",
     ["ambiguous-new-windows"] = "more than one new window appeared; left them untouched",
+    ["new-window-identity-mismatch"] = "the new window's native identity did not match; left it untouched",
+    ["new-window-navigation-unavailable"] = "this app has no verified new-window page operation",
     ["application-did-not-launch"] = "the app did not become ready before the launch timeout",
     ["new-window-command-unavailable"] = "this app's genuine New Window command is unavailable",
     ["new-window-menu-disabled"] = "this app's New Window menu is disabled; no fallback was used",
@@ -601,6 +603,19 @@ function obj:establishWorkspace(name, options)
     create = function(bundleID, complete)
       return windowFactory.create(bundleID, { guard = guard }, complete)
     end,
+    navigateCreated = function(assignment, windowID, complete)
+      return windowFactory.navigateCreated(assignment.target.bundleID, windowID, {
+        guard = function()
+          local allowed, reason = guard()
+          if not allowed then return false, reason end
+          local record, recordErr = describeWindow(self, assignment.candidate.window, context, true)
+          if not record or record.id ~= windowID or record.id ~= assignment.candidate.id then
+            return false, recordErr or "new-window-identity-mismatch"
+          end
+          return true
+        end,
+      }, complete)
+    end,
     place = function(assignment, complete)
       local target = assert(workspaceLogic.absoluteFrame(assignment.target.frame, context.screenFrame))
       local window = assignment.candidate.window
@@ -630,6 +645,10 @@ function obj:establishWorkspace(name, options)
       if report.reason then message = "ESTABLISH stopped · " .. reasonText(report.reason) end
       for _, failure in ipairs(report.creationFailures) do
         message = message .. "\n" .. failure.appName .. ": " .. reasonText(failure.reason)
+      end
+      if report.navigated > 0 then message = message .. "\nPages opened: " .. report.navigated end
+      for _, failure in ipairs(report.navigationFailures) do
+        message = message .. "\n" .. failure.target.appName .. " page: " .. reasonText(failure.reason)
       end
       local failedNames, seen = {}, {}
       for _, failure in ipairs(report.failures) do

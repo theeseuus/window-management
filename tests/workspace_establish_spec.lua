@@ -23,7 +23,7 @@ local function environment()
   local env = {
     windows = {}, timers = {}, launches = {}, creates = {}, placements = {},
     running = {}, unsupported = {}, active = true, nextID = 100, completes = 0,
-    collections = {}, events = {},
+    collections = {}, events = {}, navigations = {},
   }
   function env:add(bundle, properties)
     self.nextID = self.nextID + 1
@@ -91,11 +91,12 @@ local function environment()
       return child(function()
         if env.createError then callback(false, env.createError); return end
         if env.changeSpace then env.active = false end
+        local newWindow
         if not env.noNewWindow then
-          env:add(bundle, { destination = not env.wrongSpace })
+          newWindow = env:add(bundle, { destination = not env.wrongSpace })
           if env.ambiguous then env:add(bundle) end
         end
-        callback(true)
+        callback(true, nil, env.receipts and newWindow and (env.wrongReceipt or newWindow.id) or nil)
       end)
     end,
     place = function(assignment, callback)
@@ -104,6 +105,15 @@ local function environment()
       return child(function()
         assignment.candidate.placed = true
         callback(not env.placeError, env.placeError, assignment.candidate.frame)
+      end)
+    end,
+    navigateCreated = function(assignment, windowID, callback)
+      equal(assignment.candidate.placed, true, "navigation follows verified placement")
+      equal(windowID, assignment.candidate.id, "navigate exactly the verified creation receipt")
+      table.insert(env.navigations, windowID)
+      return child(function()
+        if env.navigationSpaceChange then env.active = false end
+        callback(not env.navigationError, env.navigationError)
       end)
     end,
   }
@@ -322,5 +332,76 @@ env.noNewWindow, env.failTimer = true, true
 report = env:start(recipe({ "Ghostty" }))
 env:drain()
 equal(report.reason, "could-not-schedule-window-check", "timer allocation fails safely")
+
+env = environment()
+env.receipts = true
+local reused = env:add("Safari")
+local remote = env:add("Safari", { destination = false })
+report = env:start(recipe({ "Safari", "Safari", "Safari", "Safari" }))
+-- Stop immediately before the final placement check: no page may start yet.
+while not (report.phase == "placing" and report.pending == 1) do
+  local timer = table.remove(env.timers, 1)
+  assert(timer, "reach the last placement check")
+  if not timer.stopped then timer.callback() end
+end
+equal(#env.navigations, 0, "all frame checks must complete before the first page call")
+env:drain()
+equal(report.applied, 4, "all four slots placed before navigation")
+equal(report.navigated, 3, "navigate only explicitly created windows")
+equal(#env.navigations, 3, "one page command per newly created window")
+for _, id in ipairs(env.navigations) do
+  equal(id ~= reused.id and id ~= remote.id, true, "existing local and other-Space windows retain content")
+end
+report = env:start(recipe({ "Safari", "Safari", "Safari", "Safari" }))
+env:drain()
+equal(report.navigated, 0, "repeat Establish never replaces existing page content")
+equal(#env.navigations, 3, "repeat adds no page commands")
+
+env = environment()
+env.receipts, env.wrongReceipt = true, 999
+report = env:start(recipe({ "Safari" }))
+env:drain()
+equal(report.creationFailures[1].reason, "new-window-identity-mismatch", "reject a receipt for another window")
+equal(report.created, 0, "mismatched identity is not verified")
+equal(#env.placements, 0, "mismatched window remains untouched")
+equal(#env.navigations, 0, "mismatched receipt never authorizes page navigation")
+
+env = environment()
+env.receipts, env.placeError = true, "frame-not-restored"
+report = env:start(recipe({ "Safari", "Safari" }))
+env:drain()
+equal(#env.navigations, 0, "an incomplete layout stays blank")
+
+env = environment()
+env.receipts, env.navigationSpaceChange = true, true
+report = env:start(recipe({ "Safari", "Safari" }))
+env:drain()
+equal(report.reason, "active-space-changed", "page stage retains destination guard")
+equal(report.stoppedDuring, "navigating", "report distinguishes creation from page-stage failure")
+equal(report.applied, 2, "completed blank placement remains truthful after page-stage failure")
+equal(report.navigated, 0, "Space-changing page command is not counted as verified")
+equal(#env.navigations, 1, "Space change stops the second page command")
+
+env = environment()
+env.receipts, env.navigationError = true, "window-command-timed-out"
+report = env:start(recipe({ "Safari", "Safari" }))
+env:drain()
+equal(report.navigationFailures[1].reason, "window-command-timed-out", "page failure remains separate from placement")
+equal(report.applied, 2, "page timeout does not erase successful placement")
+equal(#env.navigations, 1, "page timeout is not retried and stops remaining pages")
+
+env = environment()
+env.receipts = true
+report = env:start(recipe({ "Safari", "Safari" }))
+while #env.navigations == 0 do
+  local timer = table.remove(env.timers, 1)
+  assert(timer, "reach navigation")
+  if not timer.stopped then timer.callback() end
+end
+env.job:cancel()
+env:drain()
+equal(report.cancelled, true, "stop cancels active page stage")
+equal(report.navigated, 0, "cancelled page is not counted")
+equal(#env.navigations, 1, "cancel prevents remaining page commands")
 
 print(string.format("workspace_establish: %d assertions passed", assertions))

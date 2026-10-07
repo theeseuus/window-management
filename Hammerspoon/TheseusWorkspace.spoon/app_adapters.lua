@@ -32,10 +32,33 @@ end tell]],
   ["com.apple.Safari"] = {
     name = "Safari",
     kind = "applescript",
+    resultKind = "window-id",
     script = [[
 tell application id "com.apple.Safari"
+  set previousWindowIDs to id of every window
   make new document with properties {URL:"about:blank"}
+  set createdWindowIDs to {}
+  repeat with candidateID in (id of every window)
+    if (contents of candidateID) is not in previousWindowIDs then
+      set end of createdWindowIDs to contents of candidateID
+    end if
+  end repeat
+  if (count of createdWindowIDs) is not 1 then error number -1728
+  return "created:" & (item 1 of createdWindowIDs)
 end tell]],
+    -- Experimental fixed destination. Only a verified, explicitly created
+    -- window may reach this operation, after the whole layout has settled.
+    navigationScript = function(windowID)
+      return [[
+tell application id "com.apple.Safari"
+  set createdWindow to window id ]] .. string.format("%.0f", windowID) .. [[
+
+  if (count of tabs of createdWindow) is not 1 then error number -1728
+  set createdTab to current tab of createdWindow
+  if URL of createdTab is not "about:blank" then error number -1728
+  set URL of createdTab to "https://www.creativetension.co"
+end tell]]
+    end,
   },
   ["com.barebones.bbedit"] = {
     name = "BBEdit",

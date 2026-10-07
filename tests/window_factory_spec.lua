@@ -31,7 +31,10 @@ local function reset()
     end,
   }
 end
-local function complete(ok, reason) calls = calls + 1; result = { ok = ok, reason = reason } end
+local function complete(ok, reason, windowID)
+  calls = calls + 1
+  result = { ok = ok, reason = reason, windowID = windowID }
+end
 local options = { guard = function() return allowed, "active-space-changed" end }
 hs = {
   application = {
@@ -147,10 +150,59 @@ for _, case in ipairs({
     equal(tasks[1].arguments[2]:find('set URL of active tab of createdWindow to "about:blank"', 1, true) ~= nil, true, "blank only the newly created Chrome window")
     equal(tasks[1].arguments[2]:find("window 1", 1, true), nil, "never navigate the existing front browser window")
   end
-  tasks[1]:finish(0, "created")
+  tasks[1]:finish(0, case[1] == "com.apple.Safari" and "created:123" or "created")
   equal(result.ok, true, "successful native dispatch")
   equal(calls, 1, "complete native dispatch once")
 end
+
+reset()
+factory.create("com.apple.Safari", options, complete)
+tasks[1]:finish(0, "created:123\n")
+equal(result.windowID, 123, "retain exact Safari identity from creation receipt")
+for _, value in ipairs({ "created", "created:0", "created:-1", "created:12.5", "created:4294967296", "created:123\nprivate text" }) do
+  reset()
+  factory.create("com.apple.Safari", options, complete)
+  tasks[1]:finish(0, value)
+  equal(result.ok, false, "reject malformed Safari receipt")
+  equal(result.reason, "unexpected-window-command-result", "receipt failure stays categorical")
+  equal(result.windowID, nil, "invalid receipt cannot authorize navigation")
+end
+
+reset()
+job = factory.navigateCreated("com.apple.Safari", 123, options, complete)
+script = tasks[1].arguments[2]
+equal(script:find("set createdWindow to window id 123", 1, true) ~= nil, true, "navigation uses retained native identity")
+equal(script:find('if URL of createdTab is not "about:blank"', 1, true) ~= nil, true, "do not replace content added since creation")
+equal(script:find('(count of tabs of createdWindow) is not 1', 1, true) ~= nil, true, "do not navigate a window modified with more tabs")
+equal(script:find('set URL of createdTab to "https://www.creativetension.co"', 1, true) ~= nil, true, "fixed owner-requested destination")
+equal(script:find("make new", 1, true), nil, "page stage never creates another window")
+equal(script:find("window 1", 1, true), nil, "page stage never borrows the front window")
+equal(script:find("activate", 1, true), nil, "page stage does not activate Safari")
+tasks[1]:finish(0, "created")
+equal(result.ok, true, "page command acknowledgement")
+for _, value in ipairs({ 0, -1, 12.5, 4294967296, "123", '123\nactivate' }) do
+  reset()
+  factory.navigateCreated("com.apple.Safari", value, options, complete)
+  equal(#tasks, 0, "invalid identity starts no page command")
+  equal(result.reason, "new-window-identity-mismatch", "invalid navigation identity")
+end
+reset()
+factory.navigateCreated("com.apple.finder", 123, options, complete)
+equal(#tasks, 0, "navigation remains adapter-allowlisted")
+equal(result.reason, "new-window-navigation-unavailable", "no generic navigation fallback")
+reset()
+allowed = false
+factory.navigateCreated("com.apple.Safari", 123, options, complete)
+equal(#tasks, 0, "Space change prevents page dispatch")
+reset()
+job = factory.navigateCreated("com.apple.Safari", 123, options, complete)
+allowed = false
+drain()
+equal(tasks[1].terminated, true, "cancel page task on Space change")
+equal(result.reason, "active-space-changed", "page-stage Space failure")
+tasks[1]:finish(0, "created")
+equal(calls, 1, "late page result cannot complete twice")
+
 for _, case in ipairs({
   { "ERROR:-1743", "automation-not-authorized" },
   { "ERROR:-1712", "window-command-timed-out" },

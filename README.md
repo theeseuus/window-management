@@ -150,7 +150,7 @@ supported apps if needed, and creates only the missing slots. The adapters are:
 | --- | --- |
 | Ghostty | Native `new window` with a default surface configuration |
 | Finder | Native `make new Finder window`, without a captured folder path |
-| Safari | Native new document explicitly opened to `about:blank`, without navigating an existing window |
+| Safari | Create `about:blank`; after verified layout placement, navigate only those new windows to Creative Tension (experimental) |
 | BBEdit | Native `make new text window`, not a document added to an existing window |
 | Chrome | Native new window; set only that new window's active tab to `about:blank` |
 | ChatGPT / OpenAI desktop | Exact **File → New Window** menu, without activating an old window or substituting **New Chat** |
@@ -169,6 +169,19 @@ creates a tab or chooser instead of a new eligible window, Establish reports the
 missing slot rather than changing preferences or accepting a false success.
 Calendar and Preview have no automatic launch/creation adapter; their existing
 eligible windows can still be captured, restored, and reused.
+
+Safari currently has an owner-directed experiment: create blank documents and
+retain their native window IDs, independently verify those IDs during discovery,
+then wait for every layout frame to settle before loading
+`https://www.creativetension.co` in the explicitly created windows. Existing and
+launch-created windows retain their contents; repeating Establish only reapplies
+geometry. The page stage refuses a new window that has gained another tab or
+whose tab is no longer blank. An incomplete layout stays blank. Navigation stops
+at the first page-command failure, without retrying. There is no extra focus or
+fixed delay and no wait for website rendering. A navigation acknowledgement means
+Safari accepted the URL assignment, not that the website finished loading.
+This trial still requires the owner's normal Space 6 workflow test; earlier
+default-page and URL-at-creation trials switched Spaces and were withdrawn.
 
 Exact app operations live in one `app_adapters.lua` registry; shared launch,
 dispatch, Space checks, and verified placement remain separate. To extend it,
@@ -442,15 +455,21 @@ TheseusWindow runs locally and makes no network requests. It contains no
 telemetry, credentials, account identifiers, or persistent logging of window
 titles and frames.
 
-TheseusWorkspace also runs locally and makes no network requests. It persists
+TheseusWorkspace runs locally. Its experimental Safari page stage instructs the
+browser to visit Creative Tension, which makes normal browser network requests.
+It persists
 the user-supplied workspace name, capture timestamp, application names and
 bundle identifiers, per-application slot ordinals, and normalized window
-geometry through `hs.settings`. It deliberately does not inspect or persist
-window titles, paths, URLs, terminal working directories, or document content.
+geometry through `hs.settings`. It does not persist window titles, paths, URLs,
+terminal working directories, or document content. The experimental Safari
+operation checks only that its exact newly created tab is still `about:blank`
+before navigating; it never reads existing-window URLs or page contents.
 Recipes are local runtime data and are not stored in this public repository.
 Establish uses fixed, allowlisted native app scripts and exact new-window menu
 paths; recipe names, application names, and captured content are never
-interpolated into executable scripts or selected as menus.
+interpolated into executable scripts or selected as menus. The Safari page
+operation inserts only a validated numeric native window ID from a creation
+receipt, independently matched against destination-window discovery.
 macOS app Automation access is broader than just window placement. Review the
 source before granting it. The adapters neither read contents nor send terminal
 input, and do not change app launch/session preferences.
