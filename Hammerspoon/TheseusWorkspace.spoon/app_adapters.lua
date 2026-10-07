@@ -34,7 +34,7 @@ end tell]],
     kind = "applescript",
     script = [[
 tell application id "com.apple.Safari"
-  make new document with properties {URL:"about:blank"}
+  make new document
 end tell]],
   },
   ["com.barebones.bbedit"] = {

@@ -122,7 +122,7 @@ equal(calls, 1, "complete exactly once")
 
 for _, case in ipairs({
   { "com.apple.finder", "make new Finder window" },
-  { "com.apple.Safari", 'make new document with properties {URL:"about:blank"}' },
+  { "com.apple.Safari", 'make new document' },
   { "com.barebones.bbedit", "make new text window" },
   { "com.google.Chrome", "set createdWindow to make new window" },
   { "com.microsoft.Excel", "make new workbook" },
@@ -140,7 +140,7 @@ for _, case in ipairs({
   equal(tasks[1].arguments[2]:find(case[2], 1, true) ~= nil, true, "fixed window API for " .. case[1])
   equal(tasks[1].arguments[2]:find("activate", 1, true), nil, "creation never activates an existing window")
   if case[1] == "com.apple.Safari" then
-    equal(tasks[1].arguments[2]:find("set URL", 1, true), nil, "blank page is specified at creation, never navigated in an existing window")
+    equal(tasks[1].arguments[2]:find("URL", 1, true), nil, "Safari uses its normal new-window page without overriding a URL")
     equal(tasks[1].arguments[2]:find("window 1", 1, true), nil, "Safari never targets an existing front window")
   end
   if case[1] == "com.google.Chrome" then

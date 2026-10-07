@@ -59,13 +59,13 @@ interpolated into executable commands.
    documents or message data, activate an existing project window, select
    `window 1`, change launch/tab/template preferences, or add generic `Command + N`
    fallbacks. Mail must create a **viewer**, never a compose/message window.
-   Safari supplies `URL:"about:blank"` when making the new document. Changing
-   this to the default Start Page or `favorites://` regressed the owner's normal
-   empty-Space Establish workflow on Safari 27.0.1. Some automated pilots passed,
-   but normal use still switched Spaces; focusing each new window and disabling
-   macOS automatic app Space switching did not resolve it. The original blank
-   creation command is restored, and the focus workaround is removed. Start Page
-   support remains deferred pending a reproducible fix through the real controls.
+   Safari uses bare `make new document`, letting Safari choose its normal
+   new-window page. It has no URL override, focus workaround, or added delay.
+   Earlier Start Page trials coincided with Space-switching failures on Safari
+   27.0.1, but reverting to `about:blank` and restarting Hammerspoon did not fix
+   them. The owner reported recovery after a full Mac reboot. The bare command
+   is restored for a controlled normal-workflow test after that reboot; whether
+   the command contributed to the earlier failures remains unproven.
    Test creation from a Space without Safari windows while another Space has
    Safari open. Do not change preferences or navigate existing windows.
 5. If a new failure category is needed, add its friendly wording in `init.lua`
