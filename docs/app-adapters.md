@@ -59,13 +59,16 @@ interpolated into executable commands.
    documents or message data, activate an existing project window, select
    `window 1`, change launch/tab/template preferences, or add generic `Command + N`
    fallbacks. Mail must create a **viewer**, never a compose/message window.
-   Safari uses bare `make new document`, letting Safari choose its normal
-   new-window page. It has no URL override, focus workaround, or added delay.
-   Earlier Start Page trials coincided with Space-switching failures on Safari
-   27.0.1, but reverting to `about:blank` and restarting Hammerspoon did not fix
-   them. The owner reported recovery after a full Mac reboot. The bare command
-   is restored for a controlled normal-workflow test after that reboot; whether
-   the command contributed to the earlier failures remains unproven.
+   Safari currently supplies `URL:"https://www.creativetension.co"` when making
+   a new document, for an owner-requested comparison of a real page with blank
+   windows and Safari's Start Page. This fixed trial URL never navigates an
+   existing window. There is no focus workaround or added delay.
+   Earlier trials on Safari 27.0.1 were complicated by computer state: restoring
+   `about:blank` and restarting Hammerspoon did not resolve Space-switching
+   failures until the owner rebooted the Mac. After that reboot, the owner
+   reported that blank creation worked and bare `make new document` failed again.
+   The real-page trial is awaiting the owner's normal-workflow result; the
+   mechanism behind the difference remains unproven.
    Test creation from a Space without Safari windows while another Space has
    Safari open. Do not change preferences or navigate existing windows.
 5. If a new failure category is needed, add its friendly wording in `init.lua`

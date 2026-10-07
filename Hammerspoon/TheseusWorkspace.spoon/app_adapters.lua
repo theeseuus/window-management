@@ -34,7 +34,7 @@ end tell]],
     kind = "applescript",
     script = [[
 tell application id "com.apple.Safari"
-  make new document
+  make new document with properties {URL:"https://www.creativetension.co"}
 end tell]],
   },
   ["com.barebones.bbedit"] = {

@@ -150,7 +150,7 @@ supported apps if needed, and creates only the missing slots. The adapters are:
 | --- | --- |
 | Ghostty | Native `new window` with a default surface configuration |
 | Finder | Native `make new Finder window`, without a captured folder path |
-| Safari | Native `make new document`, using Safari's normal new-window page without overriding a URL |
+| Safari | Current creation trial: native new document opened to `https://www.creativetension.co`, without navigating an existing window |
 | BBEdit | Native `make new text window`, not a document added to an existing window |
 | Chrome | Native new window; set only that new window's active tab to `about:blank` |
 | ChatGPT / OpenAI desktop | Exact **File → New Window** menu, without activating an old window or substituting **New Chat** |
@@ -442,7 +442,9 @@ TheseusWindow runs locally and makes no network requests. It contains no
 telemetry, credentials, account identifiers, or persistent logging of window
 titles and frames.
 
-TheseusWorkspace also runs locally and makes no network requests. It persists
+TheseusWorkspace itself runs locally and makes no network requests. Browser
+creation can load a page: the current Safari trial asks Safari to open Creative
+Tension, which causes normal browser network activity. TheseusWorkspace persists
 the user-supplied workspace name, capture timestamp, application names and
 bundle identifiers, per-application slot ordinals, and normalized window
 geometry through `hs.settings`. It deliberately does not inspect or persist
