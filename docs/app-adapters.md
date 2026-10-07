@@ -59,6 +59,9 @@ interpolated into executable commands.
    documents or message data, activate an existing project window, select
    `window 1`, change launch/tab/template preferences, or add generic `Command + N`
    fallbacks. Mail must create a **viewer**, never a compose/message window.
+   Safari uses `make new document` without a URL override, preserving its normal
+   new-window page, including Start Page. Do not change Safari preferences to
+   achieve this or navigate an existing window.
 5. If a new failure category is needed, add its friendly wording in `init.lua`
    and exercise it in tests. Do not expose raw app-returned errors or stderr.
 
