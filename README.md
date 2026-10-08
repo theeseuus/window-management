@@ -20,6 +20,7 @@ configuration keeps broader responsibilities separate:
 The complete reference map is in [SHORTCUTS.md](SHORTCUTS.md). Its application
 launch shortcuts document one example setup and are not implemented by this
 Spoon.
+<img width="683" height="538" alt="image" src="https://github.com/user-attachments/assets/b77a03c6-1918-49b3-8f60-85638790482e" />
 
 ## Requirements
 
