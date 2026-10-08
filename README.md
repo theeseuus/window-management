@@ -430,8 +430,8 @@ half-width/full-height column, and `Hyper + Shift + Return` still maximizes.
 
 ## Optional Space indicator
 
-The supplied `Hammerspoon/init.lua` enables a compact menu-bar label such as
-`[2]`:
+The supplied `Hammerspoon/init.lua` enables a compact menu-bar indicator with
+the Space number centred inside a rounded rectangular outline:
 
 ```lua
 spoon.TheseusWindow.showSpaceIndicator = true
@@ -441,9 +441,11 @@ spoon.TheseusWindow:bindHotkeys():start()
 Set `showSpaceIndicator` to `false` to disable it. The indicator has no hotkeys
 and performs no Space switching. An `hs.spaces.watcher` triggers updates; the
 label is recomputed from the ordered list of user Spaces rather than displaying
-an opaque macOS Space ID. The square brackets provide a simple monochrome box
-without consuming the width of the word “Space.” An unavailable Space is shown
-as `[?]`; a full-screen/tiled Space is shown as `[—]`.
+an opaque macOS Space ID. The outline and number are rendered as a monochrome
+template icon, letting macOS choose their colour. The interior and surrounding
+area are transparent, so the menu-bar wallpaper remains visible. The icon is
+24 × 18 points for one or two digits, widening for larger numbers. An unavailable
+Space shows `?` inside the outline; a full-screen/tiled Space shows `—`.
 
 ## Security and privacy
 

@@ -5,7 +5,7 @@
 local M = {}
 
 function M.indicatorTitle(value)
-  return "[" .. tostring(value == nil and "?" or value) .. "]"
+  return tostring(value == nil and "?" or value)
 end
 
 function M.contains(values, needle)

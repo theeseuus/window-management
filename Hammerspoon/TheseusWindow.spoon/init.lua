@@ -805,12 +805,42 @@ end
 ------------------------------------------------------------
 -- Public API
 ------------------------------------------------------------
+function obj:_setSpaceIndicatorValue(value)
+  local label = spaceLogic.indicatorTitle(value)
+  self._spaceIndicatorIcons = self._spaceIndicatorIcons or {}
+  local icon = self._spaceIndicatorIcons[label]
+  if not icon then
+    -- Draw only the outline and numeral. The template image lets macOS choose
+    -- their colour; the transparent interior retains the menu-bar wallpaper.
+    local width, height = math.max(24, utf8.len(label) * 8 + 8), 18
+    local canvas = hs.canvas.new({ x = 0, y = 0, w = width, h = height })
+    canvas:appendElements({
+      type = "rectangle", action = "stroke",
+      frame = { x = 0.75, y = 0.75, w = width - 1.5, h = height - 1.5 },
+      roundedRectRadii = { xRadius = 4, yRadius = 4 },
+      strokeWidth = 1.25, strokeColor = { white = 0, alpha = 1 },
+    }, {
+      type = "text", text = label, textSize = 13,
+      textColor = { white = 0, alpha = 1 }, textAlignment = "center",
+      frame = { x = 0, y = 0, w = width, h = height },
+    })
+    local textSize = canvas:minimumTextSize(2, label)
+    canvas[2].frame = {
+      x = 0, y = (height - textSize.h) / 2, w = width, h = textSize.h,
+    }
+    icon = canvas:imageFromCanvas()
+    canvas:delete()
+    self._spaceIndicatorIcons[label] = icon
+  end
+  self._spaceIndicator:setTitle(nil):setIcon(icon, true)
+end
+
 function obj:updateSpaceIndicator()
   if not self._spaceIndicator then return end
 
   local screen = hs.screen.mainScreen()
   if not screen then
-    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle())
+    self:_setSpaceIndicatorValue()
     self._spaceIndicator:setTooltip("No active screen")
     return
   end
@@ -818,26 +848,26 @@ function obj:updateSpaceIndicator()
   local activeOK, activeSpace, activeErr = pcall(hs.spaces.activeSpaceOnScreen, screen)
   if not activeOK or not activeSpace then
     local reason = activeOK and activeErr or activeSpace
-    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle())
+    self:_setSpaceIndicatorValue()
     self._spaceIndicator:setTooltip("Could not read active Space: " .. tostring(reason))
     return
   end
 
   local userSpaces, userSpacesErr = orderedUserSpaces(screen)
   if not userSpaces then
-    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle())
+    self:_setSpaceIndicatorValue()
     self._spaceIndicator:setTooltip(tostring(userSpacesErr))
     return
   end
 
   local ordinal, count = spaceLogic.ordinal(userSpaces, activeSpace)
   if ordinal then
-    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle(ordinal))
+    self:_setSpaceIndicatorValue(ordinal)
     self._spaceIndicator:setTooltip(
       string.format("Active user Space %d of %d", ordinal, count)
     )
   else
-    self._spaceIndicator:setTitle(spaceLogic.indicatorTitle("—"))
+    self:_setSpaceIndicatorValue("—")
     self._spaceIndicator:setTooltip("Active Space is full-screen or tiled")
   end
 end
@@ -853,6 +883,7 @@ function obj:_scheduleSpaceIndicatorUpdate()
 end
 
 function obj:_stopSpaceIndicator()
+  self._spaceIndicatorIcons = nil
   if self._spaceIndicatorUpdateTimer then
     self._spaceIndicatorUpdateTimer:stop()
     self._spaceIndicatorUpdateTimer = nil
