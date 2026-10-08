@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'; connect-src 'none'">
-<meta name="color-scheme" content="light dark"><title>Workspaces</title>
+<meta name="color-scheme" content="light dark"><title>Window Factory</title>
 <style>
   :root { color-scheme: light dark; font: 14px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; --surface: rgba(37,39,45,.97); --text: #f3f4f6; --muted: #b9bdc8; --line: rgba(255,255,255,.15); --control: rgba(255,255,255,.10); --blue: #0a84ff; --selected: rgba(10,132,255,.17); --danger: #ff6961; }
   @media (prefers-color-scheme: light) { :root { --surface: rgba(247,247,249,.97); --text: #202127; --muted: #606571; --line: rgba(0,0,0,.15); --control: rgba(0,0,0,.045); --selected: rgba(0,122,255,.10); --blue: #007aff; --danger: #c72c2c; } }
@@ -75,7 +75,7 @@
   .context-menu button:hover, .context-menu button:focus-visible { background: var(--blue); color: white; outline: none; }
   @media (max-width: 580px) { header { gap: 8px; padding-left: 14px; padding-right: 14px; } .search { width: 160px; } .thumbnail { width: 100px; flex-basis: 100px; } .layout-row { gap: 12px; } footer { padding-left: 14px; padding-right: 14px; } .action button { min-width: 125px; } .action:last-child button { min-width: 165px; } }
 </style></head><body>
-<header><h1>Workspaces</h1><div id="search-box" class="search"><img id="search-icon" class="system-icon" alt="" hidden><input id="search" type="search" placeholder="Search layouts" aria-label="Search layouts" autocomplete="off"></div><button id="capture-button" type="button">Capture…</button></header>
+<header><h1>Window Factory</h1><div id="search-box" class="search"><img id="search-icon" class="system-icon" alt="" hidden><input id="search" type="search" placeholder="Search layouts" aria-label="Search layouts" autocomplete="off"></div><button id="capture-button" type="button">Capture…</button></header>
 <main>
   <section id="library" aria-label="Saved layouts"><div id="rows" role="listbox" aria-label="Saved layouts"></div><div id="empty" class="empty" hidden><h2 id="empty-title"></h2><p id="empty-detail"></p></div></section>
   <section id="capture" aria-labelledby="capture-title" hidden><h2 id="capture-title">Capture current Space</h2><p id="capture-status" role="status" aria-live="polite">Capturing windows…</p><div id="capture-summary" class="capture-summary" hidden><div id="capture-preview"></div><div class="included"><h3>Included apps</h3><ul id="included-apps"></ul></div></div><form id="capture-form"><label for="name">Workspace name</label><input id="name" type="text" maxlength="80" autocomplete="off" placeholder="Name this layout" disabled><p class="privacy">Only apps and window positions are saved.<br>Window titles and contents are not stored.</p></form></section>

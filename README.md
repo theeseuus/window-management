@@ -93,7 +93,7 @@ geometry restoration, width adjustments, and spatial arrow controls.
 Factory Workspace treats the eligible windows in the current native user Space
 as one cross-application layout. It supports:
 
-- `Hyper + R`: open one compact **Workspaces** window for saved layouts and
+- `Hyper + R`: open one compact **Window Factory** window for saved layouts and
   capture. Search by layout name or application, select a row, then use the
   bottom buttons, Return from search/the list for **Restore**, or `Command + Return` for
   **Establish here**. Double-click also restores; right-click or the row's
@@ -136,7 +136,7 @@ Capture and Restore use one application-window enumeration per operation instead
 of a full scan for every window ID. Capture still reads macOS Accessibility
 information sequentially; it is not an atomic screenshot of the entire desktop
 at the instant the key is pressed. If the selected Space changes during
-collection, capture fails without saving. The Workspaces panel itself is excluded.
+collection, capture fails without saving. The Window Factory panel itself is excluded.
 
 The panel uses a native macOS window with system typography, automatic light/dark
 appearance, and local-only assets. Its previews contain geometry and app names,
@@ -272,7 +272,7 @@ The direct `captureCurrentWorkspace` API captures and saves synchronously when
 called; the panel uses the non-blocking capture/name/save flow. Both store
 the same recipe schema, so existing recipes remain compatible.
 
-For existing custom configurations, `showRestoreChooser()` opens Workspaces and
+For existing custom configurations, `showRestoreChooser()` opens Window Factory and
 `promptCaptureCurrentWorkspace()` opens its capture view. The legacy `restore`
 and `capture` hotkey mappings are still accepted when explicitly configured;
 the reference setup now uses only `workspaces` on `Hyper + R` and no longer

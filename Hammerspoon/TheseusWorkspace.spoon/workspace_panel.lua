@@ -118,7 +118,7 @@ function panel.open(screenFrame, callbacks, initial)
   }, content)
   session.view
     :windowStyle({ "titled", "closable", "fullSizeContentView", "nonactivating" })
-    :windowTitle("")
+    :windowTitle("Window Factory")
     :allowTextEntry(true)
     :allowNewWindows(false)
     :closeOnEscape(false)
