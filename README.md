@@ -1,4 +1,4 @@
-# Theseus Window and Workspace Management
+# Window Factory: Window and Workspace Management
 
 This repository contains two independent Hammerspoon Spoons:
 
