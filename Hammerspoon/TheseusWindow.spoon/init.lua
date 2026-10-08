@@ -873,6 +873,9 @@ function obj:updateSpaceIndicator()
 end
 
 function obj:_scheduleSpaceIndicatorUpdate()
+  -- Every notification gets an immediate read, including rapid traversal.
+  -- Only the settling check is debounced; it never delays the first update.
+  self:updateSpaceIndicator()
   if self._spaceIndicatorUpdateTimer then
     self._spaceIndicatorUpdateTimer:stop()
   end

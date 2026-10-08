@@ -439,7 +439,9 @@ spoon.TheseusWindow:bindHotkeys():start()
 ```
 
 Set `showSpaceIndicator` to `false` to disable it. The indicator has no hotkeys
-and performs no Space switching. An `hs.spaces.watcher` triggers updates; the
+and performs no Space switching. Each `hs.spaces.watcher` notification triggers
+an immediate update, followed by a settling check 100 ms after the last
+notification. Rapid traversal does not postpone the immediate updates. The
 label is recomputed from the ordered list of user Spaces rather than displaying
 an opaque macOS Space ID. The outline and number are rendered as a monochrome
 template icon, letting macOS choose their colour. The interior and surrounding
