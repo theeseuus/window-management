@@ -9,7 +9,7 @@ together. Adapters should report command completion without adding placement
 delays; the engine verifies window discovery and geometry separately.
 Capture, Restore, and existing-window reuse already identify ordinary windows
 generically. An adapter is needed only to launch an app or create missing
-windows. See the [README](../README.md#theseusworkspace) for user-facing behaviour
+windows. See the [README](../README.md#factory-workspace) for user-facing behaviour
 and the current app list.
 
 ## Where the behaviour lives

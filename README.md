@@ -1,18 +1,23 @@
 # Window Factory: Window and Workspace Management
 
-This repository contains two independent Hammerspoon Spoons:
+Window Factory contains two independent components, implemented as Hammerspoon
+Spoons:
 
-- **TheseusWindow** provides deterministic macOS window placement, window
+- **Factory Window** provides deterministic macOS window placement, window
   switching, and native Space movement.
-- **TheseusWorkspace** captures, restores, and establishes named,
+- **Factory Workspace** captures, restores, and establishes named,
   cross-application window layouts in the current native user Space.
+
+The Spoon filenames and Lua API names are `TheseusWindow` for Factory Window
+and `TheseusWorkspace` for Factory Workspace, as used in the installation and
+code examples below.
 
 Either Spoon can be installed and loaded without the other. The reference
 configuration keeps broader responsibilities separate:
 
 - Karabiner defines key semantics. Holding Tab emits Hyper
   (`Control + Option + Command`).
-- Raycast owns the general application-launch shortcuts. TheseusWorkspace can
+- Raycast owns the general application-launch shortcuts. Factory Workspace can
   launch supported apps only when filling missing saved-layout slots.
 - Hammerspoon and these Spoons manipulate windows.
 - Native macOS `Control + Left/Right` moves only the user between Spaces.
@@ -27,12 +32,12 @@ Spoon.
 
 ## Requirements
 
-- For TheseusWindow move-and-follow, macOS with native Mission Control
+- For Factory Window move-and-follow, macOS with native Mission Control
   `Control + Left/Right` shortcuts enabled.
 - Hammerspoon with Accessibility permission; version 1.1.1 is the tested
   release.
-- At least two ordinary user Spaces for TheseusWindow move-and-follow commands.
-- An ordinary user Space for TheseusWorkspace capture and restore. Full-screen
+- At least two ordinary user Spaces for Factory Window move-and-follow commands.
+- An ordinary user Space for Factory Workspace capture and restore. Full-screen
   and tiled Spaces are deliberately rejected.
 - For **Establish here**, macOS Automation permission for each scripting adapter
   used (listed below). Ghostty requires version 1.3 or later with AppleScript
@@ -63,8 +68,8 @@ Spoon.
    }):start()
    ```
 
-   Remove either block when that Spoon is not wanted. TheseusWorkspace does not
-   load or call TheseusWindow internally. The Workspace binding shown here is
+   Remove either block when that Spoon is not wanted. Factory Workspace does not
+   load or call Factory Window internally. The Workspace binding shown here is
    the supplied reference map, not a hard-coded default. Copy the whole Spoon
    directory, including its local HTML and JavaScript panel assets.
 
@@ -75,17 +80,17 @@ Spoon.
 If dotfiles are managed by chezmoi or another configuration manager, add these
 files to its source state and deploy them through that manager.
 
-## TheseusWindow
+## Factory Window
 
-TheseusWindow provides cross-app window switching, deterministic geometry
+Factory Window provides cross-app window switching, deterministic geometry
 cycles in both directions, stateless canonical size and position cycles,
 current-Space directional focus, stash/restore, accordion layout, a centred
 half-width layout, position-preserving horizontal centering, maximize/minimize,
 geometry restoration, width adjustments, and spatial arrow controls.
 
-## TheseusWorkspace
+## Factory Workspace
 
-TheseusWorkspace treats the eligible windows in the current native user Space
+Factory Workspace treats the eligible windows in the current native user Space
 as one cross-application layout. It supports:
 
 - `Hyper + R`: open one compact **Workspaces** window for saved layouts and
@@ -223,7 +228,7 @@ work, but does not close windows already created. Native app launch/session
 preferences may themselves reopen windows; this Spoon does not change those
 preferences or recover contents.
 
-TheseusWorkspace does **not yet** track live group membership, move a group
+Factory Workspace does **not yet** track live group membership, move a group
 between Spaces, create or remove Spaces, continuously enforce a layout, or
 restore browser tabs, Finder folders, terminal commands, or chats.
 
@@ -317,7 +322,7 @@ horizontal overlap. This keeps focus in the same visual row or column instead
 of allowing a diagonally placed window to win. No window geometry changes.
 
 The example Raycast map in `SHORTCUTS.md` also lists `Hyper + K` for Shortcut
-Viewer. TheseusWindow reserves that binding for upward focus, so remove or
+Viewer. Factory Window reserves that binding for upward focus, so remove or
 reassign the Raycast binding if it remains configured.
 
 ## Stateless canonical geometry
@@ -442,11 +447,11 @@ as `[?]`; a full-screen/tiled Space is shown as `[—]`.
 
 ## Security and privacy
 
-TheseusWindow runs locally and makes no network requests. It contains no
+Factory Window runs locally and makes no network requests. It contains no
 telemetry, credentials, account identifiers, or persistent logging of window
 titles and frames.
 
-TheseusWorkspace also runs locally and makes no network requests. It persists
+Factory Workspace also runs locally and makes no network requests. It persists
 the user-supplied workspace name, capture timestamp, application names and
 bundle identifiers, per-application slot ordinals, and normalized window
 geometry through `hs.settings`. It deliberately does not inspect or persist
@@ -460,7 +465,7 @@ source before granting it. The adapters neither read contents nor send terminal
 input, and do not change app launch/session preferences.
 
 Hammerspoon's Accessibility permission is powerful: it allows these Spoons to
-inspect and manipulate windows and allows TheseusWindow to synthesize mouse and
+inspect and manipulate windows and allows Factory Window to synthesize mouse and
 keyboard events.
 The native Space transport briefly moves the pointer to the focused window's
 title bar, holds that window, emits `Control + Left/Right`, releases the window,
@@ -470,7 +475,7 @@ permission and install only code from a revision you trust.
 ## macOS and Hammerspoon limitations
 
 - [`hs.spaces`](https://www.hammerspoon.org/docs/hs.spaces.html) is experimental
-  and uses private APIs. TheseusWindow still relies on it to enumerate and
+  and uses private APIs. Factory Window still relies on it to enumerate and
   verify Spaces, so a macOS update can break even the read/verification stages.
 - macOS 27 currently breaks Hammerspoon's direct window-move and `gotoSpace`
   paths on this Mac. The isolated native-input transport avoids those two calls,
@@ -485,7 +490,7 @@ permission and install only code from a revision you trust.
   Spaces, panels, desktop elements, minimized windows, and non-standard windows
   are rejected. The command does not force a move into an incompatible Space.
 - Some applications enforce their own minimum sizes or frame placement.
-  TheseusWindow reapplies the original frame, but macOS and the application
+  Factory Window reapplies the original frame, but macOS and the application
   remain authoritative.
 - The implementation intentionally targets one monitor. Space lookup is scoped
   to the focused window's screen so a later multi-monitor policy can be added
