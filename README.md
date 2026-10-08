@@ -27,7 +27,9 @@ launch shortcuts document one example setup and are not implemented by this
 Spoon.
 
 
-<img width="683" height="538" alt="image" src="https://github.com/user-attachments/assets/b77a03c6-1918-49b3-8f60-85638790482e" />
+<img width="683" height="539" alt="image" src="https://github.com/user-attachments/assets/e12d8272-3242-4eeb-88b1-d5d87d7984c5" />
+
+
 
 
 ## Requirements
