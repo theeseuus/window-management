@@ -90,6 +90,12 @@ current-Space directional focus, stash/restore, accordion layout, a centred
 half-width layout, position-preserving horizontal centering, maximize/minimize,
 geometry restoration, width adjustments, and spatial arrow controls.
 
+Directional focus collects current-Space windows only when its shortcut is
+pressed, then releases the temporary window filter, including on collection
+errors. It does not keep background application/window queries active between
+commands. The menu-bar Space indicator remains event driven. An unresponsive
+application can still delay a window-information request during a command.
+
 ## Factory Workspace
 
 Factory Workspace treats the eligible windows in the current native user Space

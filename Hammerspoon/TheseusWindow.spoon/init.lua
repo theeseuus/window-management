@@ -641,15 +641,27 @@ windowFilter:setOverrideFilter({
 
 local windowSwitcher = hs.window.switcher.new(windowFilter)
 
--- Directional focus is deliberately scoped to normal, visible windows in the
--- current Space. The default filter's app exclusions remain in force.
-local spatialWindowFilter = hs.window.filter.new()
-spatialWindowFilter:setOverrideFilter({
-  visible = true,
-  currentSpace = true,
-  fullscreen = false,
-  allowRoles = { "AXStandardWindow" },
-})
+-- A persistent currentSpace filter keeps global app/Space watchers querying
+-- windows in the background. Track only while a focus command collects its
+-- candidates, retaining the default app exclusions and current-Space rules.
+local function currentSpaceCandidates()
+  local filter = hs.window.filter.new()
+  local ok, windows = pcall(function()
+    filter:setOverrideFilter({
+      visible = true,
+      currentSpace = true,
+      fullscreen = false,
+      allowRoles = { "AXStandardWindow" },
+    })
+    return filter:getWindows()
+  end)
+  filter:delete()
+  if not ok then
+    hs.printf("TheseusWindow: could not collect focus candidates: %s", tostring(windows))
+    return {}
+  end
+  return windows or {}
+end
 
 -- UI tuning (restrained; adjust if you want bigger previews)
 windowSwitcher.ui.showTitles = true
@@ -774,7 +786,7 @@ local function focusDirectionalWindow(direction)
   local win, screen = focusedCanonicalWindow()
   if not win then return end
 
-  local candidates = spatialWindowFilter:getWindows() or {}
+  local candidates = currentSpaceCandidates()
   local candidateRecords = {}
   local sameScreenRecords = {}
   local screenID = screen:id()

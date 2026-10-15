@@ -24,6 +24,7 @@ local luaFiles = {
   repositoryRoot .. "/tests/geometry_logic_spec.lua",
   repositoryRoot .. "/tests/space_logic_spec.lua",
   repositoryRoot .. "/tests/spatial_focus_logic_spec.lua",
+  repositoryRoot .. "/tests/window_filter_lifecycle_spec.lua",
   repositoryRoot .. "/tests/workspace_logic_spec.lua",
   repositoryRoot .. "/tests/workspace_runtime_spec.lua",
   repositoryRoot .. "/tests/workspace_capture_spec.lua",
@@ -50,6 +51,7 @@ dofile(repositoryRoot .. "/tests/cycle_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/geometry_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/space_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/spatial_focus_logic_spec.lua")
+dofile(repositoryRoot .. "/tests/window_filter_lifecycle_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_logic_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_runtime_spec.lua")
 dofile(repositoryRoot .. "/tests/workspace_capture_spec.lua")
