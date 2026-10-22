@@ -149,6 +149,10 @@ collection, capture fails without saving. The Window Factory panel itself is exc
 The panel uses a native macOS window with system typography, automatic light/dark
 appearance, and local-only assets. Its previews contain geometry and app names,
 not screenshots. No web service or generated image is needed at runtime.
+The window remains hidden until the page has applied its initial library or
+Capture model, then reveals the prepared panel. Repeating the entry shortcut
+during loading reuses that hidden window. Initial rendering failures and an
+eight-second loading timeout close it with an alert, allowing another attempt.
 
 Recipes identify a slot using the owning application's bundle identifier plus
 an ordinal. They do not store window titles, document paths, browser URLs,

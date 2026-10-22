@@ -99,7 +99,7 @@ equal(f:session().state, "library", "invalid destination keeps window")
 f = fixture.new(); f.openError = true; f:open()
 equal(f:session(), nil, "opening failure leaves no active session")
 equal(#f.alerts, 1, "opening failure has a useful alert")
-f = fixture.new(); f.renderError = { description = "render failed" }; f:open()
+f = fixture.new(); f:open(); f.renderError = { description = "render failed" }; f:session():render()
 equal(f:session().renderError, "render failed", "retain native JavaScript diagnostics")
 f.renderError = { code = 0 }; f:session():render()
 equal(f:session().renderError, nil, "native code-zero success clears stale diagnostics")
@@ -113,6 +113,51 @@ f.hotkeys[1].callback()
 equal(#f.views, 1, "global command reuses panel")
 f.workspace:stop()
 equal(f.hotkeys[1].deleted, true, "stop cleans global entry shortcut")
+
+
+-- The native frame and contents must first appear together, including re-entry
+-- while WebKit is preparing and callbacks that arrive after cancellation.
+f = fixture.new(); f:seed(); f.deferRender = true
+f.workspace:showWorkspaces()
+view = f.views[1]
+equal(view.shown, nil, "keep native frame hidden before page ready")
+equal(view.preferences.suppressesIncrementalRendering, true, "suppress partial WebKit loading")
+f.workspace:showWorkspaces()
+equal(#f.views, 1, "reuse hidden loading panel")
+equal(view.shown, nil, "repeat shortcut cannot show unprepared contents")
+f:send("ready")
+equal(view.shown, nil, "page ready alone does not reveal empty library")
+f.workspace:showWorkspaces()
+f.renderCallbacks[1](nil, nil)
+equal(view.shown, nil, "stale model completion cannot reveal panel")
+f.renderCallbacks[2](nil, { code = 0 })
+equal(view.shown, true, "reveal after current model finishes rendering")
+equal(view.frontCount, 1, "present one prepared window")
+equal(f:session().loadTimer, nil, "stop load watchdog on presentation")
+f:send("capture"); f:drain()
+f:send("cancel"); f:send("close")
+equal(view.deleted, true, "prepared panel supports capture cancel and close")
+
+f = fixture.new(); f.deferRender = true; f:open(true)
+view = f.views[1]
+equal(view.updates[1].state, "capturing", "direct Capture prepares capture instead of flashing library")
+local watchdog = f:session().loadTimer
+f.workspace:stop()
+f.renderCallbacks[1](nil, nil)
+equal(view.shown, nil, "late render callback cannot reopen closed window")
+equal(watchdog.stopped, true, "close stops hidden-load watchdog")
+f:drain()
+equal(f.enumerations, 0, "closed pending Capture cannot enumerate windows")
+
+f = fixture.new(); f.renderError = { description = "initial render failed" }; f:open()
+equal(f:session(), nil, "failed initial render releases hidden session")
+equal(f.views[1].shown, nil, "failed first render never reveals partial UI")
+equal(f.views[1].deleted, true, "failed first render releases native view")
+equal(#f.alerts, 1, "failed first render has visible feedback")
+f = fixture.new(); f.workspace:showWorkspaces(); view = f.views[1]; f:drain()
+equal(f:session(), nil, "missing page-ready message expires hidden load")
+equal(view.deleted, true, "load timeout releases hidden view")
+equal(#f.alerts, 1, "load timeout has visible feedback")
 
 hs = previousHs
 print(string.format("workspace_panel_workflow_spec: %d assertions passed", assertions))

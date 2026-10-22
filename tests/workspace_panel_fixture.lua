@@ -67,7 +67,12 @@ function fixture.new()
     timer = {
       doAfter = function(_, callback)
         local timer = { callback = callback }
-        function timer:stop() self.stopped = true end
+        function timer:stop()
+          self.stopped = true
+          for index, pending in ipairs(f.timers) do
+            if pending == self then table.remove(f.timers, index); break end
+          end
+        end
         table.insert(f.timers, timer)
         return timer
       end,
@@ -104,7 +109,12 @@ function fixture.new()
         function view:evaluateJavaScript(script, callback)
           self.script = script
           table.insert(self.updates, f.lastEncoded)
-          if callback then callback(nil, f.renderError) end
+          if callback then
+            if f.deferRender then
+              f.renderCallbacks = f.renderCallbacks or {}
+              table.insert(f.renderCallbacks, callback)
+            else callback(nil, f.renderError) end
+          end
           return self
         end
         function view:delete() self.deleted = true end

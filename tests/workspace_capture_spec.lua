@@ -12,7 +12,7 @@ end
 
 local f = fixture.new()
 local view = f:open(true)
-equal(view.shown, true, "show unified panel immediately")
+equal(view.shown, true, "show unified panel after capture model is prepared")
 equal(f:session().state, "capturing", "start capture in the existing panel")
 equal(f.enumerations, 0, "paint disabled capture state before enumeration")
 equal(view.source:find('id="name"', 1, true) ~= nil, true, "native form has naming field")
