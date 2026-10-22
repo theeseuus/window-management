@@ -214,6 +214,16 @@ preserved. Disposable windows were closed; the test recipe was retained in
 application-owned state. Cold-start and safe failure cases remain mock-only
 coverage; this pilot does not prove cold-launch or reboot recovery.
 
+An owner-driven normal-interface retest with the Hammerspoon Console hidden
+also passed: the first Establish created/placed two Rex windows, and the
+repeat created none and reused the same two IDs. Both completed on the selected
+Space without failures; the owner confirmed the visible result. An earlier UI
+attempt stopped before creation with `active-space-changed`; the Console's
+possible role in that transition remains unproven. The owner reported slow
+initial panel drawing while diagnostic focus/Space polling was active. The
+polling was stopped; panel latency needs an uninstrumented check independently
+of this functional acceptance.
+
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
 recipe. A missing/disabled menu fails cleanly. Older releases that offer only
