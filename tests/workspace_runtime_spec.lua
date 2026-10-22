@@ -350,6 +350,9 @@ for _, app in pairs(applications) do
 end
 hs.application = {
   get = function(bundleID) return applications[bundleID] end,
+  applicationsForBundleID = function(bundleID)
+    return applications[bundleID] and { applications[bundleID] } or {}
+  end,
   infoForBundleID = function() return { CFBundleShortVersionString = "1.3.1", OSAScriptingDefinition = "Ghostty.sdef" } end,
 }
 hs.task = { new = function(executable, callback, arguments)
@@ -517,6 +520,58 @@ equal(rexRestore.applied, 1, "Rex Restore still verifies")
 equal(windows[81].setCount, 2, "Rex Restore keeps ordinary full-frame placement")
 equal(windows[81].moveCount, 1, "Rex Restore never receives startup placement policy")
 equal(settingsWrites, 0, "Rex policy never modifies saved recipes")
+
+-- A running Codex instance may be missed by the subsequent menu lookup.
+-- Recover that read in the first Establish, without borrowing its other-Space
+-- window or dispatching another command when Establish is repeated.
+local codex = makeApplication("com.openai.codex", "Codex")
+applications[codex:bundleID()] = codex
+local codexCommands, codexLookups = 0, 0
+windows[83] = makeWindow(83, codex, { x = 350, y = 100, w = 800, h = 800 }, { 902 })
+function codex:allWindows()
+  return windows[82] and { windows[82], windows[83] } or { windows[83] }
+end
+function codex:findMenuItem(menu)
+  equal(table.concat(menu, "/"), "File/New Window", "Codex resolves only the genuine window menu")
+  return { enabled = true }
+end
+function codex:selectMenuItem()
+  codexCommands = codexCommands + 1
+  windows[82] = makeWindow(82, codex, { x = 100, y = 50, w = 800, h = 1000 })
+  return true
+end
+local exactLookup = hs.application.applicationsForBundleID
+hs.application.applicationsForBundleID = function(bundleID)
+  if bundleID ~= codex:bundleID() then return exactLookup(bundleID) end
+  codexLookups = codexLookups + 1
+  return codexLookups == 1 and {} or { codex }
+end
+settings.TheseusWorkspaceRecipesV1.recipes.CodexPilot = {
+  schemaVersion = 1, name = "CodexPilot", capturedAt = "2026-10-23T00:00:00Z", windows = {
+    { bundleID = "com.openai.codex", appName = "Codex", ordinal = 1,
+      frame = { x = 0, y = 0, w = 0.5, h = 1 } },
+  },
+}
+local codexReport = workspace:establishWorkspace("CodexPilot", { silent = true })
+drainTimers()
+equal(codexLookups, 2, "transient empty menu lookup recovered within the first Establish")
+equal(codexCommands, 1, "first Establish issues a single Codex creation command")
+equal(codexReport.created, 1, "first Establish discovers the missing Codex window")
+equal(codexReport.applied, 1, "first Establish verifies Codex geometry")
+equal(#codexReport.creationFailures, 0, "recovered read is not a creation failure")
+equal(#codexReport.missing, 0, "first Establish leaves no missing Codex slot")
+equal(#codexReport.extras, 0, "other-Space Codex window is not a destination extra")
+equal(codexReport.diagnostics.totals["menu-application:com.openai.codex"].calls, 2, "report retains both exact lookup attempts")
+local codexRepeat = workspace:establishWorkspace("CodexPilot", { silent = true })
+drainTimers()
+equal(codexCommands, 1, "repeat never dispatches another Codex creation")
+equal(codexRepeat.created, 0, "repeat creates no duplicate Codex window")
+equal(codexRepeat.reused, 1, "repeat reuses the window from the first Establish")
+equal(codexRepeat.applied, 1, "repeat keeps Codex placement verified")
+equal(windows[83].setCount, 0, "other-Space Codex window receives no geometry writes")
+equal(windows[83].memberships[1], 902, "other-Space Codex window stays in its Space")
+equal(settingsWrites, 0, "lookup recovery does not modify recipes")
+hs.application.applicationsForBundleID = exactLookup
 
 hs = previousHs
 

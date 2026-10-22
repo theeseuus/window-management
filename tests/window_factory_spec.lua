@@ -8,14 +8,14 @@ end
 
 local previousHs = hs
 local info, tasks, timers, allowed, failNew, failStart, failSchedule
-local result, calls
+local result, calls, lookupCalls
 local app, menuItem, menuCalls, menuError, menuSelected, identity, expectedMenu
 local function reset()
   info = { CFBundleShortVersionString = "1.3.1", OSAScriptingDefinition = "Ghostty.sdef" }
   tasks, timers, allowed = {}, {}, true
   failNew, failStart, failSchedule, result, calls = false, false, false, nil, 0
   menuItem, menuCalls, menuError, menuSelected, identity = { enabled = true }, {}, nil, true, nil
-  expectedMenu = "File/New Window"
+  expectedMenu, lookupCalls = "File/New Window", 0
   app = {
     bundleID = function() return identity or "com.openai.codex" end,
     findMenuItem = function(_, menu)
@@ -36,7 +36,11 @@ local options = { guard = function() return allowed, "active-space-changed" end 
 hs = {
   application = {
     infoForBundleID = function() return info end,
-    get = function() return app end,
+    get = function() error("menu dispatch must not use a generic application search") end,
+    applicationsForBundleID = function(bundleID)
+      lookupCalls = lookupCalls + 1
+      return app and { app } or {}
+    end,
   },
   task = { new = function(executable, callback, arguments)
     if failNew then return nil end
@@ -51,9 +55,9 @@ hs = {
     table.insert(tasks, task)
     return task
   end },
-  timer = { doAfter = function(_, callback)
+  timer = { doAfter = function(delay, callback)
     if failSchedule then return nil end
-    local timer = { callback = callback }
+    local timer = { callback = callback, delay = delay }
     function timer:stop() self.stopped = true end
     table.insert(timers, timer)
     return timer
@@ -272,7 +276,7 @@ for _, bundle in ipairs({ "com.openai.codex", "com.superlogical.rex" }) do
     { "disabled", "new-window-menu-disabled" },
     { "lookup", "new-window-command-unavailable" },
     { "selection", "window-command-failed" },
-    { "not-running", "application-not-running" },
+    { "not-running", "application-not-found" },
     { "identity", "application-identity-mismatch" },
     { "space", "active-space-changed" },
     { "declined", "window-command-failed" },
@@ -291,6 +295,7 @@ for _, bundle in ipairs({ "com.openai.codex", "com.superlogical.rex" }) do
     equal(result.reason, case[2], "safe menu failure category")
     equal(calls, 1, "no repeated menu callback")
     equal(#menuCalls <= 1, true, "never retry or substitute a content command")
+    equal(lookupCalls, case[1] == "not-running" and 3 or 1, "only absent application reads may retry")
   end
 end
 reset()
@@ -362,23 +367,90 @@ equal(result.reason, "new-window-command-unavailable", "measured lookup keeps ca
 equal(trace.data.events[2].success, false, "failed menu lookup is visible in timeline")
 equal(trace.data.events[2].reason, nil, "raw native exception text is not stored")
 
-local originalGet = hs.application.get
-for _, mode in ipairs({ "exception", "absent" }) do
+local originalLookup = hs.application.applicationsForBundleID
+for _, mode in ipairs({ "exception", "absent", "invalid" }) do
   reset()
-  hs.application.get = function()
+  hs.application.applicationsForBundleID = function(bundleID)
+    equal(bundleID, "com.openai.codex", "lookup retains exact recipe identity")
+    lookupCalls = lookupCalls + 1
     if mode == "exception" then error("private native error text") end
+    if mode == "absent" then return {} end
     return nil
   end
   trace = diagnostics.new(function() return now end)
   factory.create("com.openai.codex", { guard = options.guard, diagnostics = trace }, complete)
   drain(); trace:finish()
-  equal(result.reason, mode == "exception" and "application-lookup-failed" or "application-not-running", "distinguish native lookup failure from absence")
-  equal(trace.data.events[1].lookupSucceeded, mode ~= "exception", "preserve original lookup result flag")
-  equal(trace.data.events[1].found, false, "no application object on either failure")
-  equal(trace.data.events[1].resultType, mode == "exception" and "string" or "nil", "retain return type without native error contents")
-  equal(#menuCalls, 0, "lookup failure never reaches menu selection")
+  equal(result.reason, mode == "absent" and "application-not-found" or "application-lookup-failed", "distinguish failed lookup from an empty result")
+  equal(lookupCalls, 3, "permanently unavailable app has a bounded read budget")
+  equal(calls, 1, "exhausted lookup completes once")
+  equal(#trace.data.events, 3, "record every read attempt without a menu event")
+  for attempt, event in ipairs(trace.data.events) do
+    equal(event.lookupSucceeded, mode ~= "exception", "preserve original lookup result flag")
+    equal(event.found, false, "no application object on failed reads")
+    equal(event.resultType, mode == "exception" and "string" or (mode == "absent" and "table" or "nil"), "retain type without native error contents")
+    equal(event.attempt, attempt, "number application read attempts")
+    equal(event.lookupMethod, "bundle-id", "report exact lookup method")
+    equal(event.reason, nil, "raw native errors are not stored")
+  end
+  equal(#menuCalls, 0, "failed lookup never reaches menu selection")
 end
-hs.application.get = originalGet
+
+-- Reproduce the observed running-app/empty-menu-lookup race. Reads may retry;
+-- an enabled genuine menu command is still dispatched only once.
+for _, mode in ipairs({ "absent", "exception", "invalid" }) do
+  reset()
+  hs.application.applicationsForBundleID = function(bundleID)
+    equal(bundleID, "com.openai.codex", "retry never broadens the identity")
+    lookupCalls = lookupCalls + 1
+    if lookupCalls == 3 then return { app } end
+    if mode == "exception" then error("private native error text") end
+    if mode == "absent" then return {} end
+    return nil
+  end
+  trace = diagnostics.new(function() return now end)
+  factory.create("com.openai.codex", { guard = options.guard, diagnostics = trace }, complete)
+  equal(timers[1].delay, 0, "first read has no added delay")
+  table.remove(timers, 1).callback()
+  equal(timers[1].delay, 0.1, "transient lookup yields briefly instead of blocking")
+  equal(#menuCalls, 0, "empty first read cannot dispatch")
+  drain(); trace:finish()
+  equal(result.ok, true, "last permitted read recovers transient " .. mode)
+  equal(lookupCalls, 3, "recovery stops at the successful read")
+  equal(#menuCalls, 1, "recovery issues exactly one new-window command")
+  equal(calls, 1, "recovery reports completion once")
+  equal(#tasks, 0, "lookup recovery never launches a fallback process")
+  equal(trace.data.events[3].found, true, "successful read is retained in the timeline")
+end
+
+reset()
+hs.application.applicationsForBundleID = function()
+  lookupCalls = lookupCalls + 1
+  return { app, app }
+end
+factory.create("com.openai.codex", options, complete); drain()
+equal(result.reason, "application-lookup-ambiguous", "multiple exact matches are not chosen arbitrarily")
+equal(lookupCalls, 1, "ambiguous identity is not retried")
+equal(#menuCalls, 0, "ambiguous identity cannot dispatch a menu")
+
+for _, interruption in ipairs({ "cancel", "space", "scheduler" }) do
+  reset()
+  hs.application.applicationsForBundleID = function()
+    lookupCalls = lookupCalls + 1
+    if interruption == "scheduler" then failSchedule = true end
+    return lookupCalls == 1 and {} or { app }
+  end
+  job = factory.create("com.openai.codex", options, complete)
+  table.remove(timers, 1).callback()
+  if interruption == "cancel" then job:cancel()
+  elseif interruption == "space" then allowed = false end
+  drain()
+  equal(result.reason, interruption == "cancel" and "establish-cancelled"
+    or (interruption == "space" and "active-space-changed" or "could-not-schedule-window-check"), "read wait respects " .. interruption)
+  equal(lookupCalls, 1, "no further reads after interrupted wait")
+  equal(#menuCalls, 0, "interrupted wait cannot create a window")
+  equal(calls, 1, "interrupted lookup completes once")
+end
+hs.application.applicationsForBundleID = originalLookup
 
 hs = previousHs
 print(string.format("window_factory: %d assertions passed", assertions))

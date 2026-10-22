@@ -65,6 +65,8 @@ local function reasonText(reason)
     ["new-window-menu-disabled"] = "this app's New Window menu is disabled; no fallback was used",
     ["application-not-running"] = "the app is no longer running",
     ["application-lookup-failed"] = "the app lookup failed before the new-window command",
+    ["application-not-found"] = "the app could not be located before the new-window command",
+    ["application-lookup-ambiguous"] = "more than one running app matches the saved bundle identifier",
     ["application-identity-mismatch"] = "the running app does not match the saved bundle identifier",
     ["claude-new-window-unavailable"] = "Claude has no verified independent-window command; reuse a local window or launch it from closed",
     ["window-command-failed"] = "the native app window command failed",

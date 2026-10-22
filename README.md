@@ -390,6 +390,41 @@ frame reads. The frame still matched half a second later; only that identified
 test window was closed. This is native geometry acceptance of the deployed
 helper, with normal-UI visual acceptance checked separately.
 
+The next normal-UI first run on 2026-10-23 still missed Codex and the owner
+still saw Rex jump. Its retained report created/placed Safari and Rex only,
+with one missing Codex slot and no placement failures, extras, or Space stop.
+Total time was 2.676 seconds; panel context took 3.211 milliseconds and initial
+feedback began at 11.321 milliseconds, so the earlier initial pause remained
+resolved in this run. Codex was reported running, but the menu's separate
+application lookup returned nil about 11 milliseconds later. No Codex menu was
+looked up or selected. That lookup path was unchanged from the previously
+successful version and failed before Rex placement started; the evidence
+supports recurrence of the earlier intermittent lookup failure, not attribution
+to the latest Rex change. It does not establish the native cause.
+
+Rex used the intended move-only path: five position requests, zero size/full
+frame requests, seven reads, and verified geometry in 1.601 seconds. This did
+not pass visual acceptance. The repeat added Codex and reused the same Safari
+and Rex windows in 0.801 seconds, with zero missing slots, failures, extras,
+or Space stop. Codex's lookup then took 0.422 milliseconds and its genuine
+menu command succeeded. Versions were Codex 26.1016.51333 (21161), Rex 0.1.0
+(1347), and Safari 27.0.1. Coordinated animation remains deferred until first-run
+creation and placement are accepted; it is not a remedy for failed discovery.
+
+Menu dispatch now looks up only the exact bundle identifier, avoiding generic
+name/window-title search when a native read is empty. An empty, invalid, or
+throwing lookup gets at most three read attempts, separated by 100 milliseconds
+only after failed reads. Multiple candidates or a mismatched identity stop
+without selection. Space and cancellation guards remain active. Menu resolution,
+lookup, and selection are never retried; at most one New Window command is
+issued. Exhausted empty reads report that the app could not be located, without
+asserting that it quit. The timeline records each attempt and candidate count.
+The regression suite reproduces a running Codex instance missed at menu lookup,
+then verifies recovery within the first Establish, repeat reuse, and other-Space
+protection. Safari's native default-profile command and Rex placement are
+unchanged. A native read-only check found one exact instance of each app;
+post-fix normal-UI creation acceptance remains pending.
+
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
 recipe. A missing/disabled menu fails cleanly. Older releases that offer only

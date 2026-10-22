@@ -38,6 +38,17 @@ Ordinary additions should change the registry and its tests, not these shared
 engines. Scripts are fixed source; names and frames from recipes must never be
 interpolated into executable commands.
 
+Menu transport resolves the exact bundle with
+`hs.application.applicationsForBundleID`, never a name/window-title fallback.
+Before any command, an empty, invalid, or throwing application read may retry
+up to three total attempts, with a 100-millisecond timer between failed reads.
+Cancellation and destination guards cover the wait. Ambiguous or mismatched
+identities fail closed. Once an app is resolved, neither menu resolution/lookup
+nor selection is retried; one slot request still issues at most one native
+New Window action. Diagnostics retain attempt numbers and candidate counts,
+without raw native errors. This read recovery is separate from launch/discovery
+waits and from placement recovery; do not turn it into command retries.
+
 ## Add one entry
 
 1. Confirm the installed app's exact `CFBundleIdentifier` and version in

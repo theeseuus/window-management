@@ -129,15 +129,36 @@ local function selectNewWindow(bundleID, menu, options, complete)
   end
   if not checkContext() then return job end
 
-  local scheduledOK, scheduled = pcall(hs.timer.doAfter, 0, function()
-    timer = nil
+  local attempts = 0
+  local tryMenu
+  local function schedule(delay)
+    local scheduledOK, scheduled = pcall(hs.timer.doAfter, delay, function()
+      timer = nil
+      if not job.finished then tryMenu() end
+    end)
+    if not scheduledOK or not scheduled then finish(false, "could-not-schedule-window-check")
+    elseif not job.finished then timer = scheduled end
+  end
+  tryMenu = function()
     if job.finished or not checkContext() then return end
+    attempts = attempts + 1
     local appRead = begin(options, "menu-application", bundleID)
-    local appOK, app = pcall(hs.application.get, bundleID)
-    appRead({ success = appOK and not not app, lookupSucceeded = appOK,
-      found = appOK and not not app, resultType = type(app) })
-    if not appOK then finish(false, "application-lookup-failed"); return end
-    if not app then finish(false, "application-not-running"); return end
+    -- Generic get() falls through to name/window-title searches on an empty
+    -- exact lookup. Stay within the saved identity and tolerate a transient
+    -- empty native read before dispatching anything. Never retry a menu action.
+    local appOK, apps = pcall(hs.application.applicationsForBundleID, bundleID)
+    local count = appOK and type(apps) == "table" and #apps or nil
+    local app = count == 1 and apps[1] or nil
+    appRead({ success = app ~= nil, lookupSucceeded = appOK,
+      found = app ~= nil, resultType = type(apps), candidateCount = count,
+      attempt = attempts, lookupMethod = "bundle-id" })
+    if not checkContext() then return end
+    if not count or count == 0 then
+      if attempts < 3 then schedule(0.1)
+      else finish(false, count == 0 and "application-not-found" or "application-lookup-failed") end
+      return
+    end
+    if count ~= 1 then finish(false, "application-lookup-ambiguous"); return end
     local identityOK, identity = pcall(function() return app:bundleID() end)
     if not identityOK or identity ~= bundleID then
       finish(false, "application-identity-mismatch"); return
@@ -167,9 +188,8 @@ local function selectNewWindow(bundleID, menu, options, complete)
     if not checkContext() then return end
     if selectOK and selected == true then finish(true)
     else finish(false, "window-command-failed") end
-  end)
-  if not scheduledOK or not scheduled then finish(false, "could-not-schedule-window-check")
-  elseif not job.finished then timer = scheduled end
+  end
+  schedule(0)
   return job
 end
 
