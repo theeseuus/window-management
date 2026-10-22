@@ -220,9 +220,13 @@ repeat created none and reused the same two IDs. Both completed on the selected
 Space without failures; the owner confirmed the visible result. An earlier UI
 attempt stopped before creation with `active-space-changed`; the Console's
 possible role in that transition remains unproven. The owner reported slow
-initial panel drawing while diagnostic focus/Space polling was active. The
-polling was stopped; panel latency needs an uninstrumented check independently
-of this functional acceptance.
+initial panel drawing while diagnostic focus/Space polling was active. A later
+baseline confirmed those recurring timers were stopped: opening returned in
+0.033 seconds, the page was ready without a render error at a single two-second
+check, and the owner reported a prompt appearance, roughly under a second.
+The delay did not reproduce in that baseline. Polling is a possible contributor,
+not a proven cause; no opening-path code change was required. Timing used only
+one-shot callbacks, with no new recurring observer.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
