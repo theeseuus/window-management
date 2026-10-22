@@ -130,14 +130,22 @@ local function selectNewWindow(bundleID, menu, options, complete)
     if not identityOK or identity ~= bundleID then
       finish(false, "application-identity-mismatch"); return
     end
-    local menuOK, item = pcall(function() return app:findMenuItem(menu) end)
+    local resolvedMenu = menu
+    if type(menu) == "function" then
+      local resolvedOK, value = pcall(menu, app)
+      if not resolvedOK or type(value) ~= "table" then
+        finish(false, "new-window-command-unavailable"); return
+      end
+      resolvedMenu = value
+    end
+    local menuOK, item = pcall(function() return app:findMenuItem(resolvedMenu) end)
     if not menuOK or type(item) ~= "table" then
       finish(false, "new-window-command-unavailable"); return
     end
     if not item.enabled then finish(false, "new-window-menu-disabled"); return end
     if not checkContext() then return end
     -- No activation, key synthesis, New Chat, or fallback menu selection.
-    local selectOK, selected = pcall(function() return app:selectMenuItem(menu) end)
+    local selectOK, selected = pcall(function() return app:selectMenuItem(resolvedMenu) end)
     if not checkContext() then return end
     if selectOK and selected == true then finish(true)
     else finish(false, "window-command-failed") end

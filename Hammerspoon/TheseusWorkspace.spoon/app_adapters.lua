@@ -1,7 +1,39 @@
 -- Canonical app-specific Establish operations. Add entries here, not shortcuts
 -- or special cases in the placement engine. See docs/app-adapters.md in the
 -- repository root for the extension and verification procedure.
--- Scripts and menu paths are fixed source; recipe data is never executable.
+-- Scripts and menu selection rules are reviewed source; recipe data is never executable.
+-- Read only Safari's File menu. Profiles rename New Window; the native default
+-- marker chooses the user's default without storing or guessing a profile name.
+local function safariWindowMenu(app)
+  local root = hs.axuielement.applicationElement(app)
+  local bar = root and root:attributeValue("AXMenuBar")
+  local function children(element)
+    return element and element:attributeValue("AXChildren") or {}
+  end
+  local defaults, ordinary = {}, {}
+  for _, item in ipairs(children(bar)) do
+    if item:attributeValue("AXTitle") == "File" then
+      for _, menu in ipairs(children(item)) do
+        for _, command in ipairs(children(menu)) do
+          local identifier = command:attributeValue("AXIdentifier")
+          local title = command:attributeValue("AXTitle")
+          if type(title) == "string" and type(identifier) == "string" then
+            if identifier:match("^New.*Window%?isDefaultProfile=true$") then
+              table.insert(defaults, title)
+            elseif identifier == "NewWindow" and title == "New Window" then
+              table.insert(ordinary, title)
+            end
+          end
+        end
+      end
+      break
+    end
+  end
+  if #defaults == 1 then return { "File", defaults[1] } end
+  if #defaults == 0 and #ordinary == 1 then return { "File", ordinary[1] } end
+  -- An absent/ambiguous default is a safe failure, never another profile/tab.
+end
+
 return {
   ["com.superlogical.rex"] = {
     name = "Rex Beta",
@@ -36,11 +68,8 @@ end tell]],
   },
   ["com.apple.Safari"] = {
     name = "Safari",
-    kind = "applescript",
-    script = [[
-tell application id "com.apple.Safari"
-  make new document with properties {URL:"about:blank"}
-end tell]],
+    kind = "menu",
+    menu = safariWindowMenu,
   },
   ["com.barebones.bbedit"] = {
     name = "BBEdit",

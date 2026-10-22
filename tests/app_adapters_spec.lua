@@ -23,11 +23,15 @@ for bundleID, adapter in pairs(adapters) do
     equal(adapter.menu, nil, "one transport, not guessed fallbacks")
     equal(adapter.reason, nil, "no launch-only reason on a script")
   elseif adapter.kind == "menu" then
-    equal(type(adapter.menu), "table", "fixed menu path")
-    equal(#adapter.menu, 2, "precise menu path")
-    equal(adapter.menu[1], "File", "app's File menu")
-    equal(type(adapter.menu[2]), "string", "exact menu item")
-    equal(adapter.menu[2] ~= "New Chat" and adapter.menu[2] ~= "New Message", true, "a window, not content navigation or composition")
+    if bundleID == "com.apple.Safari" then
+      equal(type(adapter.menu), "function", "Safari resolves the native default-profile command")
+    else
+      equal(type(adapter.menu), "table", "fixed menu path")
+      equal(#adapter.menu, 2, "precise menu path")
+      equal(adapter.menu[1], "File", "app's File menu")
+      equal(type(adapter.menu[2]), "string", "exact menu item")
+      equal(adapter.menu[2] ~= "New Chat" and adapter.menu[2] ~= "New Message", true, "a window, not content navigation or composition")
+    end
     equal(adapter.script, nil, "menu does not fall back to scripting")
     equal(adapter.reason, nil, "menu is not launch-only")
   else
@@ -46,5 +50,31 @@ equal(table.concat(adapters["com.apple.mail"].menu, "/"), "File/New Viewer Windo
 equal(adapters["com.superlogical.rex"].kind, "menu", "Rex uses existing Accessibility access")
 equal(table.concat(adapters["com.superlogical.rex"].menu, "/"), "File/New Window", "Rex creates a window rather than a session or tab")
 equal(adapters["com.mitchellh.ghostty"].kind, "applescript", "Ghostty remains an independent fallback")
+
+
+local previousHs = hs
+local function ax(attributes)
+  return { attributeValue = function(_, key) return attributes[key] end }
+end
+local function resolve(commands)
+  local file = ax({ AXTitle = "File", AXChildren = { ax({ AXChildren = commands }) } })
+  hs = { axuielement = { applicationElement = function()
+    return ax({ AXMenuBar = ax({ AXChildren = {
+      ax({ AXTitle = "History", AXChildren = {} }), file,
+    } }) })
+  end } }
+  return adapters["com.apple.Safari"].menu({})
+end
+local function command(title, identifier) return ax({ AXTitle = title, AXIdentifier = identifier }) end
+local nondefault = command("New Personal Window", "NewPersonalWindow?isDefaultProfile=false")
+local default = command('New Work "review" Window', "NewWorkWindow?isDefaultProfile=true")
+local resolved = resolve({ nondefault, default, command("New Private Window", "NewPrivateWindow") })
+equal(table.concat(resolved, "/"), 'File/New Work "review" Window', "use the native default marker rather than a remembered profile name")
+equal(resolve({ nondefault }), nil, "never substitute a non-default profile")
+equal(resolve({ default, default }), nil, "ambiguous default fails closed")
+equal(resolve({ command("New Chat", "NewChat"), command("New Tab", "NewTab") }), nil, "never substitute content or a tab")
+equal(table.concat(resolve({ command("New Window", "NewWindow") }), "/"), "File/New Window", "profile-free Safari uses its genuine window command")
+equal(resolve({ command("New Window", "unknown") }), nil, "unverified command identifier is not enough")
+hs = previousHs
 
 print(string.format("app_adapters: %d assertions passed", assertions))

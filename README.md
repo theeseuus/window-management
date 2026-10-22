@@ -172,7 +172,7 @@ supported apps if needed, and creates only the missing slots. The adapters are:
 | Rex Beta | Exact **File → New Window** menu using existing Accessibility access |
 | Ghostty | Native `new window` with a default surface configuration |
 | Finder | Native `make new Finder window`, without a captured folder path |
-| Safari | Native new document explicitly opened to `about:blank`, without navigating an existing window |
+| Safari | Native File menu command for the default profile; uses normal startup-page settings |
 | BBEdit | Native `make new text window`, not a document added to an existing window |
 | Chrome | Native new window; set only that new window's active tab to `about:blank` |
 | ChatGPT / OpenAI desktop | Exact **File → New Window** menu, without activating an old window or substituting **New Chat** |
@@ -231,6 +231,23 @@ check, and the owner reported a prompt appearance, roughly under a second.
 The delay did not reproduce in that baseline. Polling is a possible contributor,
 not a proven cause; no opening-path code change was required. Timing used only
 one-shot callbacks, with no new recurring observer.
+
+Safari resolves the default profile's native new-window command from the File
+menu's Accessibility identifier; it does not store or guess profile names.
+Without profiles it accepts the ordinary native New Window command. An absent,
+ambiguous, or disabled command fails cleanly, without another profile, a tab,
+AppleScript, or a keyboard fallback. This uses existing Accessibility access and
+leaves Safari's profile, startup-page, pinned-tab, and tab preferences unchanged.
+It creates a normal default-profile window rather than forcing `about:blank`.
+
+A 2026-10-22 GPT Workspace failure stopped with `active-space-changed` before any
+new window was verified. Safari was first in the three-app recipe (Safari,
+Codex, Rex). With all three apps already running elsewhere, an isolated native
+menu probe created one independent window per app in the selected empty Space,
+without switching Spaces, and closed only those test windows. Safari 27.0.1,
+Codex 26.1013.40934, and Rex 0.1.0 (1347) were tested. The profile-aware Safari
+resolver was also checked against the installed menu. Full-layout acceptance
+is recorded separately; this dispatch probe alone does not prove Establish.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the

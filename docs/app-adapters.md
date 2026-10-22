@@ -52,7 +52,12 @@ interpolated into executable commands.
 
    This is a structural example, not a universal command. Use the app's verified
    creation API. `kind = "menu"` instead supplies `menu = { "File", "New Window" }`
-   (the app's exact path); `kind = "launch-only"` instead supplies a categorical
+   (the app's exact path). A reviewed app-specific `menu(app)` resolver may return
+   an exact path from native menu metadata; shared dispatch still checks identity,
+   enabled state, and the destination before selection. Safari reads only the File
+   menu and selects the unique native default-profile marker (or ordinary New
+   Window when profiles are absent). It never guesses a profile name or substitutes
+   a tab, private window, AppleScript, or shortcut. `kind = "launch-only"` instead supplies a categorical
    `reason` and never creates additional windows. Ghostty illustrates the optional
    `checkInstalled(info)` metadata-only capability check.
 4. Keep creation blank/default and unsaved. Do not reopen captured content, read
@@ -60,8 +65,16 @@ interpolated into executable commands.
    `window 1`, change launch/tab/template preferences, or add generic `Command + N`
    fallbacks. Rex Beta uses **File → New Window**, not **New Session** or
    **New Tab**; Ghostty remains a separate exact-identity adapter. Mail must create a **viewer**, never a compose/message window.
-   Safari supplies `URL:"about:blank"` when making a new document. There is no
-   focus workaround or added delay. Earlier trials on Safari 27.0.1 were
+   Safari now uses the native default-profile File menu command, preserving normal
+   startup-page settings and requiring only existing Accessibility access. An
+   installed Safari 27.0.1 probe kept that new window on the selected empty Space
+   while Safari was already running elsewhere; Codex and Rex menu commands passed
+   the same condition. The default is resolved from the native identifier, not a
+   stored profile name. Do not restore the failed blank-document route as a fallback.
+
+   Historical Safari experiments below describe prior states, not the current
+   adapter. Safari supplied `URL:"about:blank"` when making a new document. There
+   was no focus workaround or added delay. Earlier trials on Safari 27.0.1 were
    complicated by computer state: restoring blank creation and restarting
    Hammerspoon did not resolve Space-switching failures until the owner rebooted
    the Mac. In the owner's normal workflow after that reboot, blank creation

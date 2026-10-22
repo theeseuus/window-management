@@ -59,6 +59,15 @@ hs = {
     return timer
   end },
 }
+local function ax(attributes)
+  return { attributeValue = function(_, key) return attributes[key] end }
+end
+local safariRoot = ax({ AXMenuBar = ax({ AXChildren = {
+  ax({ AXTitle = "File", AXChildren = { ax({ AXChildren = {
+    ax({ AXTitle = "New Personal Window", AXIdentifier = "NewPersonalWindow?isDefaultProfile=true" }),
+  } }) } }),
+} }) })
+hs.axuielement = { applicationElement = function() return safariRoot end }
 local factory = dofile(root .. "/Hammerspoon/TheseusWorkspace.spoon/window_factory.lua")
 local function drain()
   local ticks = 0
@@ -122,7 +131,6 @@ equal(calls, 1, "complete exactly once")
 
 for _, case in ipairs({
   { "com.apple.finder", "make new Finder window" },
-  { "com.apple.Safari", 'make new document with properties {URL:"about:blank"}' },
   { "com.barebones.bbedit", "make new text window" },
   { "com.google.Chrome", "set createdWindow to make new window" },
   { "com.microsoft.Excel", "make new workbook" },
@@ -139,10 +147,6 @@ for _, case in ipairs({
   equal(tasks[1].arguments[2]:find('tell application id "' .. case[1] .. '"', 1, true) ~= nil, true, "exact application identity")
   equal(tasks[1].arguments[2]:find(case[2], 1, true) ~= nil, true, "fixed window API for " .. case[1])
   equal(tasks[1].arguments[2]:find("activate", 1, true), nil, "creation never activates an existing window")
-  if case[1] == "com.apple.Safari" then
-    equal(tasks[1].arguments[2]:find("set URL", 1, true), nil, "Safari supplies a blank URL only when creating a new document")
-    equal(tasks[1].arguments[2]:find("window 1", 1, true), nil, "Safari never targets an existing front window")
-  end
   if case[1] == "com.google.Chrome" then
     equal(tasks[1].arguments[2]:find('set URL of active tab of createdWindow to "about:blank"', 1, true) ~= nil, true, "blank only the newly created Chrome window")
     equal(tasks[1].arguments[2]:find("window 1", 1, true), nil, "never navigate the existing front browser window")
@@ -159,7 +163,7 @@ for _, case in ipairs({
   { "arbitrary application text", "unexpected-window-command-result" },
 }) do
   reset()
-  job = factory.create("com.apple.Safari", options, complete)
+  job = factory.create("com.apple.finder", options, complete)
   tasks[1]:finish(0, case[1], "private diagnostic must not be retained")
   equal(result.ok, false, "not a successful creation")
   equal(result.reason, case[2], "safe categorical error")
@@ -228,10 +232,11 @@ factory.create("com.example.Chat", options, complete)
 equal(#tasks, 0, "unsupported apps never receive a generic shortcut")
 equal(result.reason, "unsupported-application", "unsupported create is safe")
 
-for _, bundle in ipairs({ "com.openai.codex", "com.openai.chat", "com.apple.mail", "com.superlogical.rex" }) do
+for _, bundle in ipairs({ "com.openai.codex", "com.openai.chat", "com.apple.mail", "com.superlogical.rex", "com.apple.Safari" }) do
   reset()
   identity = bundle
   expectedMenu = bundle == "com.apple.mail" and "File/New Viewer Window" or "File/New Window"
+  if bundle == "com.apple.Safari" then expectedMenu = "File/New Personal Window" end
   job = factory.create(bundle, options, complete)
   equal(job.finished, false, "menu dispatch is asynchronous")
   equal(#menuCalls, 0, "no premature menu selection")
@@ -312,6 +317,24 @@ reset()
 factory.launch("com.example.Unrequested", options, complete)
 equal(#tasks, 0, "direct launch remains allowlisted")
 equal(result.reason, "unsupported-application", "unlisted launch rejected")
+
+
+for _, failure in ipairs({ "missing", "exception", "space" }) do
+  reset(); identity = "com.apple.Safari"
+  local original = hs.axuielement.applicationElement
+  hs.axuielement.applicationElement = function()
+    if failure == "exception" then error("private application text") end
+    if failure == "space" then allowed = false; return safariRoot end
+    return nil
+  end
+  expectedMenu = "File/New Personal Window"
+  factory.create("com.apple.Safari", options, complete); drain()
+  equal(result.ok, false, "Safari resolver fails safely on " .. failure)
+  equal(#menuCalls, 0, "no dispatch after failed resolution or changed Space")
+  equal(#tasks, 0, "no Safari AppleScript fallback")
+  equal(calls, 1, "resolver failure completes exactly once")
+  hs.axuielement.applicationElement = original
+end
 
 hs = previousHs
 print(string.format("window_factory: %d assertions passed", assertions))
