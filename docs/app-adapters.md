@@ -58,7 +58,8 @@ interpolated into executable commands.
 4. Keep creation blank/default and unsaved. Do not reopen captured content, read
    documents or message data, activate an existing project window, select
    `window 1`, change launch/tab/template preferences, or add generic `Command + N`
-   fallbacks. Mail must create a **viewer**, never a compose/message window.
+   fallbacks. Rex Beta uses **File → New Window**, not **New Session** or
+   **New Tab**; Ghostty remains a separate exact-identity adapter. Mail must create a **viewer**, never a compose/message window.
    Safari supplies `URL:"about:blank"` when making a new document. There is no
    focus workaround or added delay. Earlier trials on Safari 27.0.1 were
    complicated by computer state: restoring blank creation and restarting

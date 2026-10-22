@@ -3,6 +3,11 @@
 -- repository root for the extension and verification procedure.
 -- Scripts and menu paths are fixed source; recipe data is never executable.
 return {
+  ["com.superlogical.rex"] = {
+    name = "Rex Beta",
+    kind = "menu",
+    menu = { "File", "New Window" },
+  },
   ["com.mitchellh.ghostty"] = {
     name = "Ghostty",
     kind = "applescript",

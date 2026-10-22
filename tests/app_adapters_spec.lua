@@ -36,11 +36,15 @@ for bundleID, adapter in pairs(adapters) do
     equal(adapter.menu, nil, "launch-only cannot create by a guessed menu")
   end
 end
-equal(count, 15, "reviewed adapter catalog")
+equal(count, 16, "reviewed adapter catalog")
 equal(adapters["com.apple.iCal"], nil, "Calendar creation remains unsupported")
 equal(adapters["com.apple.Preview"], nil, "Preview creation remains unsupported")
 equal(adapters["com.microsoft.PowerPoint"], nil, "never alias a differently cased identifier")
 equal(adapters["com.apple.mail"].kind, "menu", "Mail needs Accessibility, not new Automation access")
 equal(table.concat(adapters["com.apple.mail"].menu, "/"), "File/New Viewer Window", "Mail opens a viewer, never a draft")
+
+equal(adapters["com.superlogical.rex"].kind, "menu", "Rex uses existing Accessibility access")
+equal(table.concat(adapters["com.superlogical.rex"].menu, "/"), "File/New Window", "Rex creates a window rather than a session or tab")
+equal(adapters["com.mitchellh.ghostty"].kind, "applescript", "Ghostty remains an independent fallback")
 
 print(string.format("app_adapters: %d assertions passed", assertions))

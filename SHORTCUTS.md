@@ -1,6 +1,6 @@
 # Complete Keyboard Shortcut Reference
 
-2026-10-07.1
+2026-10-22
 
 Hyper = `Control + Option + Command`
 
@@ -10,7 +10,7 @@ These commands are owned by Raycast, not Hammerspoon.
 
 | Category | Shortcut | Action |
 | --- | --- | --- |
-| Terminals | `Hyper + T` | Ghostty |
+| Terminals | `Hyper + T` | Rex Beta |
 | Terminals | `Hyper + Shift + T` | iTerm |
 | Browsers | `Hyper + B` | Safari |
 | Browsers | `Hyper + Shift + B` | Chrome |
@@ -128,7 +128,7 @@ The confirmation is inline in the same window. This adds no global shortcut.
 
 To establish a saved layout in the current Space, highlight it and press
 `Command + Return`, click **Establish here**, or right-click and choose
-**Establish here**. Independent new-window support is Ghostty (1.3+ with AppleScript
+**Establish here**. Independent new-window support includes Rex Beta (**File → New Window**) and Ghostty (1.3+ with AppleScript
 enabled), Finder, Safari, BBEdit, Chrome, and ChatGPT/OpenAI desktop with an
 enabled **File → New Window** menu. Claude can supply its launch-created main
 window when closed or reuse a local window; additional missing Claude windows

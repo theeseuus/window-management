@@ -160,7 +160,7 @@ equal(report.applied, 4, "repeat re-establishes geometry")
 -- before requesting another window, then reuse both on repeat Establish.
 for _, bundle in ipairs({
   "com.microsoft.Excel", "com.microsoft.Word", "com.microsoft.Powerpoint",
-  "com.apple.iWork.Keynote", "com.apple.iWork.Pages", "com.apple.iWork.Numbers", "com.apple.mail",
+  "com.apple.iWork.Keynote", "com.apple.iWork.Pages", "com.apple.iWork.Numbers", "com.apple.mail", "com.superlogical.rex",
 }) do
   env = environment()
   env.running[bundle], env.launchWindow = false, true

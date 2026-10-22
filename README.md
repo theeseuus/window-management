@@ -165,6 +165,7 @@ supported apps if needed, and creates only the missing slots. The adapters are:
 
 | App | New-window operation |
 | --- | --- |
+| Rex Beta | Exact **File → New Window** menu using existing Accessibility access |
 | Ghostty | Native `new window` with a default surface configuration |
 | Finder | Native `make new Finder window`, without a captured folder path |
 | Safari | Native new document explicitly opened to `about:blank`, without navigating an existing window |
@@ -192,6 +193,19 @@ dispatch, Space checks, and verified placement remain separate. To extend it,
 follow [Adding an application adapter](docs/app-adapters.md). The same guide is
 linked from the agent entry point; ordinary additions need no new hotkeys,
 recipe format, or plugin framework.
+
+Rex Beta is identified exactly as `com.superlogical.rex`. It creates an
+independent window through **File → New Window**, without enabling Rex remote
+control or changing its Option-key handling. Ghostty remains supported separately.
+Existing Ghostty recipes keep their identity; capture a layout containing Rex
+windows when that layout should use Rex.
+
+A 2026-10-22 pilot with Rex Beta 0.1.0 (1347) invoked the deployed menu adapter
+and observed exactly one new standard window in the destination Space. Rex
+also exposed one non-standard auxiliary window; existing eligibility filtering
+excludes it. The disposable standard window was closed afterward. Cold-start
+two-slot/repeat reuse and safe failure cases passed mocked tests; a live
+multi-window Establish/placement pilot has not been run.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the

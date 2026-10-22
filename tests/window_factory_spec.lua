@@ -228,7 +228,7 @@ factory.create("com.example.Chat", options, complete)
 equal(#tasks, 0, "unsupported apps never receive a generic shortcut")
 equal(result.reason, "unsupported-application", "unsupported create is safe")
 
-for _, bundle in ipairs({ "com.openai.codex", "com.openai.chat", "com.apple.mail" }) do
+for _, bundle in ipairs({ "com.openai.codex", "com.openai.chat", "com.apple.mail", "com.superlogical.rex" }) do
   reset()
   identity = bundle
   expectedMenu = bundle == "com.apple.mail" and "File/New Viewer Window" or "File/New Window"
@@ -257,29 +257,32 @@ for _, failure in ipairs({ "missing", "disabled", "identity", "space", "cancel" 
   equal(#tasks, 0, "Mail cannot fall back to scripting")
   equal(calls, 1, "complete Mail failure once")
 end
-for _, case in ipairs({
-  { "missing", "new-window-command-unavailable" },
-  { "disabled", "new-window-menu-disabled" },
-  { "lookup", "new-window-command-unavailable" },
-  { "selection", "window-command-failed" },
-  { "not-running", "application-not-running" },
-  { "identity", "application-identity-mismatch" },
-  { "space", "active-space-changed" },
-  { "declined", "window-command-failed" },
-}) do
-  reset()
-  if case[1] == "missing" then menuItem = nil
-  elseif case[1] == "disabled" then menuItem.enabled = false
-  elseif case[1] == "not-running" then app = nil
-  elseif case[1] == "identity" then identity = "com.example.Other"
-  elseif case[1] == "declined" then menuSelected = nil
-  else menuError = case[1] end
-  factory.create("com.openai.codex", options, complete)
-  drain()
-  equal(result.ok, false, "fail closed on menu " .. case[1])
-  equal(result.reason, case[2], "safe menu failure category")
-  equal(calls, 1, "no repeated menu callback")
-  equal(#menuCalls <= 1, true, "never retry or fall back to New Chat")
+for _, bundle in ipairs({ "com.openai.codex", "com.superlogical.rex" }) do
+  for _, case in ipairs({
+    { "missing", "new-window-command-unavailable" },
+    { "disabled", "new-window-menu-disabled" },
+    { "lookup", "new-window-command-unavailable" },
+    { "selection", "window-command-failed" },
+    { "not-running", "application-not-running" },
+    { "identity", "application-identity-mismatch" },
+    { "space", "active-space-changed" },
+    { "declined", "window-command-failed" },
+  }) do
+    reset()
+    identity = bundle
+    if case[1] == "missing" then menuItem = nil
+    elseif case[1] == "disabled" then menuItem.enabled = false
+    elseif case[1] == "not-running" then app = nil
+    elseif case[1] == "identity" then identity = "com.example.Other"
+    elseif case[1] == "declined" then menuSelected = nil
+    else menuError = case[1] end
+    factory.create(bundle, options, complete)
+    drain()
+    equal(result.ok, false, "fail closed on menu " .. case[1])
+    equal(result.reason, case[2], "safe menu failure category")
+    equal(calls, 1, "no repeated menu callback")
+    equal(#menuCalls <= 1, true, "never retry or substitute a content command")
+  end
 end
 reset()
 job = factory.create("com.openai.codex", options, complete)
