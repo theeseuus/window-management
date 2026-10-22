@@ -292,6 +292,34 @@ window polling. Installed versions were Safari 27.0.1 (22625.1.29.11.28), Codex
 probe; that is compatibility context, not an established cause. The inspection
 changed no application configuration, recipes, or windows.
 
+The next instrumented normal-UI first run on 2026-10-23 retained its full report:
+three requested, two created/placed, zero reused, one missing Codex slot, no
+placement failures or extras, and no Space-stop reason. Codex failed during
+application lookup with `application-not-running`, before any menu lookup or
+selection. The original diagnostic merged a lookup exception with an absent
+app; it does not establish that Codex quit. The recipe's “ChatGPT” display label
+still targeted the exact `com.openai.codex` bundle.
+
+Measured action-receipt-to-completion time was 5.805 seconds with no dropped
+events. Destination-context resolution before closing the panel took 1.506
+seconds; initial feedback began at 1.521 seconds. The failed Codex application
+lookup took 1.141 seconds. Rex placement verification took 2.085 seconds and
+succeeded; the owner observed the window moving back and forth before settling.
+These are wall-clock stage intervals, not isolated app startup costs. Safari's
+1.464-second placement interval overlapped the synchronous Codex lookup, which
+may delay scheduled verification callbacks. Do not add overlapping stage totals.
+The context stage still combines several native calls, so its internal cause
+is unmeasured.
+
+A subsequent bounded read-only probe found one running GUI Codex instance and
+three successful lookups, each below one millisecond. The immediate failure is
+therefore isolated to the earlier application lookup, but its native cause and
+any connection to the Codex update or removed Dock item remain unproven. Future
+diagnostics distinguish `application-lookup-failed` (exception) from
+`application-not-running` (no object), retain lookup outcome/type flags, and
+separate absent apps from apps exposing zero windows in enumeration. This
+refines reporting without adding calls, retries, or a new creation operation.
+
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the

@@ -64,6 +64,7 @@ local function reasonText(reason)
     ["new-window-command-unavailable"] = "this app's genuine New Window command is unavailable",
     ["new-window-menu-disabled"] = "this app's New Window menu is disabled; no fallback was used",
     ["application-not-running"] = "the app is no longer running",
+    ["application-lookup-failed"] = "the app lookup failed before the new-window command",
     ["application-identity-mismatch"] = "the running app does not match the saved bundle identifier",
     ["claude-new-window-unavailable"] = "Claude has no verified independent-window command; reuse a local window or launch it from closed",
     ["window-command-failed"] = "the native app window command failed",
@@ -240,12 +241,15 @@ local function collectRecipeWindows(controller, recipe, context, onlyBundleID, t
     if not controller.excludedBundleIDs[bundleID] then
       local measured = trace and trace:begin("enumerate-app", bundleID)
       local skipped, eligible = {}, 0
+      local app, lookupSucceeded
       local ok, windows = pcall(function()
-        local app = hs.application.get(bundleID)
+        app = hs.application.get(bundleID)
+        lookupSucceeded = true
         return app and app:allWindows() or {}
       end)
       if not ok or type(windows) ~= "table" then
-        if measured then measured({ success = false, reason = "could-not-enumerate-workspace-windows" }) end
+        if measured then measured({ success = false, reason = "could-not-enumerate-workspace-windows",
+          lookupSucceeded = lookupSucceeded == true, appFound = not not app }) end
         return nil, "could-not-enumerate-workspace-windows"
       end
       for _, window in ipairs(windows) do
@@ -268,7 +272,8 @@ local function collectRecipeWindows(controller, recipe, context, onlyBundleID, t
           end
         end
       end
-      if measured then measured({ success = true, seen = #windows, eligible = eligible, skipped = skipped }) end
+      if measured then measured({ success = true, seen = #windows, eligible = eligible, skipped = skipped,
+        lookupSucceeded = true, appFound = not not app }) end
     end
   end
   return records, nil, seenIDs

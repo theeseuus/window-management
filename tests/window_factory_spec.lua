@@ -358,5 +358,23 @@ equal(result.reason, "new-window-command-unavailable", "measured lookup keeps ca
 equal(trace.data.events[2].success, false, "failed menu lookup is visible in timeline")
 equal(trace.data.events[2].reason, nil, "raw native exception text is not stored")
 
+local originalGet = hs.application.get
+for _, mode in ipairs({ "exception", "absent" }) do
+  reset()
+  hs.application.get = function()
+    if mode == "exception" then error("private native error text") end
+    return nil
+  end
+  trace = diagnostics.new(function() return now end)
+  factory.create("com.openai.codex", { guard = options.guard, diagnostics = trace }, complete)
+  drain(); trace:finish()
+  equal(result.reason, mode == "exception" and "application-lookup-failed" or "application-not-running", "distinguish native lookup failure from absence")
+  equal(trace.data.events[1].lookupSucceeded, mode ~= "exception", "preserve original lookup result flag")
+  equal(trace.data.events[1].found, false, "no application object on either failure")
+  equal(trace.data.events[1].resultType, mode == "exception" and "string" or "nil", "retain return type without native error contents")
+  equal(#menuCalls, 0, "lookup failure never reaches menu selection")
+end
+hs.application.get = originalGet
+
 hs = previousHs
 print(string.format("window_factory: %d assertions passed", assertions))

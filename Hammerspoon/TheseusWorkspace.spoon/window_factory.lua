@@ -129,8 +129,10 @@ local function selectNewWindow(bundleID, menu, options, complete)
     if job.finished or not checkContext() then return end
     local appRead = begin(options, "menu-application", bundleID)
     local appOK, app = pcall(hs.application.get, bundleID)
-    appRead({ success = appOK and app ~= nil })
-    if not appOK or not app then finish(false, "application-not-running"); return end
+    appRead({ success = appOK and not not app, lookupSucceeded = appOK,
+      found = appOK and not not app, resultType = type(app) })
+    if not appOK then finish(false, "application-lookup-failed"); return end
+    if not app then finish(false, "application-not-running"); return end
     local identityOK, identity = pcall(function() return app:bundleID() end)
     if not identityOK or identity ~= bundleID then
       finish(false, "application-identity-mismatch"); return
