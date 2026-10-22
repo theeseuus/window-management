@@ -246,8 +246,14 @@ Codex, Rex). With all three apps already running elsewhere, an isolated native
 menu probe created one independent window per app in the selected empty Space,
 without switching Spaces, and closed only those test windows. Safari 27.0.1,
 Codex 26.1013.40934, and Rex 0.1.0 (1347) were tested. The profile-aware Safari
-resolver was also checked against the installed menu. Full-layout acceptance
-is recorded separately; this dispatch probe alone does not prove Establish.
+resolver was also checked against the installed menu. The subsequent normal-UI
+GPT Workspace test stayed on the selected Space: first run created all three
+windows with no missing slots or extras; Safari and Codex placed correctly but
+Rex reported `frame-not-restored`. The repeat created none, reused the same three
+window IDs, and placed all three without failures. The windows were left open,
+the saved catalog was unchanged, and the temporary observer stopped. This fixes
+the tested Space-switching failure, while Rex's first-run placement issue remains
+open. Cold-launch/reboot behavior is not established by this running-app test.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
