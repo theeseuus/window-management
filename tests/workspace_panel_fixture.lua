@@ -115,6 +115,7 @@ function fixture.new()
         function view:bringToFront() self.frontCount = (self.frontCount or 0) + 1; return self end
         function view:hswindow() return f.panel end
         function view:evaluateJavaScript(script, callback)
+          self.renderedWhileVisible = self.shown == true
           self.script = script
           table.insert(self.updates, f.lastEncoded)
           if callback then

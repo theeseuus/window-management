@@ -166,10 +166,12 @@ collection, capture fails without saving. The Window Factory panel itself is exc
 The panel uses a native macOS window with system typography, automatic light/dark
 appearance, and local-only assets. Its previews contain geometry and app names,
 not screenshots. No web service or generated image is needed at runtime.
-The window remains hidden until the page has applied its initial library or
-Capture model, then reveals the prepared panel. Repeating the entry shortcut
-during loading reuses that hidden window. Initial rendering failures and an
-eight-second loading timeout close it with an alert, allowing another attempt.
+The native window is shown before the page applies its initial model, so page
+focus is requested after native presentation. Repeating the entry shortcut
+reuses that window. Content may draw after the frame appears. The prepared
+hidden reveal was rolled back after a keyboard-input regression; the earlier
+sequence passed the owner's harmless native-panel typing, arrow, and Escape
+check on 2026-10-23. Production shortcut acceptance remains a separate check.
 
 Recipes identify a slot using the owning application's bundle identifier plus
 an ordinal. They do not store window titles, document paths, browser URLs,
@@ -455,6 +457,15 @@ these results accept creation/reuse through the pointer path only. A harmless
 memory-only panel pilot is comparing the earlier presentation sequence with
 the prepared-content reveal; no keyboard fix or native successor is accepted
 by these creation reports.
+
+The owner then tested the memory-only panel using the presentation sequence
+from before `aadb284`, with the later destination-frame accessor retained.
+Typing after clicking search, Up/Down navigation, and Escape all worked. The
+prepared-content reveal has therefore been rolled back as one isolated change;
+no application adapter, creation command, placement rule, or shortcut changed.
+This comparison implicates the presentation lifecycle but does not establish
+the underlying AppKit/WebKit focus mechanism. The production shortcut and full
+workspace acceptance must pass before a baseline tag is created.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the

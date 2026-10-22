@@ -27,22 +27,21 @@ local function systemIcons()
 end
 
 function panel.open(screenFrame, callbacks, initial)
-  local session = { state = "library", revision = 0, closed = false, loaded = false, presented = false }
+  local session = { state = "library", revision = 0, closed = false, loaded = false }
   local content = hs.webview.usercontent.new("TheseusWorkspacePanel")
   session.content = content
   initial.icons = systemIcons()
   session.model = initial
 
   function session:render()
-    if self.closed or not self.loaded or self.preparing then return end
+    if self.closed or not self.loaded then return end
     local model = {}
     for key, value in pairs(self.model) do model[key] = value end
     model.state, model.revision = self.state, self.revision
     -- JSON is passed as an expression, never interpolated into HTML or a string.
     local json = hs.json.encode(model):gsub("\226\128\168", "\\u2028"):gsub("\226\128\169", "\\u2029")
-    local revision = self.revision
     self.view:evaluateJavaScript("window.setWorkspaceState(" .. json .. ");", function(_, err)
-      if self.closed or revision ~= self.revision then return end
+      if self.closed then return end
       -- Hammerspoon 1.1.1 can report successful evaluations as { code = 0 }.
       local success = err == nil or (type(err) == "table" and err.code == 0
         and err.domain == nil and err.description == nil and err.localizedDescription == nil)
@@ -51,16 +50,6 @@ function panel.open(screenFrame, callbacks, initial)
         self.renderError = err.description or err.localizedDescription
           or ("JavaScript render error: " .. tostring(err.code or "unknown"))
       else self.renderError = tostring(err) end
-      if not self.presented then
-        if success then
-          self.presented = true
-          if self.loadTimer then self.loadTimer:stop(); self.loadTimer = nil end
-          self:bringToFront()
-        else
-          self:close()
-          hs.alert.show("Window Factory could not prepare its contents: " .. self.renderError)
-        end
-      end
     end)
   end
 
@@ -82,7 +71,6 @@ function panel.open(screenFrame, callbacks, initial)
     if session.closed then return end
     session.closed, session.state = true, "closed"
     session:stopTimer()
-    if session.loadTimer then session.loadTimer:stop(); session.loadTimer = nil end
     content:setCallback(nil)
     local view = session.view
     session.view = nil
@@ -92,7 +80,7 @@ function panel.open(screenFrame, callbacks, initial)
 
   function session:close() finish(true) end
   function session:bringToFront()
-    if not self.closed and self.presented then self.view:show():bringToFront() end
+    if not self.closed then self.view:show():bringToFront() end
   end
   function session:frame()
     return self.view and self.view:frame()
@@ -108,11 +96,8 @@ function panel.open(screenFrame, callbacks, initial)
     if body.action == "ready" then
       if session.loaded then return end
       session.loaded = true
-      -- Resolve a pending Capture entry before preparing the first visible model.
-      session.preparing = true
-      if callbacks.loaded then callbacks.loaded(session) end
-      session.preparing = false
       session:render()
+      if callbacks.loaded then callbacks.loaded(session) end
       return
     end
     -- Discard queued events from a previous view, confirmation, or closed panel.
@@ -132,7 +117,7 @@ function panel.open(screenFrame, callbacks, initial)
     w = width, h = height,
   }, {
     privateBrowsing = true, javaScriptCanOpenWindowsAutomatically = false,
-    developerExtrasEnabled = false, suppressesIncrementalRendering = true,
+    developerExtrasEnabled = false,
   }, content)
   session.view
     :windowStyle({ "titled", "closable", "fullSizeContentView", "nonactivating" })
@@ -153,13 +138,8 @@ function panel.open(screenFrame, callbacks, initial)
       if action == "closing" then finish(false) end
     end)
     :html(html)
-  -- Loading happens while hidden. Do not depend on animation frames, which WebKit
-  -- may pause for a hidden view, or leave a failed load invisible indefinitely.
-  session.loadTimer = hs.timer.doAfter(8, function()
-    if session.closed or session.presented then return end
-    session:close()
-    hs.alert.show("Window Factory could not load its contents. Please try opening it again.")
-  end)
+    :show()
+    :bringToFront()
   return session
 end
 
