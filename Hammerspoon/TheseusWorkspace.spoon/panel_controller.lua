@@ -90,6 +90,10 @@ function controller.new(adapter)
   function ui:action(session, body)
     if self.session ~= session then return end
     local state, action = session.state, body.action
+    -- Timestamp receipt of the existing UI action, not the physical keypress.
+    local trace = state == "library" and action == "establish" and adapter.beginEstablishDiagnostics
+      and adapter.beginEstablishDiagnostics() or nil
+    local dispatched = trace and trace:begin("panel-dispatch")
     if action == "close" and state == "library" then session:close(); return end
     if action == "cancel" and state ~= "saving" then
       if state == "confirm-replace" then self:ready()
@@ -114,11 +118,16 @@ function controller.new(adapter)
         local busy = adapter.busy()
         if busy then self:library(body.name, adapter.reason(busy)); return end
         -- Retain the intended destination before closing changes keyboard focus.
+        local measuredContext = trace and trace:begin("panel-context")
         local context, contextErr = adapter.context()
+        if measuredContext then measuredContext({ success = context ~= nil }) end
         if not context then self:library(body.name, adapter.reason(contextErr)); return end
         local name = body.name
+        local closed = trace and trace:begin("panel-close")
         session:close()
-        adapter.apply(action, name, context)
+        if closed then closed() end
+        if dispatched then dispatched() end
+        adapter.apply(action, name, context, trace)
       end
     elseif state == "ready" and action == "save" and type(body.name) == "string" then
       self:save(body.name, false)

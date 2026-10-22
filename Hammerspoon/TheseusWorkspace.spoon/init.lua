@@ -23,6 +23,7 @@ local frameRestore = dofile(sourcePath .. "frame_restore.lua")
 local panelController = dofile(sourcePath .. "panel_controller.lua")
 local windowFactory = dofile(sourcePath .. "window_factory.lua")
 local workspaceEstablish = dofile(sourcePath .. "workspace_establish.lua")
+local establishDiagnostics = dofile(sourcePath .. "establish_diagnostics.lua")
 
 local function copyFrame(frame)
   return { x = frame.x, y = frame.y, w = frame.w, h = frame.h }
@@ -227,7 +228,7 @@ end
 -- Establish enumerates only the apps named in the recipe, not the whole
 -- desktop. Retain all observed IDs so an old hidden/minimized window cannot
 -- be mistaken for a newly created one when it becomes visible.
-local function collectRecipeWindows(controller, recipe, context, onlyBundleID)
+local function collectRecipeWindows(controller, recipe, context, onlyBundleID, trace)
   local records, seenIDs, bundles = {}, {}, {}
   for _, slot in ipairs(recipe.windows) do
     if not onlyBundleID or slot.bundleID == onlyBundleID then bundles[slot.bundleID] = true end
@@ -237,11 +238,14 @@ local function collectRecipeWindows(controller, recipe, context, onlyBundleID)
   table.sort(ordered)
   for _, bundleID in ipairs(ordered) do
     if not controller.excludedBundleIDs[bundleID] then
+      local measured = trace and trace:begin("enumerate-app", bundleID)
+      local skipped, eligible = {}, 0
       local ok, windows = pcall(function()
         local app = hs.application.get(bundleID)
         return app and app:allWindows() or {}
       end)
       if not ok or type(windows) ~= "table" then
+        if measured then measured({ success = false, reason = "could-not-enumerate-workspace-windows" }) end
         return nil, "could-not-enumerate-workspace-windows"
       end
       for _, window in ipairs(windows) do
@@ -249,8 +253,14 @@ local function collectRecipeWindows(controller, recipe, context, onlyBundleID)
         if not idOK or not id then return nil, "could-not-read-window-id" end
         if not seenIDs[id] then
           seenIDs[id] = true
-          local record = describeWindow(controller, window, context)
+          local record, excluded = describeWindow(controller, window, context)
+          if not record then
+            -- Retain only the categorical prefix, never raw Accessibility errors.
+            local category = (excluded or "unknown"):match("^[^:]+")
+            skipped[category] = (skipped[category] or 0) + 1
+          end
           if record and record.bundleID == bundleID then
+            eligible = eligible + 1
             local frame, err = workspaceLogic.normalizeFrame(record.frame, context.screenFrame)
             if not frame then return nil, err end
             record.frame = frame
@@ -258,6 +268,7 @@ local function collectRecipeWindows(controller, recipe, context, onlyBundleID)
           end
         end
       end
+      if measured then measured({ success = true, seen = #windows, eligible = eligible, skipped = skipped }) end
     end
   end
   return records, nil, seenIDs
@@ -563,43 +574,63 @@ function obj:establishWorkspace(name, options)
     if not options.silent then showAlert("WORKSPACE: an operation is already in progress") end
     return nil, busy
   end
+  local trace = options._diagnostics or establishDiagnostics.new()
+  local prepared = trace:begin("prepare")
   local normalizedName, err = workspaceLogic.normalizeName(name)
   local catalog
   if normalizedName then catalog, err = loadCatalog(self) end
   local recipe = catalog and catalog.recipes[normalizedName]
   if catalog and not recipe then err = "workspace-not-found" end
+  local function reject(reason)
+    prepared({ success = false, reason = reason })
+    trace:finish(reason)
+    establishDiagnostics.retain(self, { name = normalizedName, requested = recipe and #recipe.windows or 0,
+      applied = 0, created = 0, reused = 0, missing = {}, extras = {}, failures = {},
+      creationFailures = {}, pending = 0, finished = true, phase = "rejected", reason = reason,
+      diagnostics = trace.data })
+  end
   if not recipe then
+    reject(err)
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(err)) end
     return nil, err
   end
+  local checkedContext = trace:begin("validate-context")
   local context, contextErr = operationContext(options)
+  checkedContext({ success = context ~= nil, reason = contextErr })
   if not context then
+    reject(contextErr)
     if not options.silent then showAlert("WORKSPACE: " .. reasonText(contextErr)) end
     return nil, contextErr
   end
+  prepared({ success = true })
 
   local session = {}
   self._establishOperation = session
   local function guard()
     if session.cancelled then return false, "establish-cancelled" end
+    local measured = trace:begin("safety-check")
     local ok, active = pcall(hs.spaces.activeSpaceOnScreen, context.screen)
+    measured({ success = ok and active == context.spaceID })
     return ok and active == context.spaceID, "active-space-changed"
   end
+  local feedback = trace:begin("initial-feedback")
   if not options.silent then showAlert("ESTABLISHING " .. normalizedName, context.screen) end
+  feedback()
   session.job = workspaceEstablish.start(recipe, {
     guard = guard,
+    diagnostics = trace,
     scheduleAfter = hs.timer.doAfter,
-    collect = function(bundleID) return collectRecipeWindows(self, recipe, context, bundleID) end,
+    collect = function(bundleID) return collectRecipeWindows(self, recipe, context, bundleID, trace) end,
     isRunning = function(bundleID) return hs.application.get(bundleID) ~= nil end,
     support = function(bundleID)
       if self.excludedBundleIDs[bundleID] then return false, "excluded-application" end
       return windowFactory.support(bundleID)
     end,
     launch = function(bundleID, complete)
-      return windowFactory.launch(bundleID, { guard = guard }, complete)
+      return windowFactory.launch(bundleID, { guard = guard, diagnostics = trace }, complete)
     end,
     create = function(bundleID, complete)
-      return windowFactory.create(bundleID, { guard = guard }, complete)
+      return windowFactory.create(bundleID, { guard = guard, diagnostics = trace }, complete)
     end,
     place = function(assignment, complete)
       local target = assert(workspaceLogic.absoluteFrame(assignment.target.frame, context.screenFrame))
@@ -622,7 +653,9 @@ function obj:establishWorkspace(name, options)
     end,
   }, function(report)
     if self._establishOperation == session then self._establishOperation = nil end
-    self.lastEstablishReport = report
+    report.diagnostics = trace.data
+    establishDiagnostics.retain(self, report)
+    local completedFeedback = trace:begin("completion-feedback")
     if not options.silent and not report.cancelled then
       local message = string.format(
         "ESTABLISHED %s · %d placed · %d new · %d missing · %d failed",
@@ -641,6 +674,8 @@ function obj:establishWorkspace(name, options)
       if #failedNames > 0 then message = message .. "\nFailed placement: " .. table.concat(failedNames, ", ") end
       showAlert(message, context.screen, 5)
     end
+    completedFeedback()
+    trace:finish(report.reason)
     if type(options.onComplete) == "function" then
       local ok, callbackErr = pcall(options.onComplete, report)
       if not ok then report.callbackError = tostring(callbackErr) end
@@ -711,9 +746,10 @@ local function workspaceUI(controller)
       return saveSnapshot(controller, name, snapshot, { replace = replace, silent = true })
     end,
     delete = function(name) return controller:deleteWorkspace(name, { silent = true }) end,
-    apply = function(action, name, context)
+    beginEstablishDiagnostics = function() return establishDiagnostics.new() end,
+    apply = function(action, name, context, trace)
       if action == "restore" then controller:restoreWorkspace(name, { _context = context })
-      else controller:establishWorkspace(name, { _context = context }) end
+      else controller:establishWorkspace(name, { _context = context, _diagnostics = trace }) end
     end,
     busy = function()
       return controller._establishOperation and "establish-in-progress"

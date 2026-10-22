@@ -336,5 +336,27 @@ for _, failure in ipairs({ "missing", "exception", "space" }) do
   hs.axuielement.applicationElement = original
 end
 
+-- Time native menu lookup and selection separately without retaining app text.
+local diagnostics = dofile(root .. "/Hammerspoon/TheseusWorkspace.spoon/establish_diagnostics.lua")
+reset()
+local now = 0
+local trace = diagnostics.new(function() return now end)
+local find, select = app.findMenuItem, app.selectMenuItem
+app.findMenuItem = function(self, menu) now = now + 1.5; return find(self, menu) end
+app.selectMenuItem = function(self, menu) now = now + 2; return select(self, menu) end
+factory.create("com.openai.codex", { guard = options.guard, diagnostics = trace }, complete)
+drain(); trace:finish()
+equal(result.ok, true, "measured dispatch preserves success")
+equal(trace.data.totals["menu-lookup:com.openai.codex"].durationSeconds, 1.5, "measure native lookup wall time")
+equal(trace.data.totals["menu-select:com.openai.codex"].durationSeconds, 2, "measure native selection wall time")
+equal(#menuCalls, 1, "timing does not dispatch an extra menu action")
+reset(); menuError = "lookup"
+trace = diagnostics.new(function() return now end)
+factory.create("com.openai.codex", { guard = options.guard, diagnostics = trace }, complete)
+drain(); trace:finish()
+equal(result.reason, "new-window-command-unavailable", "measured lookup keeps categorical failure")
+equal(trace.data.events[2].success, false, "failed menu lookup is visible in timeline")
+equal(trace.data.events[2].reason, nil, "raw native exception text is not stored")
+
 hs = previousHs
 print(string.format("window_factory: %d assertions passed", assertions))

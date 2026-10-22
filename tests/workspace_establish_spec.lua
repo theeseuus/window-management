@@ -330,4 +330,30 @@ report = env:start(recipe({ "Ghostty" }))
 env:drain()
 equal(report.reason, "could-not-schedule-window-check", "timer allocation fails safely")
 
+-- Diagnostics measure the existing bounded waits without adding scans or retries.
+local diagnostics = dofile(root .. "/Hammerspoon/TheseusWorkspace.spoon/establish_diagnostics.lua")
+local now = 0
+local trace = diagnostics.new(function() return now end)
+env = environment(); env.noNewWindow = true
+local originalCollect, originalSchedule = env.options.collect, env.options.scheduleAfter
+env.options.diagnostics = trace
+env.options.collect = function(bundle)
+  now = now + 2 -- simulate a slow Accessibility call
+  return originalCollect(bundle)
+end
+env.options.scheduleAfter = function(delay, callback)
+  return originalSchedule(delay, function() now = now + delay; callback() end)
+end
+report = env:start(recipe({ "com.openai.codex" })); env:drain(); trace:finish(report.reason)
+equal(#env.creates, 1, "instrumentation never retries a failed creation")
+equal(report.creationFailures[1].reason, "new-window-not-in-destination-space", "first failure category survives")
+equal(report.diagnostics, trace.data, "active and completed report share bounded diagnostics")
+local waiting
+for _, event in ipairs(trace.data.events) do
+  if event.stage == "await-new-window" then waiting = event end
+end
+equal(waiting.checks, 24, "retain existing discovery check limit")
+equal(waiting.durationSeconds > 48, true, "wall timing includes slow scans and scheduled waits")
+equal(trace.data.totals["collect:com.openai.codex"].calls, 27, "instrumentation adds no collection calls")
+
 print(string.format("workspace_establish: %d assertions passed", assertions))

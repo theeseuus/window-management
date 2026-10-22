@@ -11,6 +11,11 @@ function establish.start(recipe, options, complete)
     reused = 0, missing = {}, extras = {}, failures = {}, creationFailures = {},
     pending = 0, finished = false, phase = "preparing",
   }
+  local trace = options.diagnostics
+  report.diagnostics = trace and trace.data or nil
+  local function begin(stage, bundleID)
+    return trace and trace:begin(stage, bundleID) or function() end
+  end
   local job = { report = report, children = {} }
   local timer, approvedIDs, createdIDs = nil, {}, {}
   local creationFinished = false
@@ -53,7 +58,11 @@ function establish.start(recipe, options, complete)
 
   local function collect(bundleID)
     if not guard() then return nil end
+    local measured = begin("collect", bundleID)
     local ok, candidates, err, seenIDs = pcall(options.collect, bundleID)
+    local seenCount = 0
+    for _ in pairs(seenIDs or {}) do seenCount = seenCount + 1 end
+    measured({ success = ok and candidates ~= nil, eligible = candidates and #candidates or 0, seen = seenCount })
     if not ok or not candidates then
       finish(ok and err or "could-not-enumerate-workspace-windows")
       return nil
@@ -123,7 +132,10 @@ function establish.start(recipe, options, complete)
     for _, assignment in ipairs(assignments) do
       if not guard() then break end
       assignment.newlyCreated = createdIDs[assignment.candidate.id] == true
+      local placed = begin("placement", bundleID)
       keep(options.place(assignment, function(success, reason, actual)
+        placed({ success = success, reason = reason, windowID = assignment.candidate.id,
+          newlyCreated = assignment.newlyCreated })
         if report.finished then return end
         if success then
           report.applied = report.applied + 1
@@ -170,7 +182,9 @@ function establish.start(recipe, options, complete)
     if not candidates then return end
     local missing = missingFor(candidates, app.bundleID)
     if #missing == 0 then nextApp(); return end
+    local supportedCheck = begin("support", app.bundleID)
     local supported, reason = options.support(app.bundleID)
+    supportedCheck({ success = supported, reason = not supported and reason or nil })
     if not supported then creationFailure(app, reason); nextApp(); return end
 
     -- A failed/late creation is never retried. A retry might create a second
@@ -188,10 +202,13 @@ function establish.start(recipe, options, complete)
       for _, candidate in ipairs(current) do baseline[candidate.id] = true end
       remainingRequests = remainingRequests - 1
       report.phase = "creating"
+      local dispatched = begin("create-command", app.bundleID)
       keep(options.create(app.bundleID, function(success, createErr)
+        dispatched({ success = success, reason = createErr })
         if not guard() then return end
         if not success then creationFailure(app, createErr); nextApp(); return end
         local ticks = 0
+        local waited = begin("await-new-window", app.bundleID)
         local function awaitWindow()
           local discovered = collect(app.bundleID)
           if not discovered then return end
@@ -202,14 +219,17 @@ function establish.start(recipe, options, complete)
             end
           end
           if #new == 1 then
+            waited({ success = true, checks = ticks + 1, windowID = new[1].id })
             rememberNew(new, baseline, app.bundleID)
             createOne()
           elseif #new > 1 then
+            waited({ success = false, reason = "ambiguous-new-windows", checks = ticks + 1 })
             creationFailure(app, "ambiguous-new-windows")
             nextApp()
           else
             ticks = ticks + 1
             if ticks >= 24 then
+              waited({ success = false, reason = "new-window-not-in-destination-space", checks = ticks })
               creationFailure(app, "new-window-not-in-destination-space")
               nextApp()
             else later(awaitWindow) end
@@ -219,14 +239,20 @@ function establish.start(recipe, options, complete)
       end))
     end
 
-    if options.isRunning(app.bundleID) then createOne(); return end
+    local runningCheck = begin("is-running", app.bundleID)
+    local running = options.isRunning(app.bundleID)
+    runningCheck({ running = running })
+    if running then createOne(); return end
     report.phase = "launching"
     local _, baseline = collect(app.bundleID)
     if not baseline then return end
+    local launched = begin("launch-command", app.bundleID)
     keep(options.launch(app.bundleID, function(success, launchErr)
+      launched({ success = success, reason = launchErr })
       if not guard() then return end
       if not success then creationFailure(app, launchErr); nextApp(); return end
       local ticks, stableTicks, lastCount = 0, 0, -1
+      local launchWait = begin("await-launch", app.bundleID)
       local function awaitLaunch()
         local discovered = collect(app.bundleID)
         if not discovered then return end
@@ -239,10 +265,12 @@ function establish.start(recipe, options, complete)
         stableTicks = count == lastCount and stableTicks + 1 or 0
         lastCount, ticks = count, ticks + 1
         if options.isRunning(app.bundleID) and ((count > 0 and stableTicks >= 3) or ticks >= launchCheckLimit) then
+          launchWait({ success = true, checks = ticks })
           -- Count launch-created/default windows before requesting more.
           rememberNew(discovered, baseline, app.bundleID)
           createOne()
         elseif ticks >= launchCheckLimit then
+          launchWait({ success = false, reason = "application-did-not-launch", checks = ticks })
           creationFailure(app, "application-did-not-launch")
           nextApp()
         else later(awaitLaunch) end

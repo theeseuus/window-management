@@ -381,6 +381,7 @@ settings.TheseusWorkspaceRecipesV1 = { schemaVersion = 1, recipes = { Pilot = {
 } } }
 windows[21].memberships = { 902 }
 local otherProjectSetCount = windows[21].setCount
+workspace.firstEstablishReport, workspace.establishReports, workspace._establishSequence = nil, nil, nil
 completedCount = 0
 local establishReport = workspace:establishWorkspace("Pilot", { silent = true, onComplete = function()
   completedCount = completedCount + 1
@@ -402,6 +403,15 @@ equal(#establishReport.failures, 0, "no frame failures")
 equal(completedCount, 1, "API completion runs once")
 equal(workspace.lastEstablishReport, establishReport, "retain final in-memory report")
 equal(workspace._establishOperation, nil, "release operation lock")
+equal(workspace.firstEstablishReport, establishReport, "pin first completed Establish report")
+equal(type(establishReport.diagnostics.durationSeconds), "number", "retain operation duration")
+local foundCollection = false
+for _, event in ipairs(establishReport.diagnostics.events) do
+  if event.stage == "enumerate-app" and event.bundleID == "com.mitchellh.ghostty" then
+    if event.skipped["not-exclusive-to-current-space"] then foundCollection = true end
+  end
+end
+equal(foundCollection, true, "report categorical other-Space exclusion without reading contents")
 equal(windows[21].setCount, otherProjectSetCount, "other project Ghostty untouched")
 near(windows[71].currentFrame.x, 900, "new Ghostty placed at saved x")
 near(windows[71].currentFrame.h, 1000, "new Ghostty placed at saved height")
@@ -410,6 +420,9 @@ drainTimers()
 equal(createCalls, 1, "second Establish creates no duplicate")
 equal(repeated.created, 0, "second Establish has no new windows")
 equal(repeated.reused, 2, "second Establish reuses both")
+equal(workspace.firstEstablishReport, establishReport, "repeat preserves original report")
+equal(#workspace.establishReports, 2, "retain both first and repeat reports")
+equal(workspace.establishReports[1].created, 1, "repeat does not mutate original counts")
 equal(settingsWrites, 0, "Establish never mutates personal recipes")
 
 windows[71] = nil

@@ -368,6 +368,33 @@ spoon.TheseusWorkspace:deleteWorkspace("Project Atlas")
 The direct `deleteWorkspace` API deletes immediately, without the panel's
 confirmation; callers are responsible for confirming their target.
 
+Establish diagnostics are memory-only and reset when Hammerspoon reloads.
+`firstEstablishReport` pins the first non-busy API attempt after reload, while
+`establishReports` retains the ten most recent reports in chronological order;
+`lastEstablishReport` remains the latest. Each report has an `attempt` number
+and `diagnostics` with a UTC start label, monotonic `durationSeconds`, bounded
+`events` (512 maximum, with `droppedEvents`), and per-stage/per-app `totals`.
+Invalid recipe/context attempts are retained as `phase="rejected"`; busy
+requests still return their existing error without starting another attempt.
+
+Timing begins when Lua receives the panel action (or at direct API entry), not
+at the physical keypress. Stages cover panel dispatch/context/close, preparation,
+feedback calls, Space guards, window collection per app, capability checks,
+launch/creation dispatch, native menu resolution/lookup/selection, discovery
+waits, and verified placement. Nested and concurrent timings overlap: do not
+sum them to obtain total elapsed time. Enumerations retain observed/eligible
+counts and categorical skip reasons, never window titles, contents, or raw app
+errors. No extra window scans, recurring observers, creation retries, recipe
+writes, or application preference changes are introduced. Existing bounded
+creation/discovery and placement checks remain authoritative.
+
+For a first-run diagnostic, reload, run Establish once from an empty ordinary
+Space, then inspect `spoon.TheseusWorkspace.firstEstablishReport` before any
+repeat. A repeat remains separately inspectable in `establishReports`. The
+history is not saved to disk; export only a deliberately scoped report when
+needed. This measures the command's work, not when macOS paints an alert.
+
+
 `establishWorkspace` is asynchronous and accepts `silent` and `onComplete`
 options, like Restore. Its final report is held in `lastEstablishReport` and
 includes verified `applied`, `created`, and `reused` counts, `missing`, `extras`,

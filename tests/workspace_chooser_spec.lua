@@ -8,7 +8,7 @@ end
 local function open(names)
   local f = fixture.new(); f:seed(names)
   f.workspace.restoreWorkspace = function(_, name, options) table.insert(f.restores, { name = name, context = options._context }) end
-  f.workspace.establishWorkspace = function(_, name, options) table.insert(f.establishes, { name = name, context = options._context }) end
+  f.workspace.establishWorkspace = function(_, name, options) table.insert(f.establishes, { name = name, context = options._context, diagnostics = options._diagnostics }) end
   return f, f:open()
 end
 
@@ -49,6 +49,10 @@ equal(#f.hotkeys, 0, "no local gesture leaks into other apps")
 
 f, view = open(); f:send("establish", "Zeta")
 equal(f.establishes[1].name, "Zeta", "Establish routes to existing engine")
+local stages = {}
+for _, event in ipairs(f.establishes[1].diagnostics.data.events) do stages[event.stage] = event end
+equal(type(stages["panel-dispatch"].durationSeconds), "number", "measure UI receipt to engine dispatch")
+equal(type(stages["panel-close"].durationSeconds), "number", "measure panel close before engine begins")
 equal(#f.restores, 0, "Establish is not Restore")
 equal(f.enumerations, 0, "dispatch does not move any windows itself")
 equal(view.deleted, true, "Establish releases panel")

@@ -1,6 +1,9 @@
 -- An allowlist of genuine new-window APIs. Never synthesize a generic Cmd+N:
 -- in an unsupported app that could replace a chat, document, tab, or session.
 local factory = {}
+local function begin(options, stage, bundleID)
+  return options.diagnostics and options.diagnostics:begin(stage, bundleID) or function() end
+end
 
 local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local adapters = dofile(sourcePath .. "app_adapters.lua")
@@ -124,7 +127,9 @@ local function selectNewWindow(bundleID, menu, options, complete)
   local scheduledOK, scheduled = pcall(hs.timer.doAfter, 0, function()
     timer = nil
     if job.finished or not checkContext() then return end
+    local appRead = begin(options, "menu-application", bundleID)
     local appOK, app = pcall(hs.application.get, bundleID)
+    appRead({ success = appOK and app ~= nil })
     if not appOK or not app then finish(false, "application-not-running"); return end
     local identityOK, identity = pcall(function() return app:bundleID() end)
     if not identityOK or identity ~= bundleID then
@@ -132,20 +137,26 @@ local function selectNewWindow(bundleID, menu, options, complete)
     end
     local resolvedMenu = menu
     if type(menu) == "function" then
+      local resolved = begin(options, "menu-resolve", bundleID)
       local resolvedOK, value = pcall(menu, app)
+      resolved({ success = resolvedOK and type(value) == "table" })
       if not resolvedOK or type(value) ~= "table" then
         finish(false, "new-window-command-unavailable"); return
       end
       resolvedMenu = value
     end
+    local lookedUp = begin(options, "menu-lookup", bundleID)
     local menuOK, item = pcall(function() return app:findMenuItem(resolvedMenu) end)
+    lookedUp({ success = menuOK and type(item) == "table", enabled = type(item) == "table" and item.enabled == true })
     if not menuOK or type(item) ~= "table" then
       finish(false, "new-window-command-unavailable"); return
     end
     if not item.enabled then finish(false, "new-window-menu-disabled"); return end
     if not checkContext() then return end
     -- No activation, key synthesis, New Chat, or fallback menu selection.
+    local selectedMenu = begin(options, "menu-select", bundleID)
     local selectOK, selected = pcall(function() return app:selectMenuItem(resolvedMenu) end)
+    selectedMenu({ success = selectOK and selected == true })
     if not checkContext() then return end
     if selectOK and selected == true then finish(true)
     else finish(false, "window-command-failed") end
