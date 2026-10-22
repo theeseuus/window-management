@@ -133,9 +133,12 @@ function establish.start(recipe, options, complete)
       if not guard() then break end
       assignment.newlyCreated = createdIDs[assignment.candidate.id] == true
       local placed = begin("placement", bundleID)
-      keep(options.place(assignment, function(success, reason, actual)
+      keep(options.place(assignment, function(success, reason, actual, metrics)
+        metrics = metrics or {}
         placed({ success = success, reason = reason, windowID = assignment.candidate.id,
-          newlyCreated = assignment.newlyCreated })
+          newlyCreated = assignment.newlyCreated,
+          fullFrameRequests = metrics.fullFrameRequests, sizeRequests = metrics.sizeRequests,
+          positionRequests = metrics.positionRequests, frameChecks = metrics.frameChecks })
         if report.finished then return end
         if success then
           report.applied = report.applied + 1

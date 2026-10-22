@@ -651,6 +651,8 @@ function obj:establishWorkspace(name, options)
       return frameRestore.place(window, target, {
         initialFrame = workspaceLogic.absoluteFrame(assignment.candidate.frame, context.screenFrame),
         newlyCreated = assignment.newlyCreated,
+        placementPolicy = assignment.newlyCreated
+          and windowFactory.placementPolicy(assignment.target.bundleID) or nil,
         animationDuration = tonumber(self.animationDuration),
         scheduleAfter = hs.timer.doAfter,
         guard = function()

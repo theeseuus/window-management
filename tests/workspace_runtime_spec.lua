@@ -451,6 +451,73 @@ equal(overlap, nil, "Establish cannot overlap Restore")
 equal(overlapErr, "restore-in-progress", "reverse overlap reason")
 workspace._restoreOperation = nil
 
+-- Exact registry policy reaches newly created Rex windows through Establish;
+-- existing Rex reuse and Restore keep ordinary placement behavior.
+local rex = makeApplication("com.superlogical.rex", "Rex Beta")
+applications[rex:bundleID()] = rex
+local rexCommands = 0
+function rex:allWindows()
+  return windows[81] and { windows[81] } or {}
+end
+function rex:findMenuItem(menu)
+  equal(table.concat(menu, "/"), "File/New Window", "Rex keeps exact creation menu")
+  return { enabled = true }
+end
+function rex:selectMenuItem(menu)
+  equal(table.concat(menu, "/"), "File/New Window", "Rex dispatch uses exact menu")
+  rexCommands = rexCommands + 1
+  windows[81] = makeWindow(81, rex, { x = 100, y = 50, w = 800, h = 1000 })
+  local rexWindow = windows[81]
+  local move, resize = rexWindow.setTopLeft, rexWindow.setSize
+  function rexWindow:setTopLeft(point)
+    self.moveCount = (self.moveCount or 0) + 1
+    return move(self, point)
+  end
+  function rexWindow:setSize(size)
+    self.resizeCount = (self.resizeCount or 0) + 1
+    return resize(self, size)
+  end
+  return true
+end
+settings.TheseusWorkspaceRecipesV1.schemaVersion = 1
+settings.TheseusWorkspaceRecipesV1.recipes.RexPilot = {
+  schemaVersion = 1, name = "RexPilot", capturedAt = "2026-10-23T00:00:00Z", windows = {
+    { bundleID = "com.superlogical.rex", appName = "Rex Beta", ordinal = 1,
+      frame = { x = 0.5, y = 0, w = 0.5, h = 1 } },
+  },
+}
+local rexReport = workspace:establishWorkspace("RexPilot", { silent = true })
+drainTimers()
+equal(rexReport.created, 1, "Rex pilot creates only its missing window")
+equal(rexReport.applied, 1, "Rex pilot verifies placement")
+equal(windows[81].setCount, 0, "new Rex policy avoids combined frame requests")
+equal(windows[81].moveCount, 1, "new Rex policy moves once when accepted")
+equal(windows[81].resizeCount or 0, 0, "new same-size Rex receives no resize")
+local rexPlacement
+for _, event in ipairs(rexReport.diagnostics.events) do
+  if event.stage == "placement" and event.bundleID == rex:bundleID() then rexPlacement = event end
+end
+equal(rexPlacement.positionRequests, 1, "retain position metrics through Establish callback")
+equal(rexPlacement.fullFrameRequests, 0, "retain zero combined-write metrics")
+equal(rexPlacement.sizeRequests, 0, "retain zero resize metrics")
+equal(rexPlacement.frameChecks, 3, "retain fresh-read and matching-check metrics")
+windows[81].currentFrame.x = 100
+local rexRepeat = workspace:establishWorkspace("RexPilot", { silent = true })
+drainTimers()
+equal(rexCommands, 1, "repeat Rex Establish creates no duplicate")
+equal(rexRepeat.created, 0, "repeat Rex reuses existing window")
+equal(windows[81].setCount, 1, "existing Rex uses ordinary full-frame placement")
+equal(windows[81].moveCount, 1, "existing Rex does not use new-window move policy")
+windows[81].currentFrame.x = 100
+hs.window.allWindows = function() return { windows[81] } end
+currentWindowIDs = { 81 }
+local rexRestore = workspace:restoreWorkspace("RexPilot", { silent = true })
+drainTimers()
+equal(rexRestore.applied, 1, "Rex Restore still verifies")
+equal(windows[81].setCount, 2, "Rex Restore keeps ordinary full-frame placement")
+equal(windows[81].moveCount, 1, "Rex Restore never receives startup placement policy")
+equal(settingsWrites, 0, "Rex policy never modifies saved recipes")
+
 hs = previousHs
 
 print(string.format("workspace_runtime_spec: %d assertions passed", assertions))

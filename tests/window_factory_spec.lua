@@ -80,6 +80,10 @@ local function drain()
 end
 
 reset()
+equal(factory.placementPolicy("com.superlogical.rex"), "position-only-when-sized", "exact Rex placement policy")
+equal(factory.placementPolicy("com.mitchellh.ghostty"), nil, "Ghostty retains ordinary placement")
+equal(factory.placementPolicy("com.apple.Safari"), nil, "Safari retains ordinary placement")
+equal(factory.placementPolicy("com.example.Unknown"), nil, "unknown app has no placement policy")
 equal(factory.support("com.apple.finder"), true, "Finder capability")
 equal(factory.support("com.apple.Safari"), true, "Safari capability")
 equal(factory.support("com.mitchellh.ghostty"), true, "Ghostty scripting capability")

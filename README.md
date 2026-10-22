@@ -261,6 +261,13 @@ use up to three bounded placement-recovery cycles, retaining all Space,
 eligibility, and cancellation guards. Existing-window placement and Restore
 keep their original timing. Recovery never launches or creates another window.
 
+New Rex windows use a registry-selected move-only path when a fresh frame read
+already matches the saved width and height. It avoids redundant resize requests,
+checks each move, and requires two consecutive complete-frame matches. After at
+most eight move requests, or if the size differs/reverts, the original bounded
+frame recovery takes over. Existing windows, Restore, and other apps retain
+their previous placement path; Safari keeps its normal startup window.
+
 A follow-up Rex 0.1.0 (1347) trace on an empty Space accepted each position write,
 then reverted to startup geometry for about two seconds. The original one-second
 placement cycle reported failure; later placement held and remained correct at
@@ -357,6 +364,32 @@ preferences changed and no operation remained running. This verifies the
 latency improvement in that path, not a full post-fix Establish timing. The
 successful fresh creation and duplicate check above preceded this context fix.
 
+A subsequent normal-UI repeat on 2026-10-23 confirmed prompt feedback and a
+correct unchanged layout. The retained report placed all three existing windows,
+created none, and reused all three in 0.345 seconds, without missing slots,
+failures, extras, or dropped events. Panel context took 1.730 milliseconds,
+dispatch/close took 5.832 milliseconds, and initial feedback began 9.892
+milliseconds after Lua received the action. This accepts the initial-pause fix
+for that normal UI path; it does not measure a fresh app launch.
+
+Bounded disposable Rex 0.1.0 (1347) traces reproduced the old path using four
+full-frame requests plus a resize and a move before verification at 2.099
+seconds. A move-only trace of the saved GPT slot, whose initial size was already
+correct, reached the target at 1.298 seconds and verified the next matching
+read at 1.556 seconds without a resize or full-frame request. Single combined
+or move requests, including a delayed move, did not hold in the observed
+intervals. Separate changed-size experiments still reverted when moved, so
+those frames retain the original recovery. These observations justify the
+narrow move-only path; the native cause and visual smoothness remain separate
+from geometry verification. Every identified disposable window was closed.
+
+After managed promotion and reload, the deployed policy placed another
+independent disposable Rex window in the saved slot, verifying at 1.561 seconds
+with zero full-frame requests, zero resizes, five position requests, and seven
+frame reads. The frame still matched half a second later; only that identified
+test window was closed. This is native geometry acceptance of the deployed
+helper, with normal-UI visual acceptance checked separately.
+
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
 recipe. A missing/disabled menu fails cleanly. Older releases that offer only
@@ -445,7 +478,9 @@ Timing begins when Lua receives the panel action (or at direct API entry), not
 at the physical keypress. Stages cover panel dispatch/context/close, preparation,
 feedback calls, Space guards, window collection per app, capability checks,
 launch/creation dispatch, native menu resolution/lookup/selection, discovery
-waits, and verified placement. Nested and concurrent timings overlap: do not
+waits, and verified placement. Placement events also count full-frame, size, and
+position requests plus frame checks, so successful recovery can be distinguished
+from repeated geometry writes. Nested and concurrent timings overlap: do not
 sum them to obtain total elapsed time. Enumerations retain observed/eligible
 counts and categorical skip reasons, never window titles, contents, or raw app
 errors. No extra window scans, recurring observers, creation retries, recipe

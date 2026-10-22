@@ -12,6 +12,12 @@ recovery: up to three placement cycles and two consecutive matching readbacks.
 This handles observed startup geometry resets such as Rex's, without delaying
 command completion, retrying creation, or changing existing-window/Restore timing.
 Space, eligibility, and cancellation guards remain active throughout.
+Rex additionally selects `placementPolicy = "position-only-when-sized"` in the
+registry. For new windows already at their saved size, the shared frame helper
+tries at most eight move-only requests with verified readbacks. A size mismatch
+or exhausted moves returns to the original bounded frame recovery. Keep this
+policy separate from creation completion; it neither delays nor retries the
+native New Window command. Existing-window reuse and Restore ignore it.
 Capture, Restore, and existing-window reuse already identify ordinary windows
 generically. An adapter is needed only to launch an app or create missing
 windows. See the [README](../README.md#factory-workspace) for user-facing behaviour

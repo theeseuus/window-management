@@ -8,6 +8,11 @@ end
 local sourcePath = debug.getinfo(1, "S").source:match("^@(.*/)")
 local adapters = dofile(sourcePath .. "app_adapters.lua")
 
+function factory.placementPolicy(bundleID)
+  local adapter = adapters[bundleID]
+  return adapter and adapter.placementPolicy or nil
+end
+
 function factory.support(bundleID)
   local adapter = adapters[bundleID]
   if not adapter then return false, "unsupported-application" end

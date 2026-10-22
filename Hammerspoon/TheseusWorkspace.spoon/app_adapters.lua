@@ -39,6 +39,7 @@ return {
     name = "Rex Beta",
     kind = "menu",
     menu = { "File", "New Window" },
+    placementPolicy = "position-only-when-sized",
   },
   ["com.mitchellh.ghostty"] = {
     name = "Ghostty",

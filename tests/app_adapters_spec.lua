@@ -15,6 +15,8 @@ for bundleID, adapter in pairs(adapters) do
   equal(adapter.name ~= "", true, "nonempty adapter label")
   equal(adapter.kind == "applescript" or adapter.kind == "menu" or adapter.kind == "launch-only", true, "known transport")
   equal(adapter.checkInstalled == nil or type(adapter.checkInstalled) == "function", true, "optional installed-metadata check")
+  equal(adapter.placementPolicy, bundleID == "com.superlogical.rex" and "position-only-when-sized" or nil,
+    "only Rex selects the reviewed new-window placement policy")
   if adapter.kind == "applescript" then
     equal(type(adapter.script), "string", "fixed native script")
     equal(adapter.script:find('tell application id "' .. bundleID .. '"', 1, true) ~= nil, true, "script targets the registry's exact app")

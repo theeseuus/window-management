@@ -61,7 +61,8 @@ local function fixture()
   end
   function state.window:setTopLeft(point)
     state.positionRequests = state.positionRequests + 1
-    if not state.ignoreStaged then
+    if state.positionSetter then state.positionSetter(point)
+    elseif not state.ignoreStaged then
       state.frame.x, state.frame.y = point.x, point.y
     end
     return self
@@ -71,9 +72,11 @@ local function fixture()
       animationDuration = duration or 0,
       initialFrame = self.initialFrame,
       newlyCreated = self.newlyCreated,
+      placementPolicy = self.placementPolicy,
       scheduleAfter = self.schedule,
       guard = function() return self.eligible, "window-no-longer-eligible" end,
-    }, function(success, reason, actual)
+    }, function(success, reason, actual, metrics)
+      self.metrics = metrics
       self.completions = self.completions + 1
       self.success, self.reason, self.actual = success, reason, actual
     end)
@@ -298,5 +301,166 @@ startupCancelled:start(); startupCancelled:drain()
 equal(startupCancelled.reason, "restore-cancelled", "cancel during extended startup recovery")
 equal(startupCancelled.fullRequests, 2, "cancelled recovery cannot issue delayed writes")
 equal(startupCancelled.completions, 1, "extended cancellation completes once")
+
+-- A reviewed app can avoid repeated resizing only when a fresh read confirms
+-- the desired size. Every other placement keeps the original recovery path.
+local function positionedFixture()
+  local state = fixture()
+  state.newlyCreated, state.placementPolicy = true, "position-only-when-sized"
+  state.frame.w, state.frame.h = target.w, target.h
+  return state
+end
+
+local sameSize = positionedFixture()
+sameSize:start(); sameSize:drain()
+equal(sameSize.success, true, "position a same-size new window")
+equal(sameSize.fullRequests, 0, "same-size policy avoids full-frame writes")
+equal(sameSize.sizeRequests, 0, "same-size policy never resizes")
+equal(sameSize.positionRequests, 1, "successful position is requested once")
+equal(sameSize.metrics.positionRequests, 1, "retain position request metric")
+equal(sameSize.metrics.fullFrameRequests, 0, "retain zero full-frame metric")
+equal(sameSize.metrics.sizeRequests, 0, "retain zero resize metric")
+equal(sameSize.metrics.frameChecks, 3, "fresh frame plus two matching readbacks")
+equal(sameSize.now, 0.5, "quick position waits only for matching readbacks")
+
+local delayedPosition = positionedFixture()
+delayedPosition.positionSetter = function(point)
+  if delayedPosition.positionRequests >= 5 then
+    delayedPosition.frame.x, delayedPosition.frame.y = point.x, point.y
+  end
+end
+delayedPosition:start(); delayedPosition:drain()
+equal(delayedPosition.success, true, "bounded position retries handle initially ignored moves")
+equal(delayedPosition.positionRequests, 5, "stop requests at first matching frame")
+equal(delayedPosition.fullRequests, 0, "delayed position needs no combined frame writes")
+equal(delayedPosition.sizeRequests, 0, "delayed position needs no resizes")
+equal(delayedPosition.now, 1.5, "verify delayed position twice")
+
+local transientPosition = positionedFixture()
+transientPosition.positionSetter = function(point)
+  transientPosition.frame.x, transientPosition.frame.y = point.x, point.y
+  if transientPosition.positionRequests == 1 then
+    transientPosition.schedule(0.4, function() transientPosition.frame.x = 20 end)
+  end
+end
+transientPosition:start(); transientPosition:drain()
+equal(transientPosition.success, true, "recover a position that reverts after first match")
+equal(transientPosition.positionRequests, 2, "first matching read causes no redundant request")
+equal(transientPosition.fullRequests, 0, "transient position can recover without resizing")
+equal(transientPosition.now, 1, "wait for consecutive matches after drift")
+
+local existingSized = positionedFixture()
+existingSized.newlyCreated = false
+existingSized:start(); existingSized:drain()
+equal(existingSized.fullRequests, 1, "existing windows retain ordinary full-frame placement")
+equal(existingSized.positionRequests, 0, "existing windows ignore startup-only policy")
+equal(existingSized.now, 0.25, "existing-window timing is unchanged")
+
+local unknownPolicy = positionedFixture()
+unknownPolicy.placementPolicy = "unreviewed"
+unknownPolicy:start(); unknownPolicy:drain()
+equal(unknownPolicy.fullRequests, 1, "unknown policy retains original placement")
+equal(unknownPolicy.positionRequests, 0, "unknown policy cannot select position-only path")
+
+local differentSize = positionedFixture()
+differentSize.frame.w = target.w - 100
+differentSize:start(); differentSize:drain()
+equal(differentSize.success, true, "different size uses original placement")
+equal(differentSize.fullRequests, 1, "different size enters full-frame path immediately")
+equal(differentSize.positionRequests, 0, "different size skips speculative position requests")
+equal(differentSize.sizeRequests, 0, "different size introduces no new resize phase")
+
+local sizeReverted = positionedFixture()
+sizeReverted.positionSetter = function(point)
+  sizeReverted.frame.x, sizeReverted.frame.y = point.x, point.y
+  sizeReverted.frame.w = target.w - 100
+end
+sizeReverted:start(); sizeReverted:drain()
+equal(sizeReverted.success, true, "size drift enters original full-frame recovery")
+equal(sizeReverted.positionRequests, 1, "stop position-only writes when size falls away")
+equal(sizeReverted.fullRequests, 1, "recover size drift with original full-frame path")
+
+local boundedMoves = positionedFixture()
+boundedMoves.positionSetter = function() end
+boundedMoves:start(); boundedMoves:drain()
+equal(boundedMoves.success, true, "ignored moves can recover with original full-frame path")
+equal(boundedMoves.positionRequests, 8, "position-only requests have an eight-request cap")
+equal(boundedMoves.fullRequests, 1, "fallback begins after position-only cap")
+equal(boundedMoves.metrics.positionRequests, 8, "metrics retain all ignored move attempts")
+
+local allIgnored = positionedFixture()
+allIgnored.ignoreStaged = true
+allIgnored.fullSetter = function() end
+allIgnored:start(); allIgnored:drain()
+equal(allIgnored.success, false, "ignored moves and original recovery fail truthfully")
+equal(allIgnored.reason, "frame-not-restored", "exhausted fallback has original failure reason")
+equal(allIgnored.positionRequests, 11, "eight new moves plus three original staged moves")
+equal(allIgnored.fullRequests, 6, "original full-frame recovery retains its cap")
+equal(allIgnored.sizeRequests, 3, "original resize fallback retains its cap")
+equal(allIgnored.completions, 1, "exhausted position-only job completes once")
+
+local freshRead = positionedFixture()
+freshRead.initialFrame = copy(target)
+freshRead:start()
+equal(freshRead.positionRequests, 1, "fresh frame overrides stale initial target match")
+freshRead:drain()
+equal(freshRead.success, true, "fresh-read placement verifies")
+
+local alreadyPlaced = positionedFixture()
+alreadyPlaced.frame, alreadyPlaced.initialFrame = copy(target), copy(target)
+alreadyPlaced:start(); alreadyPlaced:drain()
+equal(alreadyPlaced.success, true, "stable target still verifies twice")
+equal(alreadyPlaced.positionRequests, 0, "already placed new window needs no move")
+equal(alreadyPlaced.fullRequests, 0, "already placed new window needs no full-frame write")
+
+local laterDrift = positionedFixture()
+laterDrift.frame, laterDrift.initialFrame = copy(target), copy(target)
+laterDrift.schedule(0.1, function() laterDrift.frame.x = 20 end)
+laterDrift:start(); laterDrift:drain()
+equal(laterDrift.success, true, "initially correct frame can drift into position-only recovery")
+equal(laterDrift.positionRequests, 1, "detected initial drift stays on preferred path")
+equal(laterDrift.fullRequests, 0, "initial drift avoids combined writes")
+
+local lostBefore = positionedFixture()
+lostBefore.eligible = false
+lostBefore:start()
+equal(lostBefore.metrics.frameChecks, 0, "guard before fresh frame read")
+equal(lostBefore.positionRequests, 0, "initial eligibility loss causes no move")
+equal(lostBefore.reason, "window-no-longer-eligible", "initial guard failure propagates")
+
+local lostDuring = positionedFixture()
+lostDuring:start(); lostDuring.eligible = false; lostDuring:drain()
+equal(lostDuring.positionRequests, 1, "eligibility loss prevents pending move retry")
+equal(lostDuring.fullRequests, 0, "eligibility loss prevents fallback")
+equal(lostDuring.completions, 1, "eligibility loss completes once")
+
+local cancelledMove = positionedFixture()
+cancelledMove:start()
+local pendingMoveCheck = cancelledMove.queue[1]
+cancelledMove.job:cancel(); cancelledMove.job:cancel()
+pendingMoveCheck.callback(); cancelledMove:drain()
+equal(cancelledMove.reason, "restore-cancelled", "cancel preferred position job")
+equal(cancelledMove.positionRequests, 1, "late callback cannot retry cancelled move")
+equal(cancelledMove.metrics.frameChecks, 1, "late callback cannot read cancelled window")
+equal(cancelledMove.completions, 1, "cancel completes preferred job once")
+
+local positionReadError = positionedFixture()
+positionReadError.readError = true
+positionReadError:start()
+equal(positionReadError.reason, "could-not-read-restored-frame", "fresh frame read failure stops placement")
+equal(positionReadError.positionRequests, 0, "unreadable window receives no move")
+
+local positionScheduleError = positionedFixture()
+positionScheduleError.schedule = function() return nil end
+positionScheduleError:start()
+equal(positionScheduleError.reason, "could-not-schedule-frame-check", "preferred scheduler failure cannot hang")
+equal(positionScheduleError.completions, 1, "preferred scheduler failure completes once")
+
+local moveError = positionedFixture()
+moveError.positionSetter = function() error("move rejected") end
+moveError:start()
+equal(moveError.success, false, "position setter exception fails placement")
+equal(moveError.positionRequests, 1, "setter exception counts the attempted move")
+equal(moveError.fullRequests, 0, "setter exception cannot silently start fallback")
 
 print(string.format("frame_restore_spec: %d assertions passed", assertions))
