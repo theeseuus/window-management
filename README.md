@@ -203,9 +203,16 @@ windows when that layout should use Rex.
 A 2026-10-22 pilot with Rex Beta 0.1.0 (1347) invoked the deployed menu adapter
 and observed exactly one new standard window in the destination Space. Rex
 also exposed one non-standard auxiliary window; existing eligibility filtering
-excludes it. The disposable standard window was closed afterward. Cold-start
-two-slot/repeat reuse and safe failure cases passed mocked tests; a live
-multi-window Establish/placement pilot has not been run.
+excludes it. The disposable standard window was closed afterward. A subsequent
+live pilot used the deployed Capture/Establish APIs with Rex already running:
+two Rex-only slots on an owner-selected empty Space, then one window closed.
+The first Establish placed two, created one replacement, and reused one; the
+repeat placed two, created none, and reused both with unchanged window IDs.
+Both reports had zero missing slots, extras, placement failures, and creation
+failures. Existing Rex geometry/Space membership and prior recipes were
+preserved. Disposable windows were closed; the test recipe was retained in
+application-owned state. Cold-start and safe failure cases remain mock-only
+coverage; this pilot does not prove cold-launch or reboot recovery.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
