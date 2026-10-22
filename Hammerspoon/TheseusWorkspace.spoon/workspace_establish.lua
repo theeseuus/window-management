@@ -122,6 +122,7 @@ function establish.start(recipe, options, complete)
     local starting = true
     for _, assignment in ipairs(assignments) do
       if not guard() then break end
+      assignment.newlyCreated = createdIDs[assignment.candidate.id] == true
       keep(options.place(assignment, function(success, reason, actual)
         if report.finished then return end
         if success then

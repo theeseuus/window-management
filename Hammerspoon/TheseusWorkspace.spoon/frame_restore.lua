@@ -22,7 +22,11 @@ function restore.place(window, target, options, complete)
   local duration = options.animationDuration
   if not finite(duration) or duration < 0 then duration = 0 end
   local delay = math.max(0.25, duration + 0.1)
-  local fullAttempts = 0
+  -- A newly created native window can accept a frame and subsequently restore
+  -- its startup geometry. Existing windows keep the original short retry path.
+  local newlyCreated = options.newlyCreated == true
+  local cycleLimit = newlyCreated and 3 or 1
+  local cycle, fullAttempts, matchingChecks = 1, 0, 0
 
   local function finish(success, reason, actual)
     if job.finished then return end
@@ -62,6 +66,7 @@ function restore.place(window, target, options, complete)
 
   local function request(callback)
     if not permitted() then return false end
+    matchingChecks = 0
     local ok, err = pcall(callback)
     if not ok then
       finish(false, tostring(err))
@@ -91,13 +96,24 @@ function restore.place(window, target, options, complete)
     if not ok then
       finish(false, "could-not-read-restored-frame")
     elseif matches(actual, target, 2) then
-      finish(true, nil, actual)
-    elseif finalAttempt then
-      finish(false, "frame-not-restored", actual)
-    elseif fullAttempts < 2 then
-      fullFrame()
+      matchingChecks = matchingChecks + 1
+      if not newlyCreated or matchingChecks >= 2 then
+        finish(true, nil, actual)
+      else
+        later(function() verify(finalAttempt) end)
+      end
     else
-      stagedFrame()
+      matchingChecks = 0
+      if finalAttempt then
+        if cycle < cycleLimit then
+          cycle, fullAttempts = cycle + 1, 0
+          later(fullFrame)
+        else finish(false, "frame-not-restored", actual) end
+      elseif fullAttempts < 2 then
+        fullFrame()
+      else
+        stagedFrame()
+      end
     end
   end
 

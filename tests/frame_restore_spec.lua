@@ -70,6 +70,7 @@ local function fixture()
     self.job = restore.place(self.window, target, {
       animationDuration = duration or 0,
       initialFrame = self.initialFrame,
+      newlyCreated = self.newlyCreated,
       scheduleAfter = self.schedule,
       guard = function() return self.eligible, "window-no-longer-eligible" end,
     }, function(success, reason, actual)
@@ -237,5 +238,65 @@ scheduleError:start()
 equal(scheduleError.success, false, "scheduler exception does not hang the job")
 equal(scheduleError.reason, "could-not-schedule-frame-check", "scheduler failure reason")
 equal(scheduleError.job.finished, true, "scheduler failure finishes the job")
+
+-- Newly created windows may accept a write and then restore startup geometry.
+-- They need bounded recovery and consecutive readbacks, not another creation.
+local startup = fixture()
+startup.newlyCreated, startup.ignoreStaged = true, true
+startup.fullSetter = function(frame)
+  if startup.now >= 2.1 then startup.frame = copy(frame) end
+end
+startup:start(); startup:drain()
+equal(startup.success, true, "recover a newly created window after its startup geometry settles")
+equal(startup.fullRequests > 2, true, "recover within the same placement job")
+equal(startup.completions, 1, "startup recovery completes once")
+
+local transient = fixture()
+transient.newlyCreated = true
+transient.fullSetter = function(frame)
+  transient.frame = copy(frame)
+  if transient.fullRequests == 1 then
+    transient.schedule(0.4, function() transient.frame = { x = 22, y = 52, w = 400, h = 500 } end)
+  end
+end
+transient:start(); transient:drain()
+equal(transient.success, true, "recover startup snapback after the first matching read")
+equal(transient.fullRequests, 2, "do not report transient first match as settled")
+equal(transient.now >= 1.0, true, "require consecutive matching checks after recovery")
+
+local freshUnchanged = fixture()
+freshUnchanged.newlyCreated = true
+freshUnchanged.frame, freshUnchanged.initialFrame = copy(target), copy(target)
+freshUnchanged:start(); freshUnchanged:drain()
+equal(freshUnchanged.success, true, "verify a newly created window already at target")
+equal(freshUnchanged.fullRequests, 0, "stable new window needs no writes")
+equal(freshUnchanged.now, 0.5, "two readbacks prove new-window stability")
+
+local startupIgnored = fixture()
+startupIgnored.newlyCreated, startupIgnored.ignoreStaged = true, true
+startupIgnored.fullSetter = function() end
+startupIgnored:start(); startupIgnored:drain()
+equal(startupIgnored.success, false, "new-window startup recovery is still bounded")
+equal(startupIgnored.reason, "frame-not-restored", "truthful failure after startup recovery")
+equal(startupIgnored.fullRequests, 6, "at most three two-request recovery cycles")
+equal(startupIgnored.positionRequests, 3, "at most three staged moves")
+equal(startupIgnored.completions, 1, "exhausted new-window recovery completes once")
+
+local startupLost = fixture()
+startupLost.newlyCreated, startupLost.ignoreStaged = true, true
+startupLost.fullSetter = function() end
+startupLost.schedule(1.1, function() startupLost.eligible = false end)
+startupLost:start(); startupLost:drain()
+equal(startupLost.reason, "window-no-longer-eligible", "extended recovery retains eligibility guard")
+equal(startupLost.fullRequests, 2, "no extended writes after losing eligibility")
+
+local startupCancelled = fixture()
+startupCancelled.newlyCreated, startupCancelled.ignoreStaged = true, true
+startupCancelled.fullSetter = function() end
+startupCancelled.schedule(1.1, function() startupCancelled.job:cancel() end)
+startupCancelled:start(); startupCancelled:drain()
+equal(startupCancelled.reason, "restore-cancelled", "cancel during extended startup recovery")
+equal(startupCancelled.fullRequests, 2, "cancelled recovery cannot issue delayed writes")
+equal(startupCancelled.completions, 1, "extended cancellation completes once")
 
 print(string.format("frame_restore_spec: %d assertions passed", assertions))

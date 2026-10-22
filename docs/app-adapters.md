@@ -7,6 +7,11 @@ windows once its creation phase ends, while preparing later apps. Launch and
 creation discovery is scoped to the current app; all same-app slots are matched
 together. Adapters should report command completion without adding placement
 delays; the engine verifies window discovery and geometry separately.
+Newly created or launch-discovered windows receive bounded startup placement
+recovery: up to three placement cycles and two consecutive matching readbacks.
+This handles observed startup geometry resets such as Rex's, without delaying
+command completion, retrying creation, or changing existing-window/Restore timing.
+Space, eligibility, and cancellation guards remain active throughout.
 Capture, Restore, and existing-window reuse already identify ordinary windows
 generically. An adapter is needed only to launch an app or create missing
 windows. See the [README](../README.md#factory-workspace) for user-facing behaviour

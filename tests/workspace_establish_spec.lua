@@ -139,6 +139,9 @@ equal(#env.launches, 0, "do not relaunch running apps")
 equal(report.created, 4, "verified new windows")
 equal(report.applied, 4, "verified placements")
 equal(report.reused, 0, "first establish reused no windows")
+for _, assignment in ipairs(env.placements) do
+  equal(assignment.newlyCreated, true, "mark discovered windows for startup placement verification")
+end
 equal(#report.missing, 0, "no missing slots")
 equal(#report.failures, 0, "no placement failures")
 equal(#report.creationFailures, 0, "no creation failures")
@@ -149,8 +152,12 @@ equal(env.events[5], "create:Ghostty", "creation proceeds while previous placeme
 local allScans = 0
 for _, scope in ipairs(env.collections) do if scope == "all" then allScans = allScans + 1 end end
 equal(allScans, 2, "scan the whole recipe only at start and final reconciliation")
+local earlierPlacements = #env.placements
 report = env:start(layout)
 env:drain()
+for index = earlierPlacements + 1, #env.placements do
+  equal(env.placements[index].newlyCreated, false, "existing windows keep ordinary placement timing")
+end
 equal(#env.creates, 4, "repeat establishment creates no duplicates")
 equal(report.created, 0, "repeat has no new windows")
 equal(report.reused, 4, "repeat reuses all four windows")

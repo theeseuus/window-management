@@ -252,8 +252,27 @@ windows with no missing slots or extras; Safari and Codex placed correctly but
 Rex reported `frame-not-restored`. The repeat created none, reused the same three
 window IDs, and placed all three without failures. The windows were left open,
 the saved catalog was unchanged, and the temporary observer stopped. This fixes
-the tested Space-switching failure, while Rex's first-run placement issue remains
-open. Cold-launch/reboot behavior is not established by this running-app test.
+the tested Space-switching failure and exposed Rex's first-run placement issue.
+Cold-launch/reboot behavior is not established by this running-app test.
+
+Establish marks only windows it created or discovered from its app launch as
+new. Those windows require two consecutive matching frame readbacks and can
+use up to three bounded placement-recovery cycles, retaining all Space,
+eligibility, and cancellation guards. Existing-window placement and Restore
+keep their original timing. Recovery never launches or creates another window.
+
+A follow-up Rex 0.1.0 (1347) trace on an empty Space accepted each position write,
+then reverted to startup geometry for about two seconds. The original one-second
+placement cycle reported failure; later placement held and remained correct at
+an additional check. Startup recovery handles this lifecycle inside one Establish
+operation, with no unconditional delay in the window-creation adapter. Safari's
+native default-profile startup-window command is unchanged.
+The full-layout acceptance attempt after deployment stopped with
+`active-space-changed` before any new window or placement was verified, so it did
+not exercise Rex's updated startup recovery. The temporary observer restored the
+original method and stopped its timers. First-run native acceptance remains
+pending after the owner's planned reboot; automated tests are not that proof.
+
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
