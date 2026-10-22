@@ -73,9 +73,17 @@ local function reasonText(reason)
   return reasons[reason] or tostring(reason)
 end
 
-local function currentUserSpaceContext()
-  local focusedWindow = hs.window.focusedWindow()
-  local screen = focusedWindow and focusedWindow:screen() or hs.screen.mainScreen()
+local function currentUserSpaceContext(panelSession)
+  local screen
+  if panelSession then
+    -- The native panel already knows its frame. Avoid a potentially blocking
+    -- AX focused-window query, but resolve its screen and active Space afresh.
+    local ok, value = pcall(function() return hs.screen.find(panelSession:frame()) end)
+    if ok then screen = value end
+  else
+    local focusedWindow = hs.window.focusedWindow()
+    screen = focusedWindow and focusedWindow:screen() or hs.screen.mainScreen()
+  end
   if not screen then
     return nil, "no-screen"
   end

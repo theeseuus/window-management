@@ -39,7 +39,7 @@ function controller.new(adapter)
     if session.state ~= "library" then return end
     local busy = adapter.busy()
     if busy then self:library(nil, adapter.reason(busy)); return end
-    local context, err = adapter.context()
+    local context, err = adapter.context(session)
     if not context then self:library(nil, adapter.reason(err)); return end
     self.snapshot, self.preview, self.pending = nil, nil, nil
     session:setState("capturing", {
@@ -119,7 +119,7 @@ function controller.new(adapter)
         if busy then self:library(body.name, adapter.reason(busy)); return end
         -- Retain the intended destination before closing changes keyboard focus.
         local measuredContext = trace and trace:begin("panel-context")
-        local context, contextErr = adapter.context()
+        local context, contextErr = adapter.context(session)
         if measuredContext then measuredContext({ success = context ~= nil }) end
         if not context then self:library(body.name, adapter.reason(contextErr)); return end
         local name = body.name
@@ -157,7 +157,7 @@ function controller.new(adapter)
     if self.session and not self.session.closed then
       local session = self.session
       if session.state == "library" then
-        local context, err = adapter.context()
+        local context, err = adapter.context(session)
         if not context then adapter.alert(adapter.reason(err)); return end
         session.model.aspectRatio = context.screenFrame.w / context.screenFrame.h
         self:library()

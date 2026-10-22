@@ -94,6 +94,9 @@ function panel.open(screenFrame, callbacks, initial)
   function session:bringToFront()
     if not self.closed and self.presented then self.view:show():bringToFront() end
   end
+  function session:frame()
+    return self.view and self.view:frame()
+  end
   function session:windowID()
     local window = self.view and self.view:hswindow()
     return window and window:id()

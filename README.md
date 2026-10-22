@@ -321,6 +321,42 @@ separate absent apps from apps exposing zero windows in enumeration. This
 refines reporting without adding calls, retries, or a new creation operation.
 
 
+A later normal-UI creation run in the same diagnostic session created and
+placed all three windows from scratch (`created=3`, `reused=0`) in 4.380 seconds.
+The repeat placed the same three window IDs, created none, and reused all three
+in 1.861 seconds. Both had zero missing slots, creation/placement failures,
+extras, stop reasons, or dropped events. Codex's successful lookup took 0.424
+milliseconds; its enabled New Window menu was selected successfully, and the
+new window was observed on the first discovery check. This verifies the tested
+fresh creation and repeat without duplicates, while retaining the earlier
+intermittent lookup failure as unresolved. Rex still moved visibly during
+startup placement; verification took 1.817 seconds in the creation run and
+0.257 seconds when reused. These are verification intervals, not pure app
+startup measurements.
+
+All three attempts spent 1.506–1.511 seconds resolving context before initial
+feedback. A bounded read-only call-level probe isolated `hs.window.focusedWindow()`:
+it returned nil after 1.502 seconds; main-screen lookup and subsequent Space,
+Space-type, and screen-frame reads took milliseconds or less. Codex was the
+frontmost application in that probe; the underlying Accessibility timeout/cause
+is not established. Live panel actions now select their screen from the native
+webview frame, then read the active ordinary Space and screen frame afresh.
+Capture, Restore, Establish, and refreshing an existing panel avoid the focused
+app query; opening the first panel and direct non-panel APIs retain their
+previous screen-selection path. A missing panel screen fails explicitly, with
+no focused-app fallback. This neither caches a Space nor weakens operation
+Space guards; no app activation, retry, creation, or Rex-placement behavior
+changes are involved.
+
+After deployment/reload, a native panel-action probe exercised the production
+context and close path, intercepting the final Establish call before any
+workspace operation. Context resolution took 3.517 milliseconds and panel
+dispatch/close took 10.882 milliseconds, with the resolved Space still active.
+The original method was restored; no workspace windows, recipes, or app
+preferences changed and no operation remained running. This verifies the
+latency improvement in that path, not a full post-fix Establish timing. The
+successful fresh creation and duplicate check above preceded this context fix.
+
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
 recipe. A missing/disabled menu fails cleanly. Older releases that offer only

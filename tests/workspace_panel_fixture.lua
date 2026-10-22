@@ -33,7 +33,14 @@ function fixture.new()
   f.ghostty = window(21, "com.mitchellh.ghostty", "Ghostty", { x = 900, y = 50, w = 800, h = 1000 })
   f.panel = window(99, "org.hammerspoon.Hammerspoon", "Hammerspoon", { x = 500, y = 300, w = 660, h = 520 })
   hs = {
-    screen = { mainScreen = function() return screen end },
+    screen = { mainScreen = function() return screen end,
+      find = function(frame)
+        f.panelScreenReads = (f.panelScreenReads or 0) + 1
+        f.lastPanelFrame = frame
+        if f.noPanelScreen then return nil end
+        return f.panelScreen or screen
+      end,
+    },
     drawing = { windowBehaviors = { moveToActiveSpace = 2 } },
     window = {
       focusedWindow = function() return f.focusedWindow or f.safari end,
@@ -95,7 +102,8 @@ function fixture.new()
       },
       new = function(frame, preferences, content)
         if f.openError then error("native view unavailable") end
-        local view = { frame = frame, preferences = preferences, content = content, updates = {} }
+        local view = { windowFrame = frame, preferences = preferences, content = content, updates = {} }
+        function view:frame() return self.windowFrame end
         for _, method in ipairs({ "windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows",
           "closeOnEscape", "deleteOnClose", "transparent", "behavior" }) do
           view[method] = function(self, value) self[method .. "Value"] = value; return self end

@@ -57,6 +57,34 @@ equal(#f.restores, 0, "Establish is not Restore")
 equal(f.enumerations, 0, "dispatch does not move any windows itself")
 equal(view.deleted, true, "Establish releases panel")
 
+-- A live panel resolves its own current screen; it never needs AX focus.
+f, view = open()
+hs.window.focusedWindow = function() error("panel actions must not query AX focus") end
+local secondScreen = { id = function() return 2 end,
+  frame = function() return { x = 1700, y = 0, w = 1200, h = 900 } end }
+f.panelScreen = secondScreen
+view.windowFrame = { x = 1800, y = 100, w = 660, h = 520 }
+f.spaceID = 905
+hs.spaces.activeSpaceOnScreen = function(screen)
+  equal(screen, secondScreen, "resolve destination on the panel's current screen")
+  return f.spaceID
+end
+f:send("establish", "Alpha")
+equal(f.establishes[1].context.spaceID, 905, "read current Space at action time, not panel opening")
+equal(f.establishes[1].context.screen, secondScreen, "panel moved between screens uses its new screen")
+equal(f.lastPanelFrame.x, 1800, "screen selection reads live native panel frame")
+equal(view.deleted, true, "close panel only after resolving current destination")
+f, view = open()
+hs.window.focusedWindow = function() error("no focus fallback for a panel with an unavailable screen") end
+f.noPanelScreen = true
+f:send("establish", "Alpha")
+equal(#f.establishes, 0, "unresolved panel screen cannot dispatch Establish")
+equal(view.deleted, nil, "keep panel available when destination cannot be resolved")
+f, view = open()
+hs.window.focusedWindow = function() error("capture and panel refresh must not query AX focus") end
+f:open(); f:capture()
+equal(f:session().state, "ready", "capture and repeat opening use live panel context")
+
 f, view = open({ 'Final "draft"' }); f:send("delete", 'Final "draft"'); f:send("confirm-delete")
 equal(next(f.settings.TheseusWorkspaceRecipesV1.recipes), nil, "delete final recipe")
 equal(f:session().state, "library", "keep empty window available for Capture")
