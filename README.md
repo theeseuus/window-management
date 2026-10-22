@@ -14,14 +14,15 @@ code examples below.
 
 ## Hammerspoon baseline and native successor
 
-The 2026-10-23 development direction is to recover and verify the Hammerspoon
-implementation, tag that accepted baseline, then develop a native macOS
-successor. The baseline must support normal keyboard and pointer interaction,
-frozen capture/save, Restore of existing windows, and first-run Establish with
-repeat reuse and current-Space isolation. It is not ready to tag while the
-reported keyboard-input failure remains unresolved. Rex startup placement
-still visibly jumps despite verified final geometry; visual smoothness remains
-an explicit acceptance question, not a passed check.
+The Hammerspoon recovery baseline is tagged `hammerspoon-baseline-2026-10-23`.
+On 2026-10-23 the owner accepted production typing, navigation, Escape,
+Capture/Cancel, and Establish of a new layout from a fresh capture after the
+show-before-render rollback. The preceding two fresh creation runs and two
+duplicate-free repeats remain the retained creation/reuse evidence. Restore
+keeps its existing implementation; this latest owner check did not separately
+exercise Restore. Rex startup placement can still visibly jump despite verified
+final geometry. That known visual limitation is retained in the baseline.
+Native macOS development follows from this recoverable Hammerspoon checkpoint.
 
 The product's core is capturing the active applications and window layout and
 restoring that workspace later. Recreating application contents, browser URLs,
@@ -171,7 +172,8 @@ focus is requested after native presentation. Repeating the entry shortcut
 reuses that window. Content may draw after the frame appears. The prepared
 hidden reveal was rolled back after a keyboard-input regression; the earlier
 sequence passed the owner's harmless native-panel typing, arrow, and Escape
-check on 2026-10-23. Production shortcut acceptance remains a separate check.
+check on 2026-10-23. The subsequent production shortcut, Capture/Cancel, and
+fresh-capture Establish checks also passed as recorded below.
 
 Recipes identify a slot using the owning application's bundle identifier plus
 an ordinal. They do not store window titles, document paths, browser URLs,
@@ -466,6 +468,15 @@ no application adapter, creation command, placement rule, or shortcut changed.
 This comparison implicates the presentation lifecycle but does not establish
 the underlying AppKit/WebKit focus mechanism. The production shortcut and full
 workspace acceptance must pass before a baseline tag is created.
+
+After deployment and reload of the rollback, the owner confirmed through the
+normal Window Factory path that typing, navigation, Escape, Capture/Cancel,
+and Establish of a new layout from a fresh capture all worked. This is the
+2026-10-23 operational acceptance for the Hammerspoon baseline tag above.
+The latest confirmation did not include a separate Restore or duplicate test;
+the unchanged creation/placement engine retains the earlier repeat evidence.
+No application contents were captured or recreated, and the observed Rex
+startup jumping remains a known limitation rather than accepted smoothness.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
