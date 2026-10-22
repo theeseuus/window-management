@@ -12,6 +12,23 @@ The Spoon filenames and Lua API names are `TheseusWindow` for Factory Window
 and `TheseusWorkspace` for Factory Workspace, as used in the installation and
 code examples below.
 
+## Hammerspoon baseline and native successor
+
+The 2026-10-23 development direction is to recover and verify the Hammerspoon
+implementation, tag that accepted baseline, then develop a native macOS
+successor. The baseline must support normal keyboard and pointer interaction,
+frozen capture/save, Restore of existing windows, and first-run Establish with
+repeat reuse and current-Space isolation. It is not ready to tag while the
+reported keyboard-input failure remains unresolved. Rex startup placement
+still visibly jumps despite verified final geometry; visual smoothness remains
+an explicit acceptance question, not a passed check.
+
+The product's core is capturing the active applications and window layout and
+restoring that workspace later. Recreating application contents, browser URLs,
+or the selected chat is a later target. ScreenPlace and other installed window
+managers are design references for the native work, not additions to this
+baseline's feature scope. Coordinated animation is deferred during recovery.
+
 Either Spoon can be installed and loaded without the other. The reference
 configuration keeps broader responsibilities separate:
 
@@ -424,6 +441,20 @@ then verifies recovery within the first Establish, repeat reuse, and other-Space
 protection. Safari's native default-profile command and Rex placement are
 unchanged. A native read-only check found one exact instance of each app;
 post-fix normal-UI creation acceptance remains pending.
+
+Subsequent pointer-driven tests on 2026-10-23 produced two successful fresh
+Establish runs (three created/placed windows each, 2.703 and 2.725 seconds) and
+two successful repeats (zero created, three reused, 0.353 and 0.348 seconds).
+All four reports had no missing slots, extras, placement failures, or creation
+failures. One fresh run recovered an empty Codex application lookup on its
+second read about 104 milliseconds later, within that same Establish. Versions
+were Codex 26.1016.51333 (21161), Rex 0.1.0 (1347), and Safari 27.0.1.
+The owner still observed Rex jumping. The owner also reported that keyboard
+navigation and shortcuts failed, including typing after clicking search, so
+these results accept creation/reuse through the pointer path only. A harmless
+memory-only panel pilot is comparing the earlier presentation sequence with
+the prepared-content reveal; no keyboard fix or native successor is accepted
+by these creation reports.
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
 but only invokes the genuine New Window menu in the exact app identified by the
