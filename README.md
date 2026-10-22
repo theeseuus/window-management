@@ -270,8 +270,27 @@ native default-profile startup-window command is unchanged.
 The full-layout acceptance attempt after deployment stopped with
 `active-space-changed` before any new window or placement was verified, so it did
 not exercise Rex's updated startup recovery. The temporary observer restored the
-original method and stopped its timers. First-run native acceptance remains
-pending after the owner's planned reboot; automated tests are not that proof.
+original method and stopped its timers. At that pre-reboot checkpoint, first-run
+native acceptance remained pending; automated tests were not that proof.
+
+In the owner's 2026-10-23 post-reboot normal-UI test, the first Establish stayed
+in the selected empty Space and opened correctly positioned Safari and Rex
+windows; Safari retained its normal default-profile startup behavior. GPT/Codex
+was absent. The repeat added that window without duplicating the others. Its
+retained report confirmed three placed, one created, two reused, zero missing,
+zero placement/creation failures, zero extras, and no stop reason. This accepts
+first-run Rex placement for the observed scenario and verifies repeat recovery;
+complete first-run GPT Workspace creation still failed.
+
+The first run's report was overwritten by the repeat, so its exact failure
+reason is unavailable. The owner reported slow response after Command–Return;
+no start/end or per-stage timings were retained, so duration and cause remain
+unmeasured. The next diagnostic should preserve the first failure and measure
+bounded action-to-feedback, creation, and placement stages without recurring
+window polling. Installed versions were Safari 27.0.1 (22625.1.29.11.28), Codex
+26.1016.51333 (21161), and Rex 0.1.0 (1347). Codex had updated since the earlier
+probe; that is compatibility context, not an established cause. The inspection
+changed no application configuration, recipes, or windows.
 
 
 The OpenAI desktop adapter recognizes `com.openai.chat` and `com.openai.codex`,
