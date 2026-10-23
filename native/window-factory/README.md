@@ -162,3 +162,33 @@ that local app followed by an app restart. Keep local pilot bundles outside the
 synced build tree and verify their signatures; ad hoc rebuilds still require
 permission checks. No production signing identity has been provisioned.
 Hammerspoon files, runtime, shortcuts and saved layouts were not changed.
+
+## Low-window live acceptance, 2026-10-23
+
+The owner re-added the corrected local candidate to Accessibility. The same
+local bundle passed strict signature verification and was restarted without
+another rebuild; Capture, Restore and Establish were enabled, and the saved
+`Native desktop pilot` layout remained selected.
+
+Using that existing capture on the pilot desktop, the owner completed both
+regression scenarios:
+
+- Safari dragged low on screen, leaving its title bar and part of the window
+  visible: Restore returned the windows correctly, with no missing windows or
+  extras.
+- Rex and Codex/GPT dragged low on screen: Restore again returned the windows
+  correctly, with no missing windows or extras.
+
+These owner-observed results close the pending low-window live acceptance from
+above. Exact full receipt counts were not supplied for these runs; the reported
+outcome is successful restoration with no missing windows or extras. No layout
+recapture was required. Combined with the preceding three-app pilot, this
+records successful Capture/Save, displaced-window Restore, missing-Safari
+Establish, a duplicate-free Establish repeat, and both low-window Restore
+regressions on the tested app/OS versions.
+
+This is acceptance of the scoped Rex/Safari/Codex pilot. The other adapter
+entries, multiple displays, production signing/permission persistence and
+Hyper+R handoff remain unaccepted. Hammerspoon remains the working fallback;
+no Spoon, Hammerspoon runtime, binding or saved Hammerspoon layout was changed.
+The pilot app and its data remain isolated development artifacts.
