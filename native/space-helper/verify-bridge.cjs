@@ -22,7 +22,10 @@ for (const args of [[],['bridge-query','extra'],['move-window','1','2'],
   ['bridge-probe-rex','1','1','receipt.json'],
   ['bridge-probe-rex','-1','2','receipt.json'],
   ['bridge-probe-rex','1','18446744073709551616','receipt.json'],
-  ['bridge-restore-rex','0','receipt.json'], ['bridge-restore-rex','1']]) {
+  ['bridge-restore-rex','0','receipt.json'], ['bridge-restore-rex','1'],
+  ['bridge-probe-rex-follow','1','2'],
+  ['bridge-probe-rex-follow','1','1','receipt.json'],
+  ['bridge-probe-rex-follow','1','18446744073709551616','receipt.json']]) {
   assert.equal(call(args,64).ok,false);
 }
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bridge-guards-'));

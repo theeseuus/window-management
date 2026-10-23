@@ -84,13 +84,17 @@ static BOOL verifyRexLocation(uint32_t wid,pid_t pid,NSString *space,BOOL onscre
     return NO;
 }
 
-static NSDictionary *bridgeRexMove(uint64_t source,uint64_t destination,NSString *receiptPath) {
+#include "rex-follow.h"
+
+static NSDictionary *bridgeRexMove(uint64_t source,uint64_t destination,NSString *receiptPath,BOOL follow) {
     NSDictionary *start=snapshot(),*inventory=rexInventory();
     if (!start || !inventory) return nil;
     NSString *from=@(source).stringValue,*to=@(destination).stringValue;
     BOOL adjacent=NO;
+    NSString *displayID=nil;
     for (NSDictionary *display in start[@"displays"]) {
         if (![display[@"activeSpaceID"] isEqual:from]) continue;
+        displayID=display[@"display"];
         NSMutableArray *users=[NSMutableArray array];
         for (NSDictionary *space in display[@"spaces"])
             if ([space[@"type"] isEqual:@"user"]) [users addObject:space[@"id"]];
@@ -99,6 +103,9 @@ static NSDictionary *bridgeRexMove(uint64_t source,uint64_t destination,NSString
     }
     if (![start[@"focusedSpaceID"] isEqual:from] || !adjacent) {
         failure=@"source-or-adjacent-target-check-failed"; return nil;
+    }
+    if (follow && (!AXIsProcessTrusted() || !axWindowID() || !followClassesAvailable())) {
+        failure=@"follow-needs-existing-ax-trust-and-bridge-classes"; return nil;
     }
     NSData *data=[NSData dataWithContentsOfFile:receiptPath];
     NSDictionary *receipt=data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
@@ -121,10 +128,16 @@ static NSDictionary *bridgeRexMove(uint64_t source,uint64_t destination,NSString
         || activeSpace(connection)!=source) {
         failure=@"rex-new-window-or-baseline-check-failed"; return nil;
     }
-    NSMutableDictionary *result=[@{@"schemaVersion": @1,@"ok": @NO,@"command": @"bridge-probe-rex",
+    NSMutableDictionary *result=[@{@"schemaVersion": @1,@"ok": @NO,@"command": follow ? @"bridge-probe-rex-follow" : @"bridge-probe-rex",
         @"windowID": key,@"pid": @(pid),@"version": inventory[@"version"],@"build": inventory[@"build"],
         @"axTrusted": AXIsProcessTrusted() ? @YES : @NO,@"sourceSpaceID": from,@"targetSpaceID": to,
         @"outboundVerified": @NO,@"returnVerified": @NO,@"moveRequests": @0} mutableCopy];
+    __block NSUInteger changes=0;
+    id observer=nil;
+    NSArray *candidates=follow ? sourceVisibilityCandidates(wid,from) : nil;
+    if (follow) observer=[NSWorkspace.sharedWorkspace.notificationCenter
+        addObserverForName:NSWorkspaceActiveSpaceDidChangeNotification object:nil queue:nil
+        usingBlock:^(__unused NSNotification *note) { changes++; }];
     NSDate *began=NSDate.date;
     @try {
         if (!bridgeMove(wid,destination)) @throw [NSException exceptionWithName:@"OutboundNotDispatched" reason:nil userInfo:nil];
@@ -133,13 +146,26 @@ static NSDictionary *bridgeRexMove(uint64_t source,uint64_t destination,NSString
         result[@"outboundCSpaces"]=spacesForWindow(wid) ?: @[];
         result[@"outboundBridgeSpaces"]=bridgeWindowSpaces(wid) ?: @[];
         result[@"outboundFacts"]=windowFacts(wid,pid) ?: @{};
-        pump(0.5);
+        if (follow) {
+            if (![result[@"outboundVerified"] boolValue] || !switchForFollow(source,destination,displayID))
+                @throw [NSException exceptionWithName:@"FollowSwitchNotDispatched" reason:nil userInfo:nil];
+            result[@"followVerified"]=verifyFollow(pid,wid,destination,candidates) ? @YES : @NO;
+            result[@"sourceWindowsChecked"]=@(candidates.count);
+            result[@"sourceWindowsHidden"]=sourceCandidatesHidden(candidates) ? @YES : @NO;
+            result[@"targetActiveSpaceID"]=@(activeSpace(connection)).stringValue;
+            result[@"targetWindowFocused"]=focusedRexWindow(pid,wid) ? @YES : @NO;
+            if ([result[@"followVerified"] boolValue]) pump(10);
+        } else pump(0.5);
     } @catch (NSException *exception) { result[@"reason"]=exception.name; }
     @finally {
         // Return only the same PID-verified test window. No desktop switch,
         // application activation, close action or generic window selector.
         if (windowFacts(wid,pid) && ![spacesForWindow(wid) isEqual:@[from]]) {
             if (bridgeMove(wid,source)) result[@"moveRequests"]=@([result[@"moveRequests"] intValue]+1);
+        }
+        if (follow && activeSpace(connection)==destination) {
+            result[@"returnSwitchDispatched"]=switchForFollow(destination,source,displayID) ? @YES : @NO;
+            result[@"returnFollowVerified"]=verifyFollow(pid,wid,source,nil) ? @YES : @NO;
         }
         result[@"returnVerified"]=verifyRexLocation(wid,pid,from,YES,source) ? @YES : @NO;
         result[@"returnCSpaces"]=spacesForWindow(wid) ?: @[];
@@ -149,9 +175,21 @@ static NSDictionary *bridgeRexMove(uint64_t source,uint64_t destination,NSString
         result[@"existingRexWindowsUnchanged"]=[after[@"windows"] isEqual:expected] ? @YES : @NO;
         result[@"activeSpaceUnchanged"]=activeSpace(connection)==source ? @YES : @NO;
         result[@"seconds"]=@(-began.timeIntervalSinceNow);
+        if (observer) {
+            [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:observer];
+            result[@"spaceChangeNotifications"]=@(changes);
+        }
     }
     BOOL ok=[result[@"outboundVerified"] boolValue] && [result[@"returnVerified"] boolValue]
         && [result[@"existingRexWindowsUnchanged"] boolValue] && [result[@"activeSpaceUnchanged"] boolValue];
+    if (follow) {
+        // The initial live probe observed no NSWorkspace change notifications
+        // despite verified focus, membership and compositor flags in both
+        // directions. Notification delivery is diagnostic, not move success.
+        ok=ok && [result[@"followVerified"] boolValue] && [result[@"returnFollowVerified"] boolValue];
+        result[@"functionalChecksPassed"]=ok ? @YES : @NO;
+        result[@"spaceChangeNotificationObserved"]=changes>0 ? @YES : @NO;
+    }
     result[@"ok"]=ok ? @YES : @NO;
     if (!ok && !result[@"reason"]) result[@"reason"]=@"rex-round-trip-not-verified";
     return result;

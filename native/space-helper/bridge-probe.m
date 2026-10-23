@@ -246,8 +246,10 @@ int main(int argc, const char *argv[]) {
             && readID(argv[2],UINT64_MAX,&from) && readID(argv[3],UINT64_MAX,&to) && from!=to;
         BOOL rex = argc==5 && strcmp(argv[1],"bridge-probe-rex")==0
             && readID(argv[2],UINT64_MAX,&from) && readID(argv[3],UINT64_MAX,&to) && from!=to;
+        BOOL follow = argc==5 && strcmp(argv[1],"bridge-probe-rex-follow")==0
+            && readID(argv[2],UINT64_MAX,&from) && readID(argv[3],UINT64_MAX,&to) && from!=to;
         BOOL restore = argc==4 && strcmp(argv[1],"bridge-restore-rex")==0 && readID(argv[2],UINT64_MAX,&to);
-        if (!query && !own && !foreign && !help && !inventory && !rex && !restore)
+        if (!query && !own && !foreign && !help && !inventory && !rex && !restore && !follow)
             return reject(@"usage: bridge-query | rex-inventory | bridge-probe-own SOURCE TARGET | bridge-probe-foreign SOURCE TARGET | bridge-probe-rex SOURCE TARGET RECEIPT | bridge-restore-rex TARGET RECEIPT | help",64);
         if (reportPath) {
             int fd=open(reportPath,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW,0600);
@@ -256,14 +258,14 @@ int main(int argc, const char *argv[]) {
             close(fd);
         }
         if (help) return emit(@{@"schemaVersion": @1,@"ok": @YES,
-            @"commands": @[@"bridge-query",@"rex-inventory",@"bridge-probe-own SOURCE TARGET",@"bridge-probe-foreign SOURCE TARGET",@"bridge-probe-rex SOURCE TARGET RECEIPT",@"bridge-restore-rex TARGET RECEIPT",@"help"],
+            @"commands": @[@"bridge-query",@"rex-inventory",@"bridge-probe-own SOURCE TARGET",@"bridge-probe-foreign SOURCE TARGET",@"bridge-probe-rex SOURCE TARGET RECEIPT",@"bridge-probe-rex-follow SOURCE TARGET RECEIPT",@"bridge-restore-rex TARGET RECEIPT",@"help"],
             @"existingWindowTargetsAllowed": @NO,@"rexCreationReceiptRequired": @YES,@"requestAccessibilityPermission": @NO},0);
         if (!loadAPI()) return reject(failure,69);
         // Real AppKit initialization is required by this private bridge.
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
         @try {
-            NSDictionary *value = restore ? restoreRexView(to,@(argv[3])) : rex ? bridgeRexMove(from,to,@(argv[4])) : inventory ? rexInventory()
+            NSDictionary *value = restore ? restoreRexView(to,@(argv[3])) : (rex || follow) ? bridgeRexMove(from,to,@(argv[4]),follow) : inventory ? rexInventory()
                 : own ? bridgeOwnMove(from,to) : foreign ? bridgeForeignMove(from,to) : bridgeQuery();
             return value ? emit(value,[value[@"ok"] boolValue] ? 0 : 69)
                 : reject(failure ?: @"bridge-probe-failed",69);

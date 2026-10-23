@@ -141,6 +141,57 @@ and an empty session. It does not fix Rex startup geometry or establish
 move-and-follow, automated creation/cleanup, live-workload, multi-monitor,
 Safari/Codex or Hammerspoon 2 integration compatibility.
 
+## Rex move-and-follow pilot, 2026-10-23
+
+One new empty Rex Beta 0.1.0 build 1381 window was identified by a fresh
+before/after receipt, with eight pre-existing Rex windows as the baseline.
+The explicit `bridge-probe-rex-follow SOURCE TARGET RECEIPT` command moved it
+from desktop 6 to adjacent desktop 7, followed it, held for ten seconds, and
+returned the window and user to desktop 6.
+
+Observed automated evidence:
+
+- Both membership readers verified both window transfers twice.
+- The destination desktop ID became current and the exact moved Rex window
+  became the app's focused window, with Rex the frontmost application.
+- All ten sampled normal windows exclusively on the origin desktop became
+  offscreen, while the moved Rex window became onscreen on the destination.
+- The return restored the original desktop and exact test-window focus.
+- The operation took about 11.38 seconds including the deliberate ten-second hold.
+- The launcher already had Accessibility trust; the probe reported true and used
+  it for exact window focus. No new grant was requested. Earlier no-follow moves
+  without AX trust remain separate evidence.
+- Safe cleanup closed the test window, then closed only its retained empty
+  session through its own sidebar context menu while a working session remained
+  selected. Final inventory exactly matched the baseline: same Rex process,
+  all eight original window IDs and memberships, original desktop, no test window.
+  No replacement view, restart or Hammerspoon change was necessary.
+
+**Notification caveat:** the probe observed zero standard NSWorkspace Space-change
+notifications. Its initial overall `ok` was false solely because the harness
+also demanded two such notifications; every functional move/follow/focus/return
+field was true. The harness now reports notification observation separately
+from functional success. This is not a second live acceptance run, nor proof
+that a fully launched AppKit app will never receive these notifications.
+A native product must explicitly reconcile after its own commands, with public
+notifications as an additional trigger rather than its only state-refresh path.
+
+Owner visual confirmation of the desktop transition remains pending. Automated
+compositor flags are stronger than a current-Space pointer alone, but they do
+not establish the absence of a visually stale frame. Move-and-follow on other
+apps, multiple displays and later OS builds remains untested.
+
+The switch uses `SLSBridgedManagedDisplaySetCurrentSpaceOperation` paired with
+`SLSBridgedHideSpacesOperation` for the origin. Focus uses existing AX access,
+checking the exact WindowServer ID via the private AX ID bridge; there is no
+keyboard/mouse synthesis. The observer is removed on completion and bounded
+queries stop; no background polling is installed. This is an isolated harness
+command, not a production binding. It fails before moving without the required
+existing AX trust/classes. The normal validation tasks never run it.
+
+The [native build proposal](../../docs/native-window-factory.md) records effort,
+keybinding ownership, permissions and staged adoption separately from this proof.
+
 ## Build and read-only checks
 
 From the repository root (fish-compatible):
