@@ -1,9 +1,10 @@
-# Native Window Factory: proposed build and transition
+# Native Window Factory: build and transition
 
-Planning estimate, 2026-10-23. This is a proposal, not authorization to deploy
-or a delivery commitment. The working Hammerspoon baseline stays in service
-while native pieces earn acceptance. Live feasibility evidence is in the
-[native proof record](../native/space-helper/README.md).
+Updated 2026-10-23. The native build is underway on `native-window-factory`.
+The working Hammerspoon baseline stays in service while the separate candidate
+earns acceptance. Build and pilot instructions are in the
+[native candidate README](../native/window-factory/README.md); earlier Space
+feasibility evidence is in the [native proof record](../native/space-helper/README.md).
 
 ## Product scope and architecture
 
@@ -47,38 +48,38 @@ the imported layouts; chezmoi owns durable machine configuration. There must be
 no two writers reconciling the same catalog. The exact production paths and
 catalog handoff are implementation decisions, not changes made by this plan.
 
-## Effort estimate
+## Corrected scope and effort
 
-These are engineering-effort ranges for one focused implementation stream with
-agent assistance and owner desktop acceptance. Existing Lua behaviour/tests
-and native probes reduce discovery work, but do not eliminate porting and live
-application compatibility work. Hours are not unattended model runtime or a
-promise that desktop acceptance will happen in one session.
+This is a port of an existing working product. Reuse its feature contract,
+schema, geometry matching, adapter operations and acceptance examples. All 16
+entries in `app_adapters.lua` belong to the initial build: Rex, Ghostty, Finder,
+Safari, BBEdit, Chrome, ChatGPT, Codex, Claude, Excel, Word, PowerPoint, Keynote,
+Pages, Numbers and Mail. Preserve their existing limitations, including Claude's
+launch-only support. Rex/Safari/Codex are the first smoke test, not a reduced
+product scope or a prerequisite for adding the other known adapters.
 
-| Milestone | Incremental effort | Acceptance |
-| --- | --- | --- |
-| Native shell, catalog, capture/restore | 12-20 hours | Reliable keyboard input/lifecycle, validated catalog import, current-desktop isolation and frame verification. A rough demonstrator may appear after 8-16 hours within this phase. |
-| Establish for Rex, Safari and Codex | 12-20 hours | Fresh creation, reuse, no duplicates, normal Safari startup, cancellation and honest failure reports across repeated pilots. |
-| Personal-use hardening and cutover | 16-30 hours | Permissions, identity/signing, keybinding handoff, startup/relaunch behaviour, migration/recovery and regression/use checks. |
-| **First daily-use target for those three apps** | **40-70 hours total** | Roughly 5-9 focused working days; allow around 2-3 calendar weeks for interrupted work and owner acceptance. |
+Allow approximately **5–11 hours of focused effort for the initial core port**:
+roughly 1–2 hours for the native shell/catalog, 2–4 for capture/matching/Restore
+and Establish using the full registry, and 2–5 for integration checks and the
+first desktop pilots. Aim for a first working candidate in one focused session,
+then address observed problems in a follow-up session. This is a planning range,
+not a guarantee of app compatibility or permission acceptance in that time.
+The prior 40–70-hour, three-app estimate treated too much existing work as new
+and has been superseded.
 
-Additional scope, not hidden inside that total:
+The first source build includes the native library, capture/save/cancel,
+search/preview, Restore/Establish, import/export/delete/report, schema-v1
+compatibility and all 16 adapter definitions. Compile and pure-core checks do
+not establish live app compatibility. Validate the existing supported operations
+on the installed versions, recording failures rather than claiming all entries
+work merely because they decode. Native catalogue migration and Hyper+R handoff
+remain explicit adoption steps after the pilot.
 
-- Remaining current adapter coverage: approximately 12-24 hours, depending on
-  available app versions and permission/creation behaviour. The current registry
-  has 16 entries, including a launch-only limitation; entry count is not proof
-  of universal creation support.
-- Replacing the broader TheseusWindow controls (geometry cycles, directional
-  focus, switcher, stash/restore, Space badge, move-and-follow): another 20-40
-  hours. They can remain in Hammerspoon during the Window Factory cutover.
-- General distribution with multi-monitor acceptance, installer/update support,
-  broader compatibility and release polish: another 40-80 hours. Signing identity
-  and any release accounts remain owner-controlled.
-
-Re-estimate after the first native capture/restore acceptance and the first
-three-app Establish pilot. The largest uncertainty is app/OS behaviour, focus
-and recovery, not drawing the panel. The estimate excludes reconstructing app
-contents and any rewrite of the OS or disabling SIP.
+The broader TheseusWindow geometry cycles, directional focus, switcher,
+stash/restore, Space badge and move-and-follow remain in Hammerspoon. App-state
+recreation, coordinated animation, general distribution, updater/installer and
+multi-monitor release acceptance are later work. Estimate those separately if
+and when they are selected; they do not block starting the core port.
 
 ## Keybindings and ownership
 
@@ -99,7 +100,8 @@ report conflicts rather than silently sharing a chord. Registration is not a
 complete conflict audit across event taps or remappers: the handoff must ensure
 one actual owner. No global keystroke logger or Input Monitoring is needed just
 to receive these registered chords. The installed Xcode SDK still exposes this
-API; validate Hyper and keyboard-layout handling in the first native milestone.
+API; validate Hyper and keyboard-layout handling before shortcut handoff. The
+current candidate registers no global shortcut.
 
 Keep the binding table in an inspectable configuration file managed through
 chezmoi on this Mac, with defaults, validation and explicit reload. A settings
@@ -129,6 +131,6 @@ and window titles in routine operation reports.
 Adopt the native panel first while TheseusWindow remains available. Require
 keyboard acceptance through the real launcher, repeated three-app Establish
 with no duplicates, current-Space isolation, honest failure/cancellation, and
-clean restart before the Hyper+R handoff. Add the remaining adapters and window
-controls in separate accepted changes. The tagged Hammerspoon version remains
+clean restart before the Hyper+R handoff. Validate the full carried-over adapter
+list; port broader window controls in separate accepted changes. The tagged Hammerspoon version remains
 the fallback until the replacement has had ordinary daily use.

@@ -27,8 +27,12 @@ Native macOS development follows from this recoverable Hammerspoon checkpoint.
 The isolated [native Space helper proof](native/space-helper/README.md) records
 standalone queries and disposable transfers of both helper-owned and separate
 test-app windows, including a run without Accessibility trust. It is not
-installed or connected to either Spoon. The [native build proposal](docs/native-window-factory.md)
-records the scoped effort estimate, keybinding ownership and staged transition.
+installed or connected to either Spoon. The [native build plan](docs/native-window-factory.md)
+records the corrected scope, effort estimate, keybinding ownership and staged
+transition. A separate [native AppKit candidate](native/window-factory/README.md)
+now implements the core workflow and carries all 16 existing adapter entries.
+It is a development build awaiting live acceptance; the Spoons remain the
+working installation.
 
 The product's core is capturing the active applications and window layout and
 restoring that workspace later. Recreating application contents, browser URLs,

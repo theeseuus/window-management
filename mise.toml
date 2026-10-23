@@ -25,3 +25,11 @@ run = [
   "node native/space-helper/verify.cjs native/space-helper/.build/space-helper --live",
   "node native/space-helper/check-app-query.cjs native/space-helper/.build/BridgeProbe.app",
 ]
+
+[tasks.native-build]
+description = "Build the isolated Swift/AppKit Window Factory candidate"
+run = "./native/window-factory/build.sh"
+
+[tasks.native-test]
+description = "Check native schema, geometry, matching and all existing adapters"
+run = "./native/window-factory/test.sh"
