@@ -25,7 +25,8 @@ final geometry. That known visual limitation is retained in the baseline.
 Native macOS development follows from this recoverable Hammerspoon checkpoint.
 
 The isolated [native Space helper proof](native/space-helper/README.md) records
-standalone queries and a disposable helper-owned window transfer. It is not
+standalone queries and disposable transfers of both helper-owned and separate
+test-app windows, including a run without Accessibility trust. It is not
 installed or connected to either Spoon.
 
 The product's core is capturing the active applications and window layout and
