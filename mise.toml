@@ -5,3 +5,17 @@ node = "24.22.1"
 [tasks.validate]
 description = "Compile Lua sources and run pure logic tests"
 run = "./scripts/validate.sh"
+
+[tasks.native-spaces-build]
+description = "Build the standalone native Space proof with the installed Apple SDK"
+run = "./native/space-helper/build.sh"
+
+[tasks.native-spaces-test]
+description = "Check native helper CLI guards without creating windows"
+depends = ["native-spaces-build"]
+run = "node native/space-helper/verify.cjs native/space-helper/.build/space-helper"
+
+[tasks.native-spaces-check-live]
+description = "Read-only live Space schema checks; requires the logged-in GUI session"
+depends = ["native-spaces-build"]
+run = "node native/space-helper/verify.cjs native/space-helper/.build/space-helper --live"
