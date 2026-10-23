@@ -12,6 +12,12 @@ enum CoreTests {
         }
         let screen = Frame(x:100,y:40,w:1200,h:800)
         let rect = Frame(x:700,y:40,w:600,h:800)
+        check(Frame(x:200,y:650,w:600,h:800).isVisible(in:screen),"Low window remains eligible with centre below screen")
+        check(Frame(x:-450,y:80,w:600,h:500).isVisible(in:screen),"Partly visible side window remains eligible")
+        check(!Frame(x:200,y:840,w:600,h:800).isVisible(in:screen),"Touching bottom edge has no visible area")
+        check(!Frame(x:1400,y:80,w:600,h:500).isVisible(in:screen),"Window entirely on another display excluded")
+        check(!Frame(x:200,y:950,w:600,h:800).isVisible(in:screen),"Entirely offscreen window excluded")
+        check(!Frame(x:200,y:100,w:0,h:500).isVisible(in:screen),"Invalid geometry excluded")
         check(rect.normalized(in:screen).absolute(in:screen) == rect,"Coordinate round trip")
         check(Frame(x:2,y:-1,w:3,h:4).absolute(in:screen) == screen,"Clamp oversized/offscreen target")
         check(try Recipe.normalizedName("  Work  ") == "Work","Name trim")

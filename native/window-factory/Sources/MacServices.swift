@@ -99,8 +99,7 @@ final class MacServices {
                 var rect = CGRect.zero
                 guard WFReadFrame(window,&rect), rect.width > 0, rect.height > 0 else { continue }
                 let frame = Frame(x:rect.minX,y:rect.minY,w:rect.width,h:rect.height)
-                let centre = CGPoint(x:rect.midX,y:rect.midY)
-                guard CGRect(x:context.frame.x,y:context.frame.y,width:context.frame.w,height:context.frame.h).contains(centre) else { continue }
+                guard frame.isVisible(in:context.frame) else { continue }
                 result.append(LiveWindow(id:id,pid:app.processIdentifier,bundleID:bundleID,
                     appName:app.localizedName ?? bundleID,element:window,frame:frame))
             }

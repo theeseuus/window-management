@@ -9,6 +9,13 @@ struct FactoryError: LocalizedError {
 struct Frame: Codable, Equatable {
     var x: Double, y: Double, w: Double, h: Double
     var valid: Bool { [x,y,w,h].allSatisfy(\.isFinite) && w > 0 && h > 0 }
+    func isVisible(in screen: Frame) -> Bool {
+        guard valid, screen.valid else { return false }
+        // A tall window can be dragged low enough that its centre is offscreen
+        // while its title bar remains visible. It must still be restorable.
+        return min(x+w,screen.x+screen.w) > max(x,screen.x)
+            && min(y+h,screen.y+screen.h) > max(y,screen.y)
+    }
     func normalized(in screen: Frame) -> Frame {
         Frame(x:(x-screen.x)/screen.w,y:(y-screen.y)/screen.h,w:w/screen.w,h:h/screen.h)
     }

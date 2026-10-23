@@ -122,3 +122,43 @@ should bring that window to the selected desktop. This affects only the native
 library, not app windows or Hammerspoon. The correction needs a repeat of the
 owner's Dock path before the three-app pilot proceeds; no live Capture/Restore/
 Establish result is claimed yet.
+
+
+## Three-app desktop pilot and low-window correction, 2026-10-23
+
+Owner-observed results with Rex Beta 0.1.0 build 1381, Safari 27.0.1
+(build 22625.1.29.11.28), and the Codex-backed ChatGPT app 26.1016.62342
+(build 21477):
+
+- Dock reopening stays on the selected empty ordinary desktop after the
+  `moveToActiveSpace` correction.
+- Establish of the preparation layout opened all three apps' windows; Capture
+  and Save produced the separate `Native desktop pilot` layout.
+- Restore returned all three displaced windows correctly with no extra windows
+  when they remained high enough on screen.
+- Closing only the disposable Safari window, then Establishing, created the
+  missing Safari window and placed all three correctly. The supplied receipt
+  showed `3 placed · 1 created · 2 reused · 0 missing · 0 extra`.
+- The owner confirmed that repeating Establish added no duplicates. The repeat's
+  exact receipt counts were not supplied.
+
+Restore had an eligibility defect: dragging a tall window low enough put its
+centre below the usable screen, so collection excluded it even though it was
+partly visible. The earlier screenshot reported two placed/reused and one
+missing. The native filter now requires positive overlap with the selected
+usable screen instead of centre containment. Windows entirely outside that
+screen, with zero-area edge contact, or invalid geometry remain excluded;
+current-Space, standard/visible, minimized/full-screen and identity checks are
+unchanged. This shared collection fix also prevents Establish from treating
+such a partially visible window as missing. A regression test reproduced the
+old omission, then passed after the correction. Live low-window acceptance of
+the corrected build is still pending; do not infer it from the other pilot
+results.
+
+Pilot packaging also exposed recurring Finder metadata and empty file-picker
+contents in the iCloud-managed build folder. A verified copy outside that tree
+was used for the successful pilot. Accessibility needed owner re-addition of
+that local app followed by an app restart. Keep local pilot bundles outside the
+synced build tree and verify their signatures; ad hoc rebuilds still require
+permission checks. No production signing identity has been provisioned.
+Hammerspoon files, runtime, shortcuts and saved layouts were not changed.
