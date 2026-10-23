@@ -45,10 +45,11 @@ include KiwiDesk source. Research reference: KiwiDesk commit
 | Cleanup | The target app exited and the window disappeared from WindowServer. The current desktop remained 6. Production Hammerspoon files were unchanged and no reload was performed. |
 
 **Result:** this private bridge can transfer a window belonging to another
-process on this machine without an Accessibility grant. The foreign process
-was our isolated disposable test app, not Rex/Safari/Codex. Those application
-scenarios, returning/following a moved window, visual behaviour on the target
-desktop, multi-monitor operation and future OS builds remain untested. This
+process on this machine without an Accessibility grant. In this phase the foreign process
+was our isolated disposable test app. The later Rex pilot below adds an actual
+application round trip; Safari/Codex, following a moved window, visual behaviour
+on the destination desktop, multi-monitor operation and future OS builds remain
+untested. This
 does not establish that all of Window Factory can run without Accessibility:
 its normal cross-app capture/geometry work uses the public Accessibility API.
 
@@ -77,6 +78,68 @@ overwritten. `open` finishing is not probe success: inspect the report's
 `ok`, verification and cleanup fields. Keep the source desktop selected;
 these probes do not follow the window or touch existing windows. Invalid CLI
 arguments are rejected before opening AppKit or creating a report.
+
+## Rex application pilot, 2026-10-23
+
+Tested Rex Beta 0.1.0 build 1381 on macOS 27.0.1 build 26A434.
+One File > New Window action created an empty fish session/window on desktop 6.
+A before/after inventory identified exactly one additional normal Rex window;
+the eight existing Rex windows and their memberships formed the baseline.
+
+The bridge moved only that new window from desktop 6 to adjacent desktop 7,
+then returned it to desktop 6 for UI cleanup. Both hops passed two consecutive
+checks through the bridge and C membership readers, together with matching
+WindowServer onscreen flags (false away, true back). The complete round trip
+took about 1.01 seconds, including a half-second pause at the destination.
+The helper reported Accessibility trust false. The active desktop and all eight
+original Rex windows' memberships stayed unchanged during the bridge operation.
+No geometry request, simulated drag or Space-switch command was used.
+
+**Cleanup incident and recovery:** closing the disposable window retained its
+empty Rex session. Selecting that session in an original window and using the
+File menu's Close Session also closed the containing original window view.
+The retained working terminal session survived. A replacement view was opened,
+its original session selected, and the replacement was returned to the original
+desktop through the bridge. The two empty sessions were removed; removing the
+second through its own sidebar context menu while the working session remained
+selected preserved the recovered view. Final inventory: same Rex process,
+eight windows, seven original IDs/memberships unchanged plus one replacement
+view on its original desktop, with the disposable window gone. The original
+view's exact geometry was not recorded and is not claimed restored. Desktop
+context changed during UI recovery; the bridge round trip itself did not change
+it, and the final query again reported the initial desktop. Do not describe the
+whole pilot as leaving every original window identity untouched.
+
+For future pilots, close a retained empty session through its own sidebar
+context menu while an existing working session stays selected. Do not select
+the test session in an existing view and invoke the File menu's Close Session.
+The recovery did not require a Rex restart. Hammerspoon configuration and runtime
+were not changed or reloaded.
+
+The isolated harness adds:
+
+- `rex-inventory`: read-only Rex PID, version, normal window IDs/memberships and
+  active Space; no titles or terminal contents.
+- `bridge-probe-rex SOURCE TARGET RECEIPT`: one adjacent desktop round trip,
+  without following, targeting only the one new window identified by a temporary
+  creation receipt. It validates the exact bundle/PID, baseline inventory and
+  source membership before dispatch. Existing windows cannot be named directly.
+- `bridge-restore-rex TARGET RECEIPT`: recovery of a similarly receipt-identified
+  new replacement view, with a valid ordinary target and unchanged inventory.
+  It verifies membership through both readers and the target's window list;
+  it does not activate an app or switch the current desktop.
+
+A receipt is temporary JSON with `pid`, `windowID` (decimal string), and
+`beforeWindows` (the before-creation inventory's `windows` dictionary).
+It must come from an immediately observed creation; do not forge one for an
+existing window. Receipts and runtime reports are not committed. The normal
+validation tasks do not run either Rex move command. The helper does not create
+or close Rex windows; those explicit UI steps remain separate from transfer.
+
+This establishes the private bridge's Rex round-trip capability for one build
+and an empty session. It does not fix Rex startup geometry or establish
+move-and-follow, automated creation/cleanup, live-workload, multi-monitor,
+Safari/Codex or Hammerspoon 2 integration compatibility.
 
 ## Build and read-only checks
 

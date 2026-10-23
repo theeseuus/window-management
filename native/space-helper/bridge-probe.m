@@ -166,6 +166,8 @@ static NSDictionary *bridgeForeignMove(uint64_t source, uint64_t target) {
     return result;
 }
 
+#include "rex-probe.h"
+
 static NSArray *topology(NSArray *displays) {
     NSMutableArray *out = [NSMutableArray array];
     for (NSDictionary *display in displays) {
@@ -237,12 +239,16 @@ int main(int argc, const char *argv[]) {
         BOOL help=argc==2 && strcmp(argv[1],"help")==0;
         uint64_t from=0,to=0;
         BOOL query = argc==2 && strcmp(argv[1],"bridge-query")==0;
+        BOOL inventory = argc==2 && strcmp(argv[1],"rex-inventory")==0;
         BOOL own = argc==4 && strcmp(argv[1],"bridge-probe-own")==0
             && readID(argv[2],UINT64_MAX,&from) && readID(argv[3],UINT64_MAX,&to) && from!=to;
         BOOL foreign = argc==4 && strcmp(argv[1],"bridge-probe-foreign")==0
             && readID(argv[2],UINT64_MAX,&from) && readID(argv[3],UINT64_MAX,&to) && from!=to;
-        if (!query && !own && !foreign && !help)
-            return reject(@"usage: bridge-query | bridge-probe-own SOURCE TARGET | bridge-probe-foreign SOURCE TARGET | help",64);
+        BOOL rex = argc==5 && strcmp(argv[1],"bridge-probe-rex")==0
+            && readID(argv[2],UINT64_MAX,&from) && readID(argv[3],UINT64_MAX,&to) && from!=to;
+        BOOL restore = argc==4 && strcmp(argv[1],"bridge-restore-rex")==0 && readID(argv[2],UINT64_MAX,&to);
+        if (!query && !own && !foreign && !help && !inventory && !rex && !restore)
+            return reject(@"usage: bridge-query | rex-inventory | bridge-probe-own SOURCE TARGET | bridge-probe-foreign SOURCE TARGET | bridge-probe-rex SOURCE TARGET RECEIPT | bridge-restore-rex TARGET RECEIPT | help",64);
         if (reportPath) {
             int fd=open(reportPath,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW,0600);
             if (fd<0) return 73;
@@ -250,14 +256,15 @@ int main(int argc, const char *argv[]) {
             close(fd);
         }
         if (help) return emit(@{@"schemaVersion": @1,@"ok": @YES,
-            @"commands": @[@"bridge-query",@"bridge-probe-own SOURCE TARGET",@"bridge-probe-foreign SOURCE TARGET",@"help"],
-            @"existingWindowTargetsAllowed": @NO,@"requestAccessibilityPermission": @NO},0);
+            @"commands": @[@"bridge-query",@"rex-inventory",@"bridge-probe-own SOURCE TARGET",@"bridge-probe-foreign SOURCE TARGET",@"bridge-probe-rex SOURCE TARGET RECEIPT",@"bridge-restore-rex TARGET RECEIPT",@"help"],
+            @"existingWindowTargetsAllowed": @NO,@"rexCreationReceiptRequired": @YES,@"requestAccessibilityPermission": @NO},0);
         if (!loadAPI()) return reject(failure,69);
         // Real AppKit initialization is required by this private bridge.
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
         @try {
-            NSDictionary *value = own ? bridgeOwnMove(from,to) : foreign ? bridgeForeignMove(from,to) : bridgeQuery();
+            NSDictionary *value = restore ? restoreRexView(to,@(argv[3])) : rex ? bridgeRexMove(from,to,@(argv[4])) : inventory ? rexInventory()
+                : own ? bridgeOwnMove(from,to) : foreign ? bridgeForeignMove(from,to) : bridgeQuery();
             return value ? emit(value,[value[@"ok"] boolValue] ? 0 : 69)
                 : reject(failure ?: @"bridge-probe-failed",69);
         } @catch (__unused NSException *exception) {

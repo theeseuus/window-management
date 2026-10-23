@@ -12,11 +12,17 @@ function call(args,status) {
 const help=call(['help'],0);
 assert.equal(help.existingWindowTargetsAllowed,false);
 assert.equal(help.requestAccessibilityPermission,false);
+assert.equal(help.rexCreationReceiptRequired,true);
 for (const args of [[],['bridge-query','extra'],['move-window','1','2'],
   ['bridge-probe-own','1','1'],['bridge-probe-foreign','0','2'],
   ['bridge-probe-foreign','-1','2'],['bridge-probe-own','1x','2'],
   ['bridge-probe-own','1','18446744073709551616'],
-  ['bridge-probe-foreign','1','2','123']]) {
+  ['bridge-probe-foreign','1','2','123'],
+  ['rex-inventory','extra'], ['bridge-probe-rex','1','2'],
+  ['bridge-probe-rex','1','1','receipt.json'],
+  ['bridge-probe-rex','-1','2','receipt.json'],
+  ['bridge-probe-rex','1','18446744073709551616','receipt.json'],
+  ['bridge-restore-rex','0','receipt.json'], ['bridge-restore-rex','1']]) {
   assert.equal(call(args,64).ok,false);
 }
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bridge-guards-'));
