@@ -48,6 +48,9 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         window.title = preview ? "Window Factory Native — Preview" : "Window Factory Native"
         window.minSize = NSSize(width:660,height:480); window.delegate = self
         window.isReleasedWhenClosed = false
+        // A summoned library belongs on the user's selected desktop. AppKit
+        // otherwise activates the retained window's old Space on Dock reopen.
+        window.collectionBehavior = [.moveToActiveSpace]
         search.placeholderString = "Search layouts or applications"; search.delegate = self
         let column = NSTableColumn(identifier:NSUserInterfaceItemIdentifier("layout"))
         column.title = "Layouts"; table.addTableColumn(column); table.headerView = nil

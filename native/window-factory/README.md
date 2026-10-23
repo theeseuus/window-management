@@ -110,3 +110,15 @@ The check caught and fixed a missing standard Edit menu. Automated observation
 reactivates/reopens a closed app window, so Escape/lifecycle acceptance still
 needs the owner's normal input path. No live capture, Restore or Establish was
 run with this candidate; no Accessibility/Automation permission was granted.
+
+
+## First desktop pilot: library activation correction
+
+The owner reported that reopening the native library from the Dock on an empty
+desktop switched back to its original working desktop. The retained NSWindow
+had default Space collection behaviour. The candidate now sets AppKit's
+`moveToActiveSpace` before its first presentation, so activating the library
+should bring that window to the selected desktop. This affects only the native
+library, not app windows or Hammerspoon. The correction needs a repeat of the
+owner's Dock path before the three-app pilot proceeds; no live Capture/Restore/
+Establish result is claimed yet.
