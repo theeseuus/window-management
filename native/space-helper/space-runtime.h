@@ -137,4 +137,3 @@ static NSDictionary *snapshot(void) {
         @"osVersion": NSProcessInfo.processInfo.operatingSystemVersionString,
         @"focusedSpaceID": @(after).stringValue, @"displays": result};
 }
-

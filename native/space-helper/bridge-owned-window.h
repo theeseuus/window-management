@@ -97,4 +97,3 @@ static NSDictionary *bridgeOwnMove(uint64_t source, uint64_t destination) {
     }
     return result;
 }
-
