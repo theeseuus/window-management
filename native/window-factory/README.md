@@ -1456,6 +1456,22 @@ Installed typography and General were inspected. Physical chained Space moves
 are pending the owner's normal keyboard check; offline tests do not prove that
 macOS retains real desktop focus.
 
+
+### Build 26 physical Space-focus retest accepted, 2026-10-25
+
+The owner confirmed that all chained moves retain the same window's focus
+without clicking it again. This accepts the build 26 move-and-follow focus fix
+for the tested normal-keyboard workflow. The owner also observed a short
+“replenish” delay when attempting the next move too quickly.
+
+The controller remains single-flight: a shortcut received while a move is still
+active is not queued. Destination verification is followed by six consecutive
+40 ms focus samples (at least 240 ms in addition to the desktop transition and
+other checks). New keyboard/button input during that operation can cancel the
+remaining verification. Rapid-repeat responsiveness is therefore a recorded
+limitation, not a claim of seamless queued movement. No timing, queue, controller,
+shortcut or Hammerspoon changes were made for this acceptance checkpoint.
+
 ## Agent command-line access
 
 There is no supported agent control CLI or IPC endpoint yet. The executable
