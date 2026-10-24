@@ -76,6 +76,14 @@ final class DirectSpaceMoveControls {
                       (entry[kCGWindowLayer as String] as? Int) == 0,WFWindowSpaces(id)?.map(\.uint64Value) == [plan.source] else { return nil }
                 return (id,pid)
             }
+            // Counts reveal intervening input without reading key contents,
+            // installing an event tap, or requesting Input Monitoring.
+            func inputCounts() -> [UInt32] {
+                [CGEventType.keyDown,.leftMouseDown,.rightMouseDown,.otherMouseDown].map {
+                    CGEventSource.counterForEventType(.combinedSessionState,eventType:$0)
+                }
+            }
+            let startingInput = inputCounts()
             task = Task { @MainActor [weak self] in
                 guard let self else { return }
                 defer { task = nil; changed?() }
@@ -88,13 +96,14 @@ final class DirectSpaceMoveControls {
                     }
                     @MainActor func identity() throws {
                         try Task.checkCancellation()
-                        guard !workspaceBusy(),NSWorkspace.shared.frontmostApplication?.processIdentifier == window.pid,
+                        guard inputCounts() == startingInput else { throw FactoryError("New keyboard or pointer input; Space command stopped.") }
+                        guard !workspaceBusy(),
                               NSRunningApplication(processIdentifier:window.pid)?.bundleIdentifier == window.bundleID,
                               NSRunningApplication(processIdentifier:window.pid)?.isHidden == false,
                               WFWindowID(window.element) == window.id,
                               attribute(window.element,kAXSubroleAttribute) as? String == kAXStandardWindowSubrole,
                               (attribute(window.element,kAXMinimizedAttribute) as? Bool) != true,
-                              (attribute(window.element,"AXFullScreen") as? Bool) != true else { throw FactoryError("Focus, application or window eligibility changed; Space command stopped.") }
+                              (attribute(window.element,"AXFullScreen") as? Bool) != true else { throw FactoryError("Application or window eligibility changed; Space command stopped.") }
                         let fresh = try topology(context.display)
                         guard fresh.map(\.id) == entries.map(\.id),fresh.map(\.kind) == entries.map(\.kind) else { throw FactoryError("Desktop order changed; Space command stopped.") }
                     }
@@ -103,6 +112,7 @@ final class DirectSpaceMoveControls {
                         let shown = try current()
                         switch phase {
                         case .beforeMove:
+                            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == window.pid else { throw FactoryError("Foreground application changed before movement.") }
                             try window.eligible(in:context)
                             let root = AXUIElementCreateApplication(window.pid); AXUIElementSetMessagingTimeout(root,0.1)
                             guard let focused = axElement(attribute(root,kAXFocusedWindowAttribute)),WFWindowID(focused) == window.id else { throw FactoryError("Focused window changed before movement.") }
@@ -148,14 +158,20 @@ final class DirectSpaceMoveControls {
                             guard actual.matches(window.frame) else { throw FactoryError("Moved and followed, but the saved frame was not reached.") }
                         }
                         try checkDestination()
-                        var main: Int32 = 0,raised: Int32 = 0
-                        _ = WFRequestWindowFocus(window.element,window.pid,&main,&raised)
-                        for _ in 0..<20 {
-                            try await Task.sleep(for:.milliseconds(40)); try checkDestination()
-                            let root = AXUIElementCreateApplication(window.pid); AXUIElementSetMessagingTimeout(root,0.1)
-                            if let focused = axElement(attribute(root,kAXFocusedWindowAttribute)),WFWindowID(focused) == window.id { return }
-                        }
-                        throw FactoryError("Moved and followed, but exact window focus was not confirmed.")
+                        try await SpaceMovement.restoreFocus(check:checkDestination,request:{
+                            var main: Int32 = 0,raised: Int32 = 0
+                            let status = WFRequestWindowFocus(window.element,window.pid,&main,&raised)
+                            guard status == 0 else { throw FactoryError("Moved and followed, but focus activation failed (status \(status)).") }
+                        },focused:{
+                            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == window.pid else { return false }
+                            let system = AXUIElementCreateSystemWide(); AXUIElementSetMessagingTimeout(system,0.1)
+                            guard let root = axElement(attribute(system,kAXFocusedApplicationAttribute)) else { return false }
+                            var pid: pid_t = 0
+                            guard AXUIElementGetPid(root,&pid) == .success,pid == window.pid else { return false }
+                            AXUIElementSetMessagingTimeout(root,0.1)
+                            guard let focused = axElement(attribute(root,kAXFocusedWindowAttribute)) else { return false }
+                            return WFWindowID(focused) == window.id
+                        })
                     })
                     lastResult = "\(direction<0 ? "←" : "→") Desktop \(plan.ordinal): exact window moved, followed and focused."
                     hud.show(lastResult,on:context.screen)

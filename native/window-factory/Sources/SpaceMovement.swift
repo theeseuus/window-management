@@ -17,6 +17,20 @@ enum SpaceMovement {
         guard users.indices.contains(next) else { throw FactoryError(direction<0 ? "Already at the first desktop." : "Already at the last desktop.") }
         return SpaceMovePlan(source:current,destination:users[next],ordinal:next+1)
     }
+    // AXFocusedWindow can still name a background app's last window. Require
+    // the real foreground window to remain focused across transition samples.
+    @MainActor static func restoreFocus(check: () throws -> Void,request: () throws -> Void,
+        focused: () -> Bool,pause: () async throws -> Void = { try await Task.sleep(for:.milliseconds(40)) }) async throws {
+        var stable = 0
+        for attempt in 0..<25 {
+            try Task.checkCancellation(); try check()
+            if attempt == 0 || (stable == 0 && (attempt == 8 || attempt == 16)) { try request() }
+            try await pause(); try Task.checkCancellation(); try check()
+            stable = focused() ? stable+1 : 0
+            if stable == 6 { return }
+        }
+        throw FactoryError("Moved and followed, but stable foreground window focus was not confirmed.")
+    }
     @MainActor static func perform(_ plan: SpaceMovePlan,
         check: (SpaceMovePhase) throws -> Void,move: () -> Bool,
         membership: () throws -> [UInt64],follow: () -> Bool,

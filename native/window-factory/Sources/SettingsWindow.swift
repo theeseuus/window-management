@@ -167,7 +167,8 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         floating.target = self; floating.action = #selector(changePreferences)
         hints.target = self; hints.action = #selector(changePreferences)
         loginSettings.target = self; loginSettings.action = #selector(openLoginSettings); loginSettings.bezelStyle = .rounded
-        let general = Self.page([Self.row("Dock icon",dockIcon),Self.row("Menu-bar indicator",indicatorEnabled),Self.row("Start at login",loginEnabled),loginSettings,Self.row("Keep library on top",floating),Self.row("Shortcuts on buttons",hints)])
+        let permission = NSButton(title:"Accessibility Settings…",target:self,action:#selector(openAccess)); permission.bezelStyle = .rounded
+        let general = Self.page([Self.row("Dock icon",dockIcon),Self.row("Menu-bar indicator",indicatorEnabled),Self.row("Start at login",loginEnabled),loginSettings,Self.row("Keep library on top",floating),Self.row("Shortcuts on buttons",hints),Self.row("Accessibility",access),permission])
         addTab("General",general); addTab("Shortcuts",shortcutEditor.view)
         shortcutEditor.isEnabled = { [weak self] in self?.groupEnabled($0) ?? false }
         shortcutEditor.changeEnabled = { [weak self] in self?.changeGroup($0,enabled:$1) }
@@ -177,10 +178,9 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         let title = NSTextField(labelWithString:"Window Factory"); title.font = .systemFont(ofSize:20,weight:.semibold)
         let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "unknown",build = Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unknown"
         let release = NSTextField(labelWithString:"Version \(version) (\(build))")
-        let permission = NSButton(title:"Accessibility Settings…",target:self,action:#selector(openAccess)); permission.bezelStyle = .rounded
         let diagnostics = NSButton(title:"Diagnostics…",target:self,action:#selector(showDiagnostics)); diagnostics.bezelStyle = .rounded
         let shortcuts = NSButton(title:"Shortcut Reference",target:self,action:#selector(openShortcuts)); shortcuts.bezelStyle = .rounded
-        addTab("About",Self.page([title,release,Self.row("Accessibility",access),permission,shortcuts,diagnostics]))
+        addTab("About",Self.page([title,release,shortcuts,diagnostics]))
         monitor = NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
             let handled = MainActor.assumeIsolated { guard let self,event.window === self.window,event.keyCode == 53,!self.shortcutEditor.isRecording else { return false }; self.window.close(); return true }
             return handled ? nil : event

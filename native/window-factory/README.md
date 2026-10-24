@@ -1418,3 +1418,56 @@ Escape cancels recording and leaves Settings open. A fresh owner check of
 physical shortcuts and the simplified Settings interface remains pending.
 Automated input changes app focus,
 so it does not establish the normal physical-key interaction result.
+
+
+### Build 25 owner check and build 26 corrections, 2026-10-25
+
+The owner confirmed Settings/shortcut editing, improved modifier spacing, and
+continued operation of the other controls. Space move-and-follow lost foreground
+focus after movement, so its earlier acceptance does not cover this reported
+case. The installed diagnostic receipt was: “Move/follow dispatched. Focus,
+application or window eligibility changed; Space command stopped.”
+
+The foreground-app guard was applied throughout the asynchronous desktop
+transition. Moving the focused window away can itself change the foreground
+app, so the guard could stop the intended focus restoration. The finishing
+check also accepted an app-local AXFocusedWindow, which can name a background
+window. Build 26 keeps strict initial focus and exact window/Space eligibility,
+but permits transition-driven foreground changes. New keyboard presses or mouse
+button presses cancel the operation, using public event counters without reading
+key contents or installing an event tap; modifier releases and autorepeat do not
+increment the keyboard counter. Destination confirmation precedes restoration.
+A bounded focus sequence now requires both the foreground app and system-wide
+Accessibility focused window to match the moved window for six samples. Late
+focus loss resets the samples and permits at most three activation requests in
+25 polls. Actual desktop order, membership, frame and cancellation checks remain.
+No shared focus bridge or other controller implementation was changed.
+
+The shortcut reference now uses real tab stops and hanging indents instead of
+spaces, keeping action text aligned across Shift and unshifted bindings and when
+wrapped. Accessibility status/settings access moved from About to General.
+185 AppKit assertions include actual glyph-column positions and permission-control
+placement; 61 Space-movement assertions cover late focus loss, stable recovery,
+timeout, intervening input and cancellation. All prior native suites and Lua
+repository validation pass. Build 26 was installed with strict signature and
+Accessibility retained; the owner's current seven-layout catalog was byte-identical
+before/after. Current app preferences and Hammerspoon were left unchanged.
+Installed typography and General were inspected. Physical chained Space moves
+are pending the owner's normal keyboard check; offline tests do not prove that
+macOS retains real desktop focus.
+
+## Agent command-line access
+
+There is no supported agent control CLI or IPC endpoint yet. The executable
+supports offline `--validate-catalog`, UI `--preview`, an alternate `--data-dir`,
+and quiet `--background` launch. The latter runs the GUI-session app without
+opening its library; it is not a command endpoint. Live capture, Restore,
+Establish, window controls and structured operation receipts are not exposed to
+agents. The earlier Space proof/helper programs are separate diagnostics, not
+Window Factory's public automation interface.
+
+The intended extension is one CLI client talking to the installed app's existing
+operation owners, returning structured results and avoiding a second app instance
+or duplicate shortcut registries. UI-free control still requires a logged-in
+WindowServer session and the app's existing Accessibility permission. This is
+future work, not part of build 26.

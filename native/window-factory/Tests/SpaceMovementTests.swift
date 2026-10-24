@@ -54,6 +54,29 @@ import Foundation
             if mode == "membership-timeout" { check(reads == 40 && pauses == 40,"membership polling is bounded") }
             if mode == "visible-timeout" { check(visibleReads == 40 && !events.contains("finish"),"no focus writes before compositor confirmation") }
         }
+        for mode in ["stable","late-loss","never","input-change","cancel","request-fails"] {
+            var samples = 0,requests = 0,checks = 0,failed = false
+            do {
+                try await SpaceMovement.restoreFocus(check:{
+                    checks += 1
+                    if mode == "input-change" && checks == 5 { throw FactoryError("new user input") }
+                },request:{
+                    requests += 1
+                    if mode == "request-fails" { throw FactoryError("activation rejected") }
+                },focused:{
+                    samples += 1
+                    if mode == "never" { return false }
+                    if mode == "late-loss" { return samples<=2 || samples>=9 }
+                    return true
+                },pause:{ if mode == "cancel" { throw CancellationError() } })
+            } catch { failed = true }
+            check(failed == !["stable","late-loss"].contains(mode),"focus result is truthful for \(mode)")
+            check(requests<=3,"focus restoration never retries without a bound")
+            if mode == "stable" { check(samples == 6 && requests == 1,"single focus request must remain foreground for six samples") }
+            if mode == "late-loss" { check(samples == 14 && requests == 2,"transient focus success must reset after late transition focus loss") }
+            if mode == "never" { check(samples == 25 && requests == 3,"stale/background focus fails with a bounded retry budget") }
+            if mode == "input-change" { check(requests == 1 && samples == 2,"new input stops restoration before any retry") }
+        }
         print("native Space movement: \(assertions) assertions passed; no desktop queries or mutations")
     }
 }

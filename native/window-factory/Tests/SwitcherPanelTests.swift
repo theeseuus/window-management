@@ -111,6 +111,23 @@ import AppKit
         dockDefaults.set(Data("invalid".utf8),forKey:"shortcutOverrides.v1")
         let damaged = KeybindingStore(defaults:dockDefaults)
         check(damaged.loadError != nil && damaged.chord(library) == library.standard,"invalid saved data safely uses defaults")
+        func allViews(_ root: NSView) -> [NSView] { [root]+root.subviews.flatMap{allViews($0)} }
+        let general = settingsTabs.tabViewItems[0].view!,about = settingsTabs.tabViewItems[3].view!
+        check(allViews(general).compactMap{$0 as? NSButton}.contains{$0.title == "Accessibility Settings…"},"Accessibility lives in General")
+        check(!allViews(about).compactMap{$0 as? NSButton}.contains{$0.title == "Accessibility Settings…"},"About does not duplicate permission controls")
+        let reference = ShortcutReferenceWindow(preferences:dockPreferences)
+        reference.refresh(); reference.window.contentView!.layoutSubtreeIfNeeded()
+        let referenceText = allViews(reference.window.contentView!).compactMap{$0 as? NSTextView}.first!
+        let layout = referenceText.layoutManager!,container = referenceText.textContainer!
+        layout.ensureLayout(for:container)
+        func commandX(_ title: String) -> CGFloat {
+            let character = (referenceText.string as NSString).range(of:title).location
+            let glyph = layout.glyphIndexForCharacter(at:character)
+            return layout.lineFragmentRect(forGlyphAt:glyph,effectiveRange:nil).minX+layout.location(forGlyphAt:glyph).x
+        }
+        check(abs(commandX("Next size")-commandX("Previous size"))<0.1,"Shift modifiers must not shift the action column")
+        check(abs(commandX("Next size")-commandX("Focus left"))<0.1,"action column aligns across shortcut groups")
+        reference.stop()
         settings.stop()
         print("native switcher panel: \(assertions) assertions passed; no windows shown or controlled")
     }
