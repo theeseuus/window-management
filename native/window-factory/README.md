@@ -892,3 +892,37 @@ Hammerspoon fallback is unchanged and Hammerspoon remains quit. The earlier
 same-Space physical acceptance remains recorded; the new end-to-end other-Space
 reveal/resolve/focus path awaits the owner's physical pilot. Discovery is now
 live-verified, but cross-Space activation is not yet marked accepted.
+
+### Build 16 physical cross-Space retest accepted, 2026-10-24
+
+The owner confirmed that other-Space windows now appear, selecting one reaches
+the correct desktop and focuses that window, and same-Space switching still
+works. Geometry, directional focus and stash/restore also continue to behave as
+expected. This accepts the ordinary-desktop discovery/reveal/exact-focus path
+in the normal keyboard workflow and closes the reported build 15 discovery
+defect for the owner's tested cases. It is not exhaustive full-screen,
+multi-display or every-app coverage.
+
+The owner supplied screenshots and two usability observations that remain open:
+
+- Right-edge stashing leaves part of the window visible; left-edge stashing was
+  reported to leave no visible portion. The right-edge result matches the
+  previously observed macOS constraint. The native Tab+S implementation is a
+  right-edge toggle; this report does not establish a native left-stash mode
+  or a tested cause for the directional asymmetry. Compare the two placements
+  separately before changing the accepted stash behaviour.
+- The native cross-Space picker is harder to interpret than the Hammerspoon
+  version. The screenshot shows generic This Space/Other Space suffixes,
+  long window titles/paths, an inconsistent mix of real titles and Window on
+  Desktop N fallbacks, and a selected-window header without a clear desktop
+  identifier. Functional switching is accepted; window/desktop identification
+  needs a separate UI refinement. A consistent explicit desktop label for every
+  row and the selected header is a concrete next design direction, not an
+  implemented change.
+
+This checkpoint records acceptance and the open observations only. No app binary,
+bindings, preferences, saved layouts or Hammerspoon fallback changed. The owner
+reported pushing both implementation commits; both local repositories matched
+their tracked remotes before this documentation checkpoint. Accordion remains
+unported. Command+? and recovery-button behaviour after a focus change retain
+their separately unverified status from earlier records.
