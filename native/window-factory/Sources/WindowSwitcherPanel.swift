@@ -15,6 +15,7 @@ final class WindowSwitcherPanel: NSObject, NSWindowDelegate {
     private let position = NSTextField(labelWithString:"")
     private let scroll = NSScrollView()
     private var rows: [Int:NSButton] = [:]
+    private var selectedRow: Int?
     private var monitor: Any?
     private var showing = false, keyboardReady = false
     var choose: ((Int) -> Void)?
@@ -54,7 +55,7 @@ final class WindowSwitcherPanel: NSObject, NSWindowDelegate {
     func loading() {
         showing = true; keyboardReady = false
         desktopTitle.stringValue = "Window switcher"; appTitle.stringValue = "Collecting windows…"; title.stringValue = ""; position.stringValue = ""
-        preview.image = nil; rows = [:]; scroll.documentView = NSView()
+        preview.image = nil; rows = [:]; selectedRow = nil; scroll.documentView = NSView()
         if let screen = NSScreen.main ?? NSScreen.screens.first {
             let f = screen.visibleFrame; panel.setFrameOrigin(NSPoint(x:f.midX-390,y:f.midY-285))
         }
@@ -68,34 +69,51 @@ final class WindowSwitcherPanel: NSObject, NSWindowDelegate {
         guard records.indices.contains(selected) else { return }
         let groups = SwitcherDesktopGrouping.groups(records.map(\.desktopLocation))
         let displays = Set(records.map(\.display)).count>1
-        let height = CGFloat(records.count*48+groups.count*36)
-        let document = NSView(frame:NSRect(x:0,y:0,width:720,height:height)); rows = [:]
-        var offset: CGFloat = 0, selectedHeading = CGRect.zero
-        for group in groups {
-            let label = group.location.label(showDisplay:displays)
-            let header = NSTextField(labelWithString:"\(label)  ·  \(group.indices.count) \(group.indices.count == 1 ? "window" : "windows")")
-            header.font = .systemFont(ofSize:13,weight:.semibold)
-            header.textColor = group.location.isCurrent ? .controlAccentColor : .secondaryLabelColor
-            header.frame = NSRect(x:12,y:height-offset-29,width:700,height:25)
-            document.addSubview(header); offset += 36
-            if group.indices.contains(selected) { selectedHeading = header.frame }
-            for i in group.indices {
-                let record = records[i], text = record.title.replacingOccurrences(of:"\n",with:" ")
-                let button = NSButton(title:"  \(record.window.appName) — \(text.isEmpty ? "Untitled window" : text)",target:self,action:#selector(clickRow(_:)))
-                button.tag = i; button.isBordered = false; button.alignment = .left; button.font = .systemFont(ofSize:13)
-                button.cell?.lineBreakMode = .byTruncatingMiddle
-                button.toolTip = "\(label)\n\(record.window.appName)\n\(text)"
-                button.image = record.icon; button.imagePosition = .imageLeft; button.imageScaling = .scaleProportionallyDown
-                button.frame = NSRect(x:14,y:height-offset-46,width:700,height:44); offset += 48
-                button.wantsLayer = true; button.layer?.cornerRadius = 7
-                button.layer?.backgroundColor = (i == selected ? NSColor.controlAccentColor.withAlphaComponent(0.35) : .clear).cgColor
-                document.addSubview(button); rows[i] = button
+        // Records are fixed for an open picker. Retain its document and viewport
+        // while navigating; replacing the document resets scrolling on every key.
+        if rows.isEmpty {
+            let height = max(scroll.contentSize.height,CGFloat(records.count*48+groups.count*36))
+            let document = NSView(frame:NSRect(x:0,y:0,width:720,height:height)); rows = [:]
+            var offset: CGFloat = 0
+            for group in groups {
+                let label = group.location.label(showDisplay:displays)
+                let header = NSTextField(labelWithString:"\(label)  ·  \(group.indices.count) \(group.indices.count == 1 ? "window" : "windows")")
+                header.font = .systemFont(ofSize:13,weight:.semibold)
+                header.textColor = group.location.isCurrent ? .controlAccentColor : .secondaryLabelColor
+                header.frame = NSRect(x:12,y:height-offset-29,width:700,height:25)
+                document.addSubview(header); offset += 36
+                for i in group.indices {
+                    let record = records[i], text = record.title.replacingOccurrences(of:"\n",with:" ")
+                    let button = NSButton(title:"  \(record.window.appName) — \(text.isEmpty ? "Untitled window" : text)",target:self,action:#selector(clickRow(_:)))
+                    button.tag = i; button.isBordered = false; button.alignment = .left; button.font = .systemFont(ofSize:13)
+                    button.cell?.lineBreakMode = .byTruncatingMiddle
+                    button.toolTip = "\(label)\n\(record.window.appName)\n\(text)"
+                    button.image = record.icon; button.imagePosition = .imageLeft; button.imageScaling = .scaleProportionallyDown
+                    button.frame = NSRect(x:14,y:height-offset-46,width:700,height:44); offset += 48
+                    button.wantsLayer = true; button.layer?.cornerRadius = 7
+                    button.layer?.backgroundColor = NSColor.clear.cgColor
+                    document.addSubview(button); rows[i] = button
+                }
             }
+            scroll.documentView = document
+            scroll.contentView.scroll(to:NSPoint(x:0,y:max(0,height-scroll.contentSize.height)))
+            scroll.reflectScrolledClipView(scroll.contentView)
         }
-        scroll.documentView = document
-        if let row = rows[selected] {
-            let withHeader = row.frame.union(selectedHeading)
-            document.scrollToVisible(withHeader.height<=scroll.contentSize.height ? withHeader : row.frame)
+        if let previous = selectedRow { rows[previous]?.layer?.backgroundColor = NSColor.clear.cgColor }
+        rows[selected]?.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.35).cgColor
+        selectedRow = selected
+        if let row = rows[selected],let document = scroll.documentView {
+            // Move immediately and only far enough to expose the selected row.
+            // Pulling the group heading into view on each step causes extra travel.
+            let clip = scroll.contentView, visible = clip.bounds
+            var y = visible.minY
+            if row.frame.minY < visible.minY { y = row.frame.minY }
+            else if row.frame.maxY > visible.maxY { y = row.frame.maxY-visible.height }
+            y = max(0,min(y,max(0,document.bounds.height-visible.height)))
+            if y != visible.minY {
+                clip.scroll(to:NSPoint(x:visible.minX,y:y))
+                scroll.reflectScrolledClipView(clip)
+            }
         }
         let record = records[selected], group = groups.first{$0.indices.contains(selected)}
         desktopTitle.stringValue = record.desktopLocation.label(showDisplay:displays)
@@ -108,6 +126,6 @@ final class WindowSwitcherPanel: NSObject, NSWindowDelegate {
     func showPreview(_ image: NSImage) { preview.image = image }
     @objc private func clickRow(_ sender: NSButton) { choose?(sender.tag) }
     func windowDidResignKey(_ notification: Notification) { if showing && keyboardReady { dismiss?() } }
-    func hide() { showing = false; keyboardReady = false; panel.orderOut(nil); rows = [:]; scroll.documentView = NSView(); preview.image = nil }
+    func hide() { showing = false; keyboardReady = false; panel.orderOut(nil); rows = [:]; selectedRow = nil; scroll.documentView = NSView(); preview.image = nil }
     func stop() { hide(); if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
 }

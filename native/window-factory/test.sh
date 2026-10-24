@@ -44,3 +44,18 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     "$native_root/Sources/WindowSwitching.swift" "$native_root/Tests/SwitcherTests.swift" \
     -o "$native_root/.build/switcher-tests"
 "$native_root/.build/switcher-tests"
+
+# Exercise the real AppKit document/viewport without showing or controlling windows.
+xcrun --sdk macosx clang -fobjc-arc -Wall -Wextra -Werror \
+    -c "$native_root/Sources/Bridge.m" -o "$native_root/.build/panel-test-bridge.o"
+set --
+for source in "$native_root"/Sources/*.swift; do
+    [ "$(basename "$source")" = Main.swift ] || set -- "$@" "$source"
+done
+xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
+    -module-cache-path "$native_root/.build/ModuleCache" \
+    -import-objc-header "$native_root/Sources/Bridge.h" \
+    "$@" "$native_root/Tests/SwitcherPanelTests.swift" "$native_root/.build/panel-test-bridge.o" \
+    -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit \
+    -o "$native_root/.build/switcher-panel-tests"
+"$native_root/.build/switcher-panel-tests"

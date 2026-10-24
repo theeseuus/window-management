@@ -1005,3 +1005,34 @@ A targeted follow-up should retain the document and viewport while updating the
 selection highlight, scrolling only enough to expose a row outside the visible
 area. This checkpoint changes documentation only; no runtime, bindings, layouts,
 stash behaviour or Hammerspoon files are changed.
+
+
+### Build 18 minimal picker scrolling, 2026-10-24
+
+Arrow navigation now retains the picker document and row views throughout the
+open session. Rendering changes the selection highlight and selected-window
+header without rebuilding the scroll contents. The viewport remains still for
+a fully visible row; a row beyond its edge moves it immediately by only the
+amount needed to expose that row. Group headings are no longer pulled into
+view on every selection. Initial rendering starts at the top before revealing
+the initial selection, and closing clears the document for a fresh session.
+
+This fixes the document-reset path identified after the owner's build 17
+roulette-wheel scrolling report. Navigation mapping, selection, cross-Space
+discovery/activation, geometry, directional focus, stash and Hammerspoon fallback
+are unchanged. No private bridge or managed Hammerspoon file changes are included.
+
+The native suite passes, including 999 switching assertions and 127 new
+regression assertions against the actual AppKit picker document and viewport.
+Those checks retain document identity, verify no scrolling for visible rows,
+minimal upward/downward movement across group boundaries, wrapping and group
+jumps, repeat selection and short-list/session reset behaviour. The panel tests
+show no windows and control no real application windows. Repository validation
+and the signed production build pass.
+
+Before updating, the running reference confirmed zero session stashes. Build 18
+was installed at the existing Applications location and restarted. Settings
+confirm Accessibility and all four native groups remain enabled; strict
+signature verification passes and the six-layout catalog is byte-for-byte
+unchanged. Hammerspoon remains stopped. A physical arrow-scrolling and switching
+regression pilot is requested; its acceptance is pending.
