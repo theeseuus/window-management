@@ -533,3 +533,17 @@ centred half-width/full-height; Hyper+Return centres horizontally without
 resizing; Hyper+Shift+Return maximizes. These geometry commands do not create
 application windows. Plain Command+Return is not a geometry-controller binding;
 in the Window Factory library it is Establish. No bindings changed in this fix.
+
+### Build 10 physical geometry retest accepted, 2026-10-24
+
+The owner confirmed that window commands now respond quickly, thirds work,
+and both bracket width controls work from the centre and the other positions
+tried so far. This closes the reported build 9 responsiveness/bracket regression
+and the earlier first-press thirds issue in the normal keyboard path. Combined
+with the preceding physical geometry checks, the geometry group is accepted
+for continued use. This is scoped to the owner's tested cases, not a claim of
+exhaustive compatibility across every app and position. The owner also reported
+pushing the build 10 fix; the local branch matched its tracked remote before
+this acceptance record. No binary, shortcuts, settings or Hammerspoon files
+changed for this documentation checkpoint. Directional focus is the next group
+in the approved controller-port sequence; it has not been handed over yet.
