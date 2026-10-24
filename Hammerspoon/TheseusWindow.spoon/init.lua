@@ -1065,6 +1065,7 @@ function obj:bindHotkeys()
 
   end -- independent accordion ownership
 
+  if self.spaceMoveHotkeys ~= false then
   -- Spatial arrows:
   -- Control+Left/Right moves only the user (native macOS, not bound here).
   -- Hyper+Left/Right moves the focused window to an adjacent user Space,
@@ -1076,6 +1077,8 @@ function obj:bindHotkeys()
   hs.hotkey.bind(h, "right", function()
     self:moveFocusedWindowToAdjacentSpace(1)
   end)
+
+  end -- independent Space move ownership
 
   if self.geometryHotkeys ~= false then
   -- Hyper+Up = centred half-width/full-height; Hyper+Down = restore.

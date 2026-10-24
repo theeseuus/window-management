@@ -1,5 +1,5 @@
 // Query signatures/masks follow MIT-licensed Hammerspoon 1.1.1 spaces.
-// See native/space-helper/THIRD_PARTY_NOTICES.md. No Space mutation here.
+// See native/space-helper/THIRD_PARTY_NOTICES.md. Mutations are scoped below.
 #import "Bridge.h"
 #include <dlfcn.h>
 typedef int (*MainFn)(void);
@@ -349,4 +349,65 @@ BOOL WFSwitcherSelectSpace(CGDirectDisplayID display,uint64_t expectedSource,uin
     id hide=[[hideClass alloc] initWithSpaces:@[@(expectedSource)]];
     if(!set || !hide) return NO;
     return wfPerformSwitcherSpaceOperation(set) && wfPerformSwitcherSpaceOperation(hide);
+}
+
+// Production use of the isolated bridge move-and-follow proof. No legacy
+// SLSMoveWindowsToManagedSpace fallback or synthesized keyboard/mouse events.
+@interface NSObject (WFSpaceMoveInitializers)
+- (instancetype)initWithWindows:(NSArray *)windows spaceID:(uint64_t)space;
+@end
+BOOL WFSpaceMoveAvailable(void) {
+    load();
+    Class move=NSClassFromString(@"SLSBridgedMoveWindowsToManagedSpaceOperation");
+    Class set=NSClassFromString(@"SLSBridgedManagedDisplaySetCurrentSpaceOperation");
+    Class hide=NSClassFromString(@"SLSBridgedHideSpacesOperation");
+    return [move instancesRespondToSelector:NSSelectorFromString(@"initWithWindows:spaceID:")]
+        && [set instancesRespondToSelector:NSSelectorFromString(@"initWithDisplayIdentifier:spaceID:")]
+        && [hide instancesRespondToSelector:NSSelectorFromString(@"initWithSpaces:")];
+}
+BOOL WFMoveWindowToAdjacentSpace(AXUIElementRef window,pid_t pid,CGDirectDisplayID display,uint64_t source,uint64_t destination) {
+    if(!WFSpaceMoveAvailable()) return NO;
+    pid_t actual=0; uint64_t current=0; int kind=-1;
+    CGWindowID wid=WFWindowID(window);
+    if(!wid || AXUIElementGetPid(window,&actual)!=kAXErrorSuccess || actual!=pid
+        || !WFContext(display,&current,&kind) || kind!=0 || current!=source
+        || ![WFWindowSpaces(wid) isEqual:@[@(source)]]) return NO;
+    NSMutableArray *users=[NSMutableArray array];
+    for(NSDictionary *entry in WFSwitcherSpaces(display)) if([entry[@"kind"] intValue]==0) [users addObject:entry[@"id"]];
+    NSUInteger a=[users indexOfObject:@(source)],b=[users indexOfObject:@(destination)];
+    if(a==NSNotFound || b==NSNotFound || !(a+1==b || b+1==a)) return NO;
+    Class cls=NSClassFromString(@"SLSBridgedMoveWindowsToManagedSpaceOperation");
+    id operation=[[cls alloc] initWithWindows:@[@(wid)] spaceID:destination];
+    return operation && wfPerformSwitcherSpaceOperation(operation);
+}
+
+// Space movement owns its two arrows independently of all accepted groups.
+static EventHotKeyRef wfSpaceMoveKeys[2];
+static EventHandlerRef wfSpaceMoveHandler;
+static WFHotKeyCallback wfSpaceMoveCallback;
+static void *wfSpaceMoveContext;
+static OSStatus wfSpaceMoveEvent(EventHandlerCallRef next,EventRef event,void *context) {
+    (void)next; (void)context; EventHotKeyID key={0};
+    OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status!=noErr || key.signature!='WFSM' || key.id>=2 || !wfSpaceMoveCallback) return eventNotHandledErr;
+    wfSpaceMoveCallback(key.id,wfSpaceMoveContext); return noErr;
+}
+void WFUnregisterSpaceMoveHotKeys(void) {
+    for(unsigned i=0;i<2;i++) if(wfSpaceMoveKeys[i]) { UnregisterEventHotKey(wfSpaceMoveKeys[i]); wfSpaceMoveKeys[i]=NULL; }
+    if(wfSpaceMoveHandler) { RemoveEventHandler(wfSpaceMoveHandler); wfSpaceMoveHandler=NULL; }
+    wfSpaceMoveCallback=NULL; wfSpaceMoveContext=NULL;
+}
+int32_t WFRegisterSpaceMoveHotKeys(WFHotKeyCallback callback,void *context,uint32_t *failedIndex) {
+    WFUnregisterSpaceMoveHotKeys(); *failedIndex=0;
+    EventTypeSpec type={kEventClassKeyboard,kEventHotKeyPressed};
+    OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfSpaceMoveEvent,1,&type,NULL,&wfSpaceMoveHandler);
+    if(status!=noErr) return status;
+    wfSpaceMoveCallback=callback; wfSpaceMoveContext=context;
+    const UInt32 keys[]={123,124};
+    for(unsigned i=0;i<2;i++) {
+        EventHotKeyID key={'WFSM',i};
+        status=RegisterEventHotKey(keys[i],cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSpaceMoveKeys[i]);
+        if(status!=noErr) { *failedIndex=i; WFUnregisterSpaceMoveHotKeys(); return status; }
+    }
+    return noErr;
 }

@@ -42,3 +42,8 @@ BOOL WFSwitcherSelectSpace(CGDirectDisplayID display,uint64_t expectedSource,uin
 
 int32_t WFRegisterAccordionHotKey(WFHotKeyCallback _Nonnull callback,void * _Nonnull context);
 void WFUnregisterAccordionHotKey(void);
+
+BOOL WFSpaceMoveAvailable(void);
+BOOL WFMoveWindowToAdjacentSpace(AXUIElementRef _Nonnull window,pid_t pid,CGDirectDisplayID display,uint64_t source,uint64_t destination);
+int32_t WFRegisterSpaceMoveHotKeys(WFHotKeyCallback _Nonnull callback,void * _Nonnull context,uint32_t * _Nonnull failedIndex);
+void WFUnregisterSpaceMoveHotKeys(void);

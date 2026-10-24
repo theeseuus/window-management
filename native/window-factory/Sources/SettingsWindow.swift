@@ -23,6 +23,10 @@ final class FactoryPreferences {
         get { defaults.bool(forKey:"nativeStashEnabled") }
         set { defaults.set(newValue,forKey:"nativeStashEnabled") }
     }
+    var spaceMoveEnabled: Bool {
+        get { defaults.bool(forKey:"nativeSpaceMoveEnabled") }
+        set { defaults.set(newValue,forKey:"nativeSpaceMoveEnabled") }
+    }
     var accordionEnabled: Bool {
         get { defaults.bool(forKey:"nativeAccordionEnabled") }
         set { defaults.set(newValue,forKey:"nativeAccordionEnabled") }
@@ -43,6 +47,9 @@ final class SettingsWindow: NSObject {
     let preferences: FactoryPreferences
     let store: LayoutStore
     var changed: (() -> Void)?
+    weak var spaceMove: DirectSpaceMoveControls?
+    private let spaceMoveEnabled = NSButton(checkboxWithTitle:"Enable native Space move-and-follow shortcuts",target:nil,action:nil)
+    private let spaceMoveStatus = NSTextField(wrappingLabelWithString:"")
     weak var accordion: DirectAccordionControls?
     private let accordionEnabled = NSButton(checkboxWithTitle:"Enable native accordion shortcut",target:nil,action:nil)
     private let accordionStatus = NSTextField(wrappingLabelWithString:"")
@@ -65,12 +72,14 @@ final class SettingsWindow: NSObject {
     private var monitor: Any?
     init(store: LayoutStore,preferences: FactoryPreferences) {
         self.store = store; self.preferences = preferences
-        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:1230),
+        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:1330),
             styleMask:[.titled,.closable],backing:.buffered,defer:false)
         super.init()
         window.title = "Window Factory Settings"; window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
         let general = Self.heading("General")
+        spaceMoveEnabled.target = self; spaceMoveEnabled.action = #selector(changeSpaceMove)
+        spaceMoveStatus.font = .systemFont(ofSize:11); spaceMoveStatus.textColor = .secondaryLabelColor
         accordionEnabled.target = self; accordionEnabled.action = #selector(changeAccordion)
         accordionStatus.font = .systemFont(ofSize:11); accordionStatus.textColor = .secondaryLabelColor
         switcherEnabled.target = self; switcherEnabled.action = #selector(changeSwitcher)
@@ -84,7 +93,7 @@ final class SettingsWindow: NSObject {
         focusKeys.font = .systemFont(ofSize:12)
         geometryEnabled.target = self; geometryEnabled.action = #selector(changeGeometry)
         geometryStatus.font = .systemFont(ofSize:11); geometryStatus.textColor = .secondaryLabelColor
-        let geometryKeys = NSTextField(wrappingLabelWithString:"Hold Tab for Hyper (⌃⌥⌘).\n− / =  Size / position cycles; add Shift to reverse\n2 / 3 / 4 / 8  Halves / thirds / quarters / eighths; Shift reverses\n↑ / ↓  Centred half / previous frame     [ / ]  Narrow / widen\n↩  Centre horizontally     ⇧↩  Maximize     D  Minimize\nSpace controls remain in Hammerspoon during the staged port.")
+        let geometryKeys = NSTextField(wrappingLabelWithString:"Hold Tab for Hyper (⌃⌥⌘).\n− / =  Size / position cycles; add Shift to reverse\n2 / 3 / 4 / 8  Halves / thirds / quarters / eighths; Shift reverses\n↑ / ↓  Centred half / previous frame     [ / ]  Narrow / widen\n↩  Centre horizontally     ⇧↩  Maximize     D  Minimize\nSpace movement has its own native pilot below.")
         geometryKeys.font = .systemFont(ofSize:12)
         for button in [hints,floating] { button.target = self; button.action = #selector(changePreferences) }
         let keys = NSTextField(wrappingLabelWithString:
@@ -105,6 +114,7 @@ final class SettingsWindow: NSObject {
             Self.heading("Stash / restore — pilot"),stashEnabled,stashStatus,
             Self.heading("Window switching — pilot"),switcherEnabled,switcherStatus,
             Self.heading("Accordion — pilot"),accordionEnabled,accordionStatus,
+            Self.heading("Space move-and-follow — pilot"),spaceMoveEnabled,spaceMoveStatus,
             Self.heading("Access and storage"),access,permission,location,folder])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -125,6 +135,14 @@ final class SettingsWindow: NSObject {
     }
     static func heading(_ text: String) -> NSTextField {
         let field = NSTextField(labelWithString:text); field.font = .systemFont(ofSize:14,weight:.semibold); return field
+    }
+    @objc func changeSpaceMove() {
+        guard let spaceMove else { return }
+        if spaceMoveEnabled.state == .on {
+            do { try spaceMove.enable() }
+            catch { let alert = NSAlert(); alert.messageText = "Space movement was not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
+        } else { spaceMove.disable() }
+        refresh()
     }
     @objc func changeAccordion() {
         guard let accordion else { return }
@@ -168,6 +186,9 @@ final class SettingsWindow: NSObject {
         refresh()
     }
     func refresh() {
+        spaceMoveEnabled.state = spaceMove?.active == true ? .on : .off
+        spaceMoveEnabled.isEnabled = spaceMove != nil
+        spaceMoveStatus.stringValue = spaceMove?.lastResult ?? "Unavailable in preview."
         accordionEnabled.state = accordion?.active == true ? .on : .off
         accordionEnabled.isEnabled = accordion != nil
         accordionStatus.stringValue = accordion?.lastResult ?? "Unavailable in preview."

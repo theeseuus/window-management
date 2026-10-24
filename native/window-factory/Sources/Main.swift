@@ -5,6 +5,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     var library: LibraryWindow?
     var settings: SettingsWindow?
     var shortcutReference: ShortcutReferenceWindow?
+    var spaceMove: DirectSpaceMoveControls?
     var accordion: DirectAccordionControls?
     var switcher: DirectSwitcherControls?
     var stash: DirectStashControls?
@@ -40,7 +41,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             settings?.changed = { [weak self] in self?.library?.applyPreferences() }
             if !preview {
                 let controls = DirectWindowControls(preferences:preferences); geometry = controls
-                controls.workspaceBusy = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil }
+                controls.workspaceBusy = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil || self?.spaceMove?.isMoving == true }
                 controls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
                 settings?.geometry = controls
                 controls.restorePreference()
@@ -57,7 +58,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 switcherControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
                 settings?.switcher = switcherControls; switcherControls.restorePreference()
                 let pickerOrWorkspaceBusy: () -> Bool = { [weak self] in
-                    self?.library?.task != nil || self?.library?.frozen != nil || self?.switcher?.isOpen == true
+                    self?.library?.task != nil || self?.library?.frozen != nil || self?.switcher?.isOpen == true || self?.spaceMove?.isMoving == true
                 }
                 controls.workspaceBusy = pickerOrWorkspaceBusy
                 focusControls.workspaceBusy = pickerOrWorkspaceBusy
@@ -67,6 +68,11 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 accordionControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
                 settings?.accordion = accordionControls; shortcutReference?.accordion = accordionControls
                 accordionControls.restorePreference()
+                let spaceControls = DirectSpaceMoveControls(preferences:preferences); spaceMove = spaceControls
+                spaceControls.workspaceBusy = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil || self?.switcher?.isOpen == true }
+                spaceControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
+                settings?.spaceMove = spaceControls; shortcutReference?.spaceMove = spaceControls
+                spaceControls.restorePreference()
                 shortcutReference?.switcher = switcherControls
                 shortcutReference?.geometry = controls; shortcutReference?.focus = focusControls; shortcutReference?.stash = stashControls
             }
@@ -120,7 +126,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main

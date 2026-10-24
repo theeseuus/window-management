@@ -110,5 +110,14 @@ for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","accor
 for _,key in ipairs({"h","j","k","l","s","w","left","right"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","accordion handoff retains " .. key) end
 bindings = {}; spoon.accordionHotkeys = true; spoon:bindHotkeys()
 equal(type(bindings["ctrl+alt+cmd+shift:s"]),"function","fallback restores accordion")
+bindings = {}; spoon.spaceMoveHotkeys = false; spoon:bindHotkeys()
+equal(bindings["ctrl+alt+cmd:left"],nil,"native Space handoff releases left")
+equal(bindings["ctrl+alt+cmd:right"],nil,"native Space handoff releases right")
+for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","Space handoff retains geometry " .. key) end
+for _,key in ipairs({"h","j","k","l","s","w"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","Space handoff retains " .. key) end
+equal(type(bindings["ctrl+alt+cmd+shift:s"]),"function","Space handoff retains accordion")
+bindings = {}; spoon.spaceMoveHotkeys = true; spoon:bindHotkeys()
+equal(type(bindings["ctrl+alt+cmd:left"]),"function","fallback restores left")
+equal(type(bindings["ctrl+alt+cmd:right"]),"function","fallback restores right")
 hs = originalHS
 print(string.format("window_filter_lifecycle_spec: %d assertions passed", assertions))

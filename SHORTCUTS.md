@@ -186,3 +186,9 @@ Settings switch owns that shortcut; the managed loader sets
 binding. The portable fallback algorithm and default binding remain available.
 See the [native pilot record](native/window-factory/README.md) for scope and
 acceptance, and the chezmoi keyboard reference for machine ownership.
+
+The personal native Space-movement pilot retains `Hyper + Left/Right`. Its
+independent Settings switch owns only those arrows; the managed loader sets
+`TheseusWindow.spaceMoveHotkeys = false`. The original Spoon transport remains
+the fallback. Native `Control + Left/Right` still moves only the user. See the
+[native pilot record](native/window-factory/README.md) for verification and scope.

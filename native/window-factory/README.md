@@ -1153,3 +1153,55 @@ issue. Build 20 remains installed. This checkpoint changes documentation only;
 application code, shortcuts, preferences, saved layouts and the Hammerspoon
 fallback remain unchanged. Space movement, the Space indicator and launcher/
 startup ownership remain the migration work listed in the keyboard reference.
+
+
+### Build 21 independent Space move-and-follow pilot, 2026-10-24
+
+Tab+Left/Right now has a separate native controller, Settings switch, persisted
+preference and shortcut-reference section. It selects the non-wrapping adjacent
+ordinary desktop in the focused window's display order, skipping full-screen
+Spaces. The focused window must be standard, visible, unminimized, not full-screen,
+and exclusively on the current ordinary desktop. Credential/own/Hammerspoon apps
+and ambiguous membership are rejected.
+
+The transport ports the successful isolated WMBridge proof, not the Hammerspoon
+mouse-drag/Control-arrow workaround. It dispatches one exact-window bridge move,
+requires two consecutive destination-membership samples before following, then
+uses the existing set-current/hide-origin bridge pair. Two visible-desktop
+samples must confirm the moved window is onscreen and sampled source windows
+are hidden. Only then does it restore the original frame if needed and request/
+verify exact-window focus. All waits are bounded; topology, identity, foreground
+app and source/destination consistency are checked throughout. An incomplete
+move/follow/focus is reported truthfully; no automatic rollback, alternate
+transport, input synthesis or background polling is added. Private APIs remain
+conditional on the installed OS; dispatch is never treated as success.
+
+The new bridge registration and operation are independent. The accepted
+geometry, directional-focus, stash, switcher and accordion implementation files
+are unchanged. Main integration prevents those commands from acting during a
+Space transaction, and prevents movement while the picker or library operation
+is active. Outside that transaction their behaviour is unchanged. The portable
+Spoon retains its original Space algorithm and default keys; the managed loader
+sets `spaceMoveHotkeys = false` to release only these two arrows. Fallback:
+disable native Space movement, set that managed flag true, apply and reload
+Hammerspoon. Hammerspoon was not launched or reloaded during the handoff.
+
+Validation passes: 45 new movement assertions cover boundaries, native ordering,
+full-screen skipping, ambiguous membership, exactly one move/follow dispatch,
+two-sample verification, bounded timeouts, rejected dispatch, cancellation,
+user-change aborts and focus failure. All prior native suites pass, including
+999 switching, 127 viewport and 46 accordion assertions. The Spoon lifecycle
+suite passes 229 assertions, proving independent Space-key release/restoration
+while retaining the accepted groups. Repository validation and signed build pass.
+
+Installed build 21 retains Accessibility, all five earlier native groups, the
+stable app identity and byte-for-byte six-layout catalog. Native Space movement
+was enabled as the sixth group. Zero session stashes were confirmed before
+restart. A separate disposable Space Move Test app is open for the physical
+round trip, original frame/focus, native Control-arrow and accepted-control
+regression pilot. Physical acceptance remains pending; the normal validation
+suite does not move real windows or switch desktops.
+
+After this pilot, the remaining Hammerspoon migration work is the menu-bar Space
+indicator and native launcher/startup ownership. The Lua library and original
+controls remain retained fallbacks, not missing native layout features.

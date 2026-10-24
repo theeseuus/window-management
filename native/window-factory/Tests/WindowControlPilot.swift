@@ -26,6 +26,10 @@ import AppKit
         appMenu.addItem(withTitle:"Quit Window Control Test",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
         item.submenu = appMenu; menu.addItem(item); NSApp.mainMenu = menu
         self.window = window; window.center()
+        if Bundle.main.object(forInfoDictionaryKey:"WFSpacePilot") as? Bool == true {
+            window.title = "Window Factory — Disposable Space Move Test"
+            text.stringValue = "Disposable Space move-and-follow test\n\nClick this window, then hold Tab and press Right once. It should move to the next ordinary desktop and take you with it, keeping its frame and focus.\n\nUse Tab+Left to return. If already at the last desktop, start Left and return Right. There is no wrap at the ends.\n\nControl+Left/Right should still move only you.\nClose this test window when finished. No documents or terminal sessions are involved."
+        }
         if (CommandLine.arguments.contains("--accordion") || Bundle.main.object(forInfoDictionaryKey:"WFAccordionPilot") as? Bool == true),let screen = NSScreen.main {
             window.title = "Accordion Test — Anchor (leave focused)"
             text.stringValue = "Accordion pilot: three disposable windows in this app.\n\nClick this anchor, then hold Tab + Shift and press S.\nThe anchor must stay still. The other two windows should match its size and fan right/down by 28 × 22 points per step.\n\nRepeat to check stability; try geometry, focus, stash/restore and switching afterwards.\nQuit this test app when finished. No documents or terminal sessions are involved."

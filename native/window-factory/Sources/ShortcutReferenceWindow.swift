@@ -6,6 +6,7 @@ final class ShortcutReferenceWindow: NSObject {
     private let preferences: FactoryPreferences
     private let text = NSTextView()
     private let restore = NSButton(title:"Restore last stashed window",target:nil,action:nil)
+    weak var spaceMove: DirectSpaceMoveControls?
     weak var accordion: DirectAccordionControls?
     weak var geometry: DirectWindowControls?
     weak var focus: DirectFocusControls?
@@ -77,8 +78,12 @@ final class ShortcutReferenceWindow: NSObject {
           Anchor stays unchanged; other windows match its size, offset 28 × 22.
           Current ordinary desktop/display only.
 
+        SPACE MOVE AND FOLLOW  [\(state(spaceMove?.active == true))]
+          Hyper + ← / →     Move the focused window to the adjacent desktop and follow
+          Same display; ordinary desktops only; no wrapping at the ends.
+          Original frame and exact window focus are verified.
+
         REMAINING HAMMERSPOON CONTROLS  [\(hammerspoon)]
-          Hyper + ← / →     Move window to adjacent Space and follow
           Hyper + R         Open native Window Factory
           Hyper + ⇧R        Open Hammerspoon layout fallback
           Control + ← / →   macOS: switch desktop without moving a window
