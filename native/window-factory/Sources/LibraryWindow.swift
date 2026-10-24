@@ -25,6 +25,14 @@ final class PreviewView: NSView {
 }
 
 @MainActor
+final class LayoutTableView: NSTableView {
+    var menuForRow: ((Int) -> NSMenu?)?
+    override func menu(for event: NSEvent) -> NSMenu? {
+        menuForRow?(row(at:convert(event.locationInWindow,from:nil)))
+    }
+}
+
+@MainActor
 final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSMenuItemValidation {
     let window: NSWindow
     let store: LayoutStore
@@ -34,13 +42,14 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     var onShortcuts: (() -> Void)?
     var onSettings: (() -> Void)?
     let shortcutHints = NSTextField(labelWithString:"↑↓ Select   ↩ Restore   ⌘↩ Establish   ⌘N Capture   ⌘F Search   ⎋ Cancel/Close")
-    let search = NSSearchField(), table = NSTableView(), drawing = PreviewView()
+    let search = NSSearchField(), table = LayoutTableView(), drawing = PreviewView()
     let status = NSTextField(wrappingLabelWithString:"")
     let name = NSTextField(), nameLabel = NSTextField(labelWithString:"Layout name")
     let save = NSButton(title:"Save",target:nil,action:nil)
     let capture = NSButton(title:"Capture…",target:nil,action:nil)
     let restore = NSButton(title:"Restore",target:nil,action:nil)
     let establish = NSButton(title:"Establish here",target:nil,action:nil)
+    let delete = NSButton(title:"Delete…",target:nil,action:nil)
     let cancel = NSButton(title:"Cancel",target:nil,action:nil)
     let shortcuts = NSButton(title:"Shortcuts…",target:nil,action:nil)
     var filtered: [Recipe] = [], frozen: Recipe?, task: Task<Void,Never>?, monitor: Any?
@@ -60,6 +69,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         let column = NSTableColumn(identifier:NSUserInterfaceItemIdentifier("layout"))
         column.title = "Layouts"; table.addTableColumn(column); table.headerView = nil
         table.rowHeight = 48; table.dataSource = self; table.delegate = self
+        table.menuForRow = { [weak self] row in self?.contextMenu(for:row) }
         table.target = self; table.doubleAction = #selector(restoreLayout)
         let scroll = NSScrollView(); scroll.documentView = table; scroll.hasVerticalScroller = true
         drawing.wantsLayer = true; drawing.layer?.cornerRadius = 8
@@ -68,7 +78,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         drawing.widthAnchor.constraint(equalTo:split.widthAnchor,multiplier:0.45).isActive = true
         split.heightAnchor.constraint(greaterThanOrEqualToConstant:240).isActive = true
         for (button,action) in [(capture,#selector(startCapture)),(restore,#selector(restoreLayout)),
-                                (establish,#selector(establishLayout)),(save,#selector(saveCapture)),(cancel,#selector(cancelAction))] {
+                                (establish,#selector(establishLayout)),(delete,#selector(deleteLayout)),(save,#selector(saveCapture)),(cancel,#selector(cancelAction))] {
             button.target = self; button.action = action; button.bezelStyle = .rounded
         }
         let permission = NSButton(title:"Settings…  ⌘,",target:self,action:#selector(openSettings))
@@ -77,7 +87,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         name.placeholderString = "Name the captured layout"; name.target = self; name.action = #selector(saveCapture)
         let naming = NSStackView(views:[nameLabel,name,save,cancel]); naming.orientation = .horizontal
         name.widthAnchor.constraint(greaterThanOrEqualToConstant:240).isActive = true
-        let buttons = NSStackView(views:[capture,restore,establish]); buttons.spacing = 8
+        let buttons = NSStackView(views:[capture,restore,establish,delete]); buttons.spacing = 8
         let tools = NSStackView(views:[permission,shortcuts]); tools.spacing = 8
         shortcutHints.font = .systemFont(ofSize:11); shortcutHints.textColor = .secondaryLabelColor
         let stack = NSStackView(views:[search,split,naming,buttons,status,tools])
@@ -110,6 +120,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         shortcutHints.isHidden = true
         let reference = ShortcutDefinition.all.first{$0.id == "library.1"}!
         shortcuts.title = preferences.showShortcutHints ? "Shortcuts…  " + preferences.shortcuts.chord(reference).actionHint : "Shortcuts…"
+        delete.title = preferences.showShortcutHints ? "Delete…  ⌘⌫" : "Delete…"
         capture.title = preferences.showShortcutHints ? "Capture…  ⌘N" : "Capture…"
         restore.title = preferences.showShortcutHints ? "Restore  ↩" : "Restore"
         establish.title = preferences.showShortcutHints ? "Establish here  ⌘↩" : "Establish here"
@@ -136,10 +147,23 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         let access = !preview && AXIsProcessTrusted(), idle = task == nil && frozen == nil
         capture.isEnabled = access && idle; restore.isEnabled = access && idle && selected != nil
         establish.isEnabled = access && idle && selected != nil
+        delete.isEnabled = !preview && idle && selected != nil
         name.isHidden = frozen == nil; nameLabel.isHidden = frozen == nil; save.isHidden = frozen == nil
         save.isEnabled = !preview && frozen != nil && task == nil
         cancel.isHidden = task == nil && frozen == nil
         search.isEnabled = task == nil && frozen == nil
+    }
+    func contextMenu(for row: Int) -> NSMenu? {
+        guard !preview, task == nil, frozen == nil, filtered.indices.contains(row) else { return nil }
+        table.selectRowIndexes(IndexSet(integer:row),byExtendingSelection:false)
+        drawing.recipe = selected; updateButtons()
+        let menu = NSMenu()
+        for (title,action) in [("Restore",#selector(restoreLayout)),("Establish here",#selector(establishLayout)),("Delete…",#selector(deleteLayout))] {
+            if action == #selector(deleteLayout) { menu.addItem(.separator()) }
+            let item = menu.addItem(withTitle:title,action:action,keyEquivalent:"")
+            item.target = self
+        }
+        return menu
     }
     func reload(select wanted: String? = nil) {
         let query = search.stringValue.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -240,14 +264,14 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     }
     @objc func deleteLayout() {
         guard !preview, task == nil, frozen == nil, let recipe = selected else { return }
-        if confirm("Delete “\(recipe.name)”?",detail:"The previous native catalog copy is retained for recovery.") {
+        if confirm("Delete “\(recipe.name)”?",detail:"The previous catalog copy is retained for recovery.",actionTitle:"Delete") {
             do { try store.delete(recipe.name); reload(); status.stringValue = "Layout deleted." }
             catch { status.stringValue = error.localizedDescription }
         }
     }
-    func confirm(_ message: String,detail: String) -> Bool {
+    func confirm(_ message: String,detail: String,actionTitle: String = "Continue") -> Bool {
         let alert = NSAlert(); alert.messageText = message; alert.informativeText = detail
-        alert.addButton(withTitle:"Continue"); alert.addButton(withTitle:"Cancel")
+        alert.addButton(withTitle:actionTitle); alert.addButton(withTitle:"Cancel")
         return alert.runModal() == .alertFirstButtonReturn
     }
     @objc func showReport() {

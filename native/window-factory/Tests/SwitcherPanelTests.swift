@@ -84,6 +84,23 @@ import AppKit
         dockPreferences.showDockIcon = true
         check(FactoryPreferences(defaults:dockDefaults).showDockIcon,"Dock visibility restores independently")
         let settingsStore = try LayoutStore(url:URL(fileURLWithPath:NSTemporaryDirectory()).appendingPathComponent("wf-settings-\(UUID().uuidString).json"))
+        let uiRegistry = AdapterRegistry(schemaVersion:1,adapters:[])
+        let layoutUI = LibraryWindow(store:settingsStore,registry:uiRegistry,preview:false,preferences:dockPreferences)
+        let rowA = Recipe(name:"A",capturedAt:"fixture",windows:[])
+        let rowB = Recipe(name:"B",capturedAt:"fixture",windows:[])
+        layoutUI.filtered = [rowA,rowB]; layoutUI.table.reloadData()
+        layoutUI.table.selectRowIndexes(IndexSet(integer:0),byExtendingSelection:false)
+        let rowMenu = layoutUI.contextMenu(for:1)!
+        check(layoutUI.selected?.name == "B","context menu selects the clicked row, not the prior selection")
+        check(rowMenu.items.filter{!$0.isSeparatorItem}.map(\.title) == ["Restore","Establish here","Delete…"],"layout context menu exposes existing actions")
+        check(rowMenu.items.last?.action == #selector(LibraryWindow.deleteLayout) && rowMenu.items.last?.target === layoutUI,"context Delete uses existing confirmation path")
+        check(layoutUI.delete.action == #selector(LibraryWindow.deleteLayout) && layoutUI.delete.isEnabled,"visible Delete uses same action without requiring Accessibility")
+        check(layoutUI.contextMenu(for:-1) == nil && layoutUI.selected?.name == "B","blank right click cannot target an old selection")
+        layoutUI.frozen = rowA; layoutUI.updateButtons()
+        check(!layoutUI.delete.isEnabled && layoutUI.contextMenu(for:0) == nil,"capture naming prevents delete and context actions")
+        layoutUI.frozen = nil; layoutUI.table.deselectAll(nil); layoutUI.updateButtons()
+        check(!layoutUI.delete.isEnabled,"Delete disabled without selection")
+        check(settingsStore.catalog.recipes.isEmpty,"menu tests do not mutate catalogs")
         let settings = SettingsWindow(store:settingsStore,preferences:FactoryPreferences())
         settings.refresh(); settings.window.contentView!.layoutSubtreeIfNeeded()
         let settingsTabs = settings.window.contentView!.subviews.compactMap{$0 as? NSTabView}.first!

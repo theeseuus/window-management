@@ -50,9 +50,8 @@ Remaining verification and polish, before adding a new feature:
 - Review deliberate, consistent visible stash edges. The current native command
   requests a right-edge stash and accepts macOS constraints; it does not promise
   a chosen visible strip width or provide a left/right stash selector.
-- Compare the old layout row thumbnails/app icons and right-click actions with
-  the native list/selected preview. The old Restore/Establish/Delete context menu
-  has not been ported; these operations are already available by buttons/menus/keys.
+- Compare the old layout row thumbnails/app icons with the native list/selected
+  preview. Build 33 adds the Restore/Establish/Delete right-click menu.
 
 Deferred feature choices, with none selected by this review:
 
@@ -91,9 +90,9 @@ or key release. It does not request Input Monitoring or disable controller group
 Registration changes preserve callbacks and session state; rejected drafts roll
 back and are not persisted. Partial rollback failures are reported explicitly.
 
-Import/Export/Last Report moved to Settings → Layouts. Delete remains in the
-Layout menu and Command+Delete. General contains Accessibility status and its settings link; About contains app/version diagnostics.
-The library keeps Capture, Restore, Establish, Settings and Shortcuts; permanent
+Import/Export/Last Report live in Settings → Layouts. Delete is available by its
+library button, row context menu, Layout menu and Command+Delete. General contains Accessibility status and its settings link; About contains app/version diagnostics.
+The library keeps Capture, Restore, Establish, Delete, Settings and Shortcuts; permanent
 instruction footers and internal pilot labels are removed. Switcher grouping,
 navigation and window-control primitives are unchanged.
 
@@ -216,7 +215,9 @@ optional and initially off; a quit app must be reopened from the Dock/Applicatio
 - Search layouts/applications, select with arrows, preview normalized outlines;
   Return restores existing windows, Command–Return establishes missing ones,
   Escape cancels an operation/capture or closes the library. Double-click
-  restores; Command–Delete requests confirmed deletion. No context menu yet.
+  restores; Command–Delete requests confirmed deletion. Right-click a layout for
+  Restore, Establish here or Delete; the menu targets the clicked row. Blank
+  space has no layout context menu, and busy/capture states suppress it.
 - Save with explicit replacement confirmation, validated import/merge, export,
   confirmed deletion and an in-memory last report. Save atomically, retain a
   previous catalog, reject an observed conflicting on-disk update.
@@ -362,3 +363,32 @@ reports its selection without changing it. `--apply` uses the identical guarded
 maintenance path used by the installer. An interrupted run may leave a lock;
 inspect the owning process before deliberately removing that lock. There is no
 automatic lock stealing or age-based deletion.
+
+
+## Disposable test-app cleanup and library actions (build 33)
+
+On 2026-10-25 the owner requested quitting both disposable test apps and removing
+their generated bundles. Window Control Test and Space Move Test quit normally;
+their exact bundles under the former `~/.cache/window-factory-native/geometry-pilot`
+and `space-pilot` directories were removed only after their processes exited.
+`Tests/WindowControlPilot.swift` and `Tests/build-pilot.sh` remain available for
+rebuilding. Existing saved recipes, including any test-app slots, are preserved.
+
+The library now exposes a Delete button and row-specific Restore, Establish here
+and Delete context actions. All use the existing guarded operation methods.
+Deletion still asks for confirmation; the confirming action is explicitly named
+Delete. Right-click selects the clicked row; a blank click cannot act on an old
+selection. Deletion does not require Accessibility, but is disabled for no
+selection, preview, capture naming and in-flight operations. The existing menu
+and Command+Delete remain available. No geometry/focus/stash/switcher/accordion/
+Space implementation or fallback changes are part of this UI change.
+
+
+Build 33 passed the full native suite (209 AppKit assertions), repository
+validation and strict installed-signature verification. The live row-menu test
+changed selection from the pilot layout to Codex and opened confirmation naming
+Codex; Cancel preserved it. The visible Delete button opened the same confirmation
+and was also cancelled. Both current/previous catalog hashes and app-owned
+settings hashes remained unchanged. The live CLI confirmed Accessibility and
+Agent access remained enabled. No saved layout was deleted during verification.
+The successful signed update retained only backup builds 32 and 31.
