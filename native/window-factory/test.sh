@@ -12,6 +12,7 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     "$native_root/Tests/StoreTests.swift" -o "$native_root/.build/store-tests"
 "$native_root/.build/store-tests"
 mise exec -- node "$native_root/Tests/install-tests.cjs"
+mise exec -- node "$native_root/Tests/data-migration-tests.cjs"
 repo_root=$(CDPATH='' cd -- "$native_root/../.." && pwd)
 mise exec -- lua "$native_root/Tests/geometry-oracle.lua" "$repo_root" > "$native_root/.build/geometry-oracle.json"
 xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \

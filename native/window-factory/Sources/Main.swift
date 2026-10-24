@@ -22,9 +22,15 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             let args = CommandLine.arguments
             let preview = args.contains("--preview")
             let dataIndex = args.firstIndex(of:"--data-dir")
-            // Compatibility path preserves existing layouts and install backups.
+            // Product data location; refuse a silent empty store when an old installation needs migration.
             let directory = dataIndex.flatMap { args.indices.contains($0+1) ? args[$0+1] : nil }
-                ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/share/window-factory-native").path
+                ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/share/window-factory").path
+            if dataIndex == nil && !preview {
+                let old = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/share/window-factory-native")
+                guard !FileManager.default.fileExists(atPath:old.path) else {
+                    throw FactoryError("Legacy Window Factory data exists. Quit and run the data-folder migration before continuing; no catalog was opened.")
+                }
+            }
             let store = try LayoutStore(url:URL(fileURLWithPath:directory).appendingPathComponent("layouts.json"))
             guard let registryURL = Bundle.main.url(forResource:"adapters",withExtension:"json") else { throw FactoryError("Bundled adapter registry missing.") }
             let registry = try JSONDecoder().decode(AdapterRegistry.self,from:Data(contentsOf:registryURL)); try registry.validate()

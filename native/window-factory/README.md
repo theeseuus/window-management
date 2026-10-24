@@ -21,7 +21,7 @@ and accepted in Window Factory. No core controller group remains to port.
 | Accordion | Accepted, with anchor frontmost and ordered stacking |
 | Space move-and-follow | Accepted; rapid repeated presses can be ignored while a move is verifying |
 | Menu-bar Space badge and app access | Accepted |
-| Library launcher, Dock visibility, optional login startup | Tab+R and Dock visibility accepted; actual login startup remains untested and off |
+| Library launcher, Dock visibility, optional login startup | Tab+R and Dock visibility accepted; actual login startup remains untested; Settings observed enabled on 2026-10-25 |
 | Capture, Restore, Establish, repeat without duplicates | Accepted Rex/Safari/Codex desktop pilots; all 16 adapters shipped, broader live coverage remains |
 | Configurable keybindings and reference | Accepted; 31 global commands, Tab+/ toggles reference |
 | Agent CLI | Read-only/off-switch checks and live Rex Capture/Restore/Establish/repeat passed; see [CLI.md](CLI.md) |
@@ -41,7 +41,8 @@ Remaining verification and polish, before adding a new feature:
   native compatibility for every entry. Include failure/cancellation cases.
 - Validate multiple displays, display changes and full-screen/unsupported-Space
   rejection in a separate harmless pilot.
-- Test start at login only when deliberately enabled; it is currently off.
+- Test actual sign-in startup separately. Settings was observed enabled on
+  2026-10-25; the migration did not change its registration.
 - Review rapid-repeat Space movement responsiveness without weakening focus,
   membership or intervening-input checks.
 - Keep Rex startup movement as a known visual limitation; verified final frames
@@ -63,11 +64,7 @@ Deferred feature choices, with none selected by this review:
 - **Application state:** browser URLs, terminal commands and selected chats.
 - **Coordinated animation:** presentation after reliable final placement.
 - **Distribution:** notarization/updating beyond the current signed local installer.
-- **Data-folder naming:** a coordinated move to `~/.local/share/window-factory`
-  is possible, but is not part of this documentation/output cleanup. Update app
-  and installer defaults together, stop the app with no stashes/jobs, preserve
-  catalog/previous catalog/backups, reject conflicting old/new stores, then verify
-  restart, CLI, layouts and a signed update. Keep the bundle ID/signing identity.
+
 
 Implementation and dated pilot receipts are preserved in
 [development history](DEVELOPMENT.md); the [original transition plan](../../docs/native-window-factory.md)
@@ -103,9 +100,9 @@ navigation and window-control primitives are unchanged.
 ## Stable build, installation and updates
 
 The local app lives at `/Applications/Window Factory.app`. Native layouts
-live at `~/.local/share/window-factory-native/layouts.json`. This compatibility
-directory remains stable to preserve layouts and backups. The separate bundle
-ID `local.windowfactory.native` preserves preferences and Accessibility identity;
+live at `~/.local/share/window-factory/layouts.json`. Build 32 migrated the
+complete former `window-factory-native` directory, including installer backups. The separate
+bundle ID `local.windowfactory.native` preserves preferences and Accessibility identity;
 changing the data folder does not require changing that bundle ID. The first stable
 installation copied the six existing native layouts byte-for-byte from the
 pilot catalog; that original pilot catalog remains recoverable. Hammerspoon's
@@ -254,7 +251,7 @@ that the startup movement is solved.
 
 ## Data and adoption
 
-Default native data is `~/.local/share/window-factory-native/layouts.json`,
+Default native data is `~/.local/share/window-factory/layouts.json`,
 created only on the first save/import. Use the explicit repository `.build`
 pilot directory above during development. No native catalog is checked in.
 
@@ -303,3 +300,43 @@ outputs and the original pilot catalogs. The geometry/Space pilot apps under
 `~/.cache/window-factory-native` were running and were left in place.
 Live catalogs, previous catalogs, installed app, settings, installer backups,
 private temporary CLI receipts and Hammerspoon fallback remain untouched.
+
+
+## Data-folder migration and backup builds (build 32)
+
+The default store is `~/.local/share/window-factory`. Both the application and
+installer use this path. Build 32 retains the exact bundle ID, signing identity,
+preference domain and controls. An old default store causes startup to stop
+rather than silently opening an empty catalog. The installer also refuses an
+ordinary default install while legacy data exists.
+
+For another installation that still uses the old folder, quit Window Factory
+with no active operation or session stashes, then run:
+
+```fish
+mise run native-install -- --migrate-data-from /Users/troymay/.local/share/window-factory-native
+```
+
+Substitute that Mac's actual old directory. This explicit operation validates
+both catalogs, rejects an occupied destination or symlink catalog/source,
+renames the entire directory and restores its original location if app
+replacement fails. It never merges stores or prunes backups. Existing explicit
+`--data-dir` launches keep their chosen location. For manual rollback to a
+pre-32 app, launch it with `--data-dir` pointing at the migrated directory;
+that old app's default still names the old folder. Do not let old and new apps
+write the catalog simultaneously.
+
+On this Mac, all 143 pre-migration file hashes matched after installation:
+current/previous catalogs and all 35 backup app bundles were preserved. The
+installer added build 31 as the 36th backup. All eight layouts were visible
+after restart, app-owned settings hashes matched, strict signing checks passed,
+and the live CLI reported Accessibility and Agent access still enabled. No
+permission re-add, settings change, shortcut or fallback change was needed.
+General Settings showed Start at login enabled; it was preserved, not changed
+by migration, and a real sign-in startup check remains outstanding.
+
+For routine local rollback, two previous **distinct** builds are recommended;
+a known-good checkpoint can be pinned during risky work. The 35 old backups
+represented 28 distinct builds and approximately 55 MB. All were preserved as
+requested. Automatic retention/pruning is not implemented; it should follow a
+separate reviewed policy, with verified recovery copies before retirement.

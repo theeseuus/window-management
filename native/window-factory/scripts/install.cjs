@@ -3,18 +3,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const {execFileSync} = require('node:child_process');
+const {migrateData}=require('./data-migration.cjs');
 const {runningAppPattern,validateExecutable} = require('./bundle-identity.cjs');
 const args = process.argv.slice(2);
-const allowed = new Set(['--source','--target','--data-dir','--import-catalog','--previous-target']);
+const allowed = new Set(['--source','--target','--data-dir','--import-catalog','--previous-target','--migrate-data-from']);
 for (let i=0;i<args.length;i+=2) {
   if (!allowed.has(args[i]) || !args[i+1] || args[i+1].startsWith('--')) throw Error('Expected named installer path arguments');
 }
 function option(key, fallback) { const i = args.indexOf(key); if (i < 0) return fallback; if (!args[i+1] || args[i+1].startsWith('--')) throw Error(`Missing ${key}`); return path.resolve(args[i+1]); }
 const source = option('--source');
 const target = option('--target','/Applications/Window Factory.app');
-// Compatibility storage name: preserve the accepted catalog and backup history.
-const dataDir = option('--data-dir',path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(),'.local/share'),'window-factory-native'));
+// Product storage path; migration is explicit and refuses an existing destination.
+const dataDir = option('--data-dir',path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(),'.local/share'),'window-factory'));
 const catalog = option('--import-catalog');
+const migrateFrom = option('--migrate-data-from');
+if(migrateFrom && catalog)throw Error('Migrate data and import catalog are separate operations');
 const previousTarget = option('--previous-target');
 const previousInstall = previousTarget || target;
 const requirement = '=identifier "local.windowfactory.native" and anchor apple generic and certificate leaf[subject.OU] = "S5V98VJ2UV" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists';
@@ -27,6 +30,7 @@ function run() {
   if (previousTarget && (previousTarget === target || fs.existsSync(target) || !fs.existsSync(previousTarget))) throw Error('Rename requires one existing old app and an unused new target');
   if (fs.existsSync(previousInstall) && fs.lstatSync(previousInstall).isSymbolicLink()) throw Error('Refusing a symlink previous install');
   verify(source);
+  if(!migrateFrom && !args.includes('--data-dir') && fs.existsSync(path.join(path.dirname(dataDir),'window-factory-native')))throw Error('Legacy data exists; use --migrate-data-from before installing');
   const executableName = validateExecutable(execFileSync('/usr/libexec/PlistBuddy',['-c','Print :CFBundleExecutable',path.join(source,'Contents/Info.plist')],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim());
   if (fs.existsSync(previousInstall)) { verify(previousInstall); if (dr(source) !== dr(previousInstall)) throw Error('Designated requirement changed; refusing update'); }
   try { execFileSync('/usr/bin/pgrep',['-f',runningAppPattern()],{stdio:'pipe'}); throw Error('Quit Window Factory before installing'); }
@@ -41,8 +45,9 @@ function run() {
   fs.mkdirSync(path.dirname(target),{recursive:true});
   const stage = fs.mkdtempSync(path.join(path.dirname(target),'.window-factory-install-'));
   const staged = path.join(stage,'Window Factory.app'), previous = path.join(stage,'previous.app');
-  let replaced = false;
+  let replaced = false,rollbackData;
   try {
+    rollbackData=migrateData(migrateFrom,dataDir,file=>execFileSync(path.join(source,'Contents/MacOS',executableName),['--validate-catalog',file],{stdio:'pipe'}));
     execFileSync('/usr/bin/ditto',[source,staged]); verify(staged);
     if (fs.existsSync(previousInstall)) {
       const backupRoot = path.join(dataDir,'install-backups'); fs.mkdirSync(backupRoot,{recursive:true,mode:0o700});
@@ -61,6 +66,7 @@ function run() {
   } catch (error) {
     if (replaced && fs.existsSync(target)) fs.renameSync(target,path.join(stage,'failed-candidate.app'));
     if (fs.existsSync(previous)) fs.renameSync(previous,previousInstall);
+    if(rollbackData)rollbackData();
     throw Error(`Install failed; previous app restored where available. Evidence: ${stage}. ${error.message}`);
   }
 }
