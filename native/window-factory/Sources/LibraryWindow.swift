@@ -25,11 +25,14 @@ final class PreviewView: NSView {
 }
 
 @MainActor
-final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
+final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSMenuItemValidation {
     let window: NSWindow
     let store: LayoutStore
     let coordinator: Coordinator
     let preview: Bool
+    let preferences: FactoryPreferences
+    var onSettings: (() -> Void)?
+    let shortcutHints = NSTextField(labelWithString:"↑↓ Select   ↩ Restore   ⌘↩ Establish   ⌘N Capture   ⌘F Search   ⎋ Cancel/Close")
     let search = NSSearchField(), table = NSTableView(), drawing = PreviewView()
     let status = NSTextField(wrappingLabelWithString:"")
     let name = NSTextField(), nameLabel = NSTextField(labelWithString:"Layout name")
@@ -40,8 +43,8 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     let cancel = NSButton(title:"Cancel",target:nil,action:nil)
     var filtered: [Recipe] = [], frozen: Recipe?, task: Task<Void,Never>?, monitor: Any?
     var lastReceipt: Receipt?
-    init(store: LayoutStore,registry: AdapterRegistry,preview: Bool) {
-        self.store = store; self.coordinator = Coordinator(registry:registry); self.preview = preview
+    init(store: LayoutStore,registry: AdapterRegistry,preview: Bool,preferences: FactoryPreferences) {
+        self.store = store; self.coordinator = Coordinator(registry:registry); self.preview = preview; self.preferences = preferences
         window = NSWindow(contentRect:NSRect(x:0,y:0,width:760,height:550),
             styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
         super.init()
@@ -71,14 +74,15 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         let deleteButton = NSButton(title:"Delete…",target:self,action:#selector(deleteLayout))
         let reportButton = NSButton(title:"Last report",target:self,action:#selector(showReport))
         for button in [importButton,exportButton,deleteButton] { button.isEnabled = !preview }
-        let permission = NSButton(title:"Accessibility Settings…",target:self,action:#selector(openAccessSettings))
+        let permission = NSButton(title:"Settings…  ⌘,",target:self,action:#selector(openSettings))
         permission.bezelStyle = .rounded
         name.placeholderString = "Name the captured layout"; name.target = self; name.action = #selector(saveCapture)
         let naming = NSStackView(views:[nameLabel,name,save,cancel]); naming.orientation = .horizontal
         name.widthAnchor.constraint(greaterThanOrEqualToConstant:240).isActive = true
         let buttons = NSStackView(views:[capture,restore,establish]); buttons.spacing = 8
         let tools = NSStackView(views:[importButton,exportButton,deleteButton,reportButton,permission]); tools.spacing = 8
-        let stack = NSStackView(views:[search,split,naming,buttons,status,tools])
+        shortcutHints.font = .systemFont(ofSize:11); shortcutHints.textColor = .secondaryLabelColor
+        let stack = NSStackView(views:[search,split,naming,buttons,shortcutHints,status,tools])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 12
         stack.edgeInsets = NSEdgeInsets(top:18,left:18,bottom:18,right:18)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -97,12 +101,36 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
             }
             return handled ? nil : event
         }
-        reload()
+        applyPreferences(); reload()
         status.stringValue = preview ? "Preview only. Window operations and catalog changes are disabled."
             : "Global shortcuts remain with Hammerspoon. " + (AXIsProcessTrusted() ? "Ready." : "Accessibility access is needed for capture and placement.")
     }
     var selected: Recipe? { filtered.indices.contains(table.selectedRow) ? filtered[table.selectedRow] : nil }
     func show() { window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true); window.makeFirstResponder(search) }
+    func applyPreferences() {
+        window.level = preferences.keepLibraryOnTop ? .floating : .normal
+        shortcutHints.isHidden = !preferences.showShortcutHints
+        capture.title = preferences.showShortcutHints ? "Capture…  ⌘N" : "Capture…"
+        restore.title = preferences.showShortcutHints ? "Restore  ↩" : "Restore"
+        establish.title = preferences.showShortcutHints ? "Establish here  ⌘↩" : "Establish here"
+        save.title = preferences.showShortcutHints ? "Save  ↩" : "Save"
+        cancel.title = preferences.showShortcutHints ? "Cancel  ⎋" : "Cancel"
+    }
+    @objc func openSettings() { onSettings?() }
+    @objc func focusSearch() { if task == nil && frozen == nil { window.makeFirstResponder(search) } }
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard window.isKeyWindow else { return false }
+        if menuItem.action == #selector(showReport) { return true }
+        guard task == nil && frozen == nil else { return false }
+        switch menuItem.action {
+        case #selector(startCapture): return capture.isEnabled
+        case #selector(restoreLayout), #selector(establishLayout): return restore.isEnabled
+        case #selector(deleteLayout): return !preview && selected != nil
+        case #selector(importLayouts), #selector(exportLayouts): return !preview
+        case #selector(focusSearch): return true
+        default: return false
+        }
+    }
     func updateButtons() {
         let access = !preview && AXIsProcessTrusted(), idle = task == nil && frozen == nil
         capture.isEnabled = access && idle; restore.isEnabled = access && idle && selected != nil

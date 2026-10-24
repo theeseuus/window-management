@@ -158,3 +158,13 @@ application identity and normalized geometry, reports missing recipe slots, and
 leaves extra windows untouched. Restore does not launch apps or create windows;
 those actions belong only to the explicit Establish operation. Neither operation
 moves the whole group between Spaces or restores window contents.
+
+## Native Window Factory candidate
+
+The installed native candidate adds a Settings pane (`Command + ,`) and a Layout
+menu with visible keyboard equivalents. Its buttons and optional hint row show
+Restore, Establish, Capture, search and cancel commands. The complete current
+in-app map and preferences are documented in the
+[native candidate guide](native/window-factory/README.md#settings-and-visible-keyboard-commands).
+These commands apply inside the native app. Hyper+R remains owned by the working
+Hammerspoon Window Factory; no global shortcut has been transferred.

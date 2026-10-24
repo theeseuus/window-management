@@ -2,35 +2,110 @@
 
 A separate Swift/AppKit port of Factory Workspace. It leaves the tagged working
 Hammerspoon implementation, deployed Spoons, recipes and global shortcuts alone.
-This is a source-built development candidate, not the default Window Factory.
+This is an installed development candidate; Hyper+R still opens the working
+Hammerspoon Window Factory.
 
-## Build and preview
+## Stable build, installation and updates
 
-From the repository root, with the installed Apple SDK and trusted repository
-mise tools:
+The local app lives at `/Applications/Window Factory Native.app`. Native layouts
+live at `~/.local/share/window-factory-native/layouts.json`. The first stable
+installation copied the six existing native layouts byte-for-byte from the
+pilot catalog; that original pilot catalog remains recoverable. Hammerspoon's
+settings database is neither read nor modified.
+
+Build with the installed Apple SDK and repository-owned mise tools:
 
 ```fish
 mise run native-build
 mise run native-test
-open 'native/window-factory/.build/Window Factory Native.app' --args --preview --data-dir "$PWD/native/window-factory/.build/preview-data"
 ```
 
-The preview uses three synthetic layouts in memory. Search, selection, outlines,
-arrows and Escape are available. Capture, Restore, Establish and catalog changes
-are disabled; it does not query or move another application's windows. Quit the
-preview before starting a normal pilot:
+Output now defaults to `~/.cache/window-factory-native/build/Window Factory Native.app`,
+outside the File Provider-managed source checkout. `WINDOW_FACTORY_BUILD_DIR`
+can select another local output directory. Do not put signed app bundles in the
+iCloud-managed source tree: Finder metadata previously invalidated their strict
+signature checks and file pickers showed empty folders.
+
+`signing-config.sh` records the selected public Developer ID Application
+certificate fingerprint and Team, matching the signing route used by the
+installed Freehold app. The build signs with Hardened Runtime and a secure
+timestamp and verifies the Apple Developer ID/Team requirement. Only the Apple
+Events automation entitlement is added for the existing scripting adapters.
+Private keys are never exported or stored here. macOS owns signing-key access;
+any key-access prompt belongs to the owner. There is no ad hoc fallback. Local
+installation does not submit the app for notarization or publish an artifact.
+
+Quit only Window Factory Native before installing or updating:
 
 ```fish
-open 'native/window-factory/.build/Window Factory Native.app' --args --data-dir "$PWD/native/window-factory/.build/pilot-data"
+mise run native-install
+open '/Applications/Window Factory Native.app'
 ```
 
-The normal pilot starts with a separate empty library. Its stable bundle ID is
-`local.windowfactory.native`; Accessibility must be granted by the owner before
-capture/placement. The app checks access without prompting. Its Settings button
-only opens the relevant system pane. Specific AppleScript adapters can require
-per-app Automation consent when used. No grants, login items, installations or
-global shortcuts are created by the build. Current local signing is ad hoc;
-permission persistence across rebuilds still needs validation.
+The installer verifies the candidate and existing signatures, rejects a changed
+designated requirement and symlink target, stages the replacement beside the
+installed app, retains a verified previous app under the native data folder's
+`install-backups`, and restores the previous app if replacement verification
+fails. It refuses to replace a running native process. It never grants access,
+registers a login item, or changes global shortcuts. Use the same bundle ID,
+Team and signing route for subsequent updates; certificate rotation needs its
+own reviewed check. Changing the build hash alone is no longer the app identity.
+
+For a first installation with a separate native pilot catalog, the explicit
+copy operation is:
+
+```fish
+./native/window-factory/install.sh --import-catalog "$PWD/native/window-factory/.build/pilot-data/layouts.json"
+```
+
+It validates through the candidate's schema decoder and refuses to overwrite a
+different existing catalog. Original bytes stay untouched; use the app's Import
+command for an intentional merge. This option does not migrate Hammerspoon data.
+
+The ad hoc-to-Developer-ID transition requires one owner-granted Accessibility
+entry for the installed Applications copy, followed by a restart. Per-app
+Automation consent may be needed when using scripting adapters. A stable
+requirement is the basis for permission continuity, but actual TCC retention
+must be verified with a live signed update; signature checks alone do not prove
+it. Keep Hammerspoon as fallback during that check.
+
+A harmless synthetic preview is still available:
+
+```fish
+open '/Applications/Window Factory Native.app' --args --preview
+```
+
+Quit a running normal instance first. Preview uses synthetic layouts in memory,
+with window operations and catalog changes disabled.
+
+## Settings and visible keyboard commands
+
+Open **Settings…** with **Command–comma**, from the app menu or library button.
+It provides persistent, app-owned preferences for showing keyboard hints and
+keeping the library above other windows, plus the effective app/layout paths,
+Accessibility status, a permission-settings link, and Show Layout Folder.
+Defaults keep hints visible and normal window level. These GUI preferences are
+not a second writer for chezmoi configuration or global keybindings.
+
+The Layout menu shows native keyboard equivalents. Action buttons and the
+library footer display the main commands; the settings pane lists the full map:
+
+| Command | Key |
+| --- | --- |
+| Capture | Command–N |
+| Select layout | Up / Down |
+| Restore existing windows | Return |
+| Establish missing windows | Command–Return |
+| Focus search | Command–F |
+| Save a named capture | Return in the name field |
+| Cancel or close | Escape |
+| Delete selected layout, with confirmation | Command–Delete |
+| Import / Export | Command–I / Shift–Command–E |
+| Settings / Close window / Quit | Command–comma / Command–W / Command–Q |
+
+Layout menu commands are scoped to the active library and disabled during a
+capture/operation or in preview as appropriate. Settings remains available via
+the app menu. Hyper+R stays with Hammerspoon; this app registers no global chord.
 
 ## Implemented contract
 
@@ -192,3 +267,26 @@ entries, multiple displays, production signing/permission persistence and
 Hyper+R handoff remain unaccepted. Hammerspoon remains the working fallback;
 no Spoon, Hammerspoon runtime, binding or saved Hammerspoon layout was changed.
 The pilot app and its data remain isolated development artifacts.
+
+
+## Stable local installation and settings checks, 2026-10-24
+
+The Developer ID Application public leaf certificate was matched to the existing
+installed Freehold signing route (Team `S5V98VJ2UV`, valid through September 2031).
+No new key/certificate or key-access policy was created. Build 0.2.0/2 was signed
+with Hardened Runtime and a secure timestamp and installed at the stable
+Applications path. All six current native layouts copied exactly into the local
+data folder. The temporary pilot and its catalog remain available for recovery.
+
+Live UI checks verified Settings via Command–comma, shortcut hint visibility
+and restoration, both preference controls, Escape from Settings, and search via
+Command–F. The main buttons, footer, Layout menu and Settings show keyboard
+commands. No live layout creation/movement was dispatched during these checks.
+
+A changed 0.2.0/3 executable was then built and signed. Its designated requirement
+is byte-for-byte identical to the installed build's requirement, while executable
+SHA-256 differs. Core/catalog tests and seven installer rejection checks pass.
+Initial Accessibility approval for the installed signed identity and a live
+signed-update retention check are pending; matching requirements alone do not
+establish permission retention. No Hammerspoon files, runtime, shortcuts or
+Hammerspoon catalog were changed.

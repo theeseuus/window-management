@@ -33,3 +33,7 @@ run = "./native/window-factory/build.sh"
 [tasks.native-test]
 description = "Check native schema, geometry, matching and all existing adapters"
 run = "./native/window-factory/test.sh"
+
+[tasks.native-install]
+description = "Install the verified Developer ID candidate locally; quit the native app first"
+run = "./native/window-factory/install.sh"
