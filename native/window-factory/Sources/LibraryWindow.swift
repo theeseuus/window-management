@@ -31,6 +31,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     let coordinator: Coordinator
     let preview: Bool
     let preferences: FactoryPreferences
+    var onShortcuts: (() -> Void)?
     var onSettings: (() -> Void)?
     let shortcutHints = NSTextField(labelWithString:"↑↓ Select   ↩ Restore   ⌘↩ Establish   ⌘N Capture   ⌘F Search   ⎋ Cancel/Close")
     let search = NSSearchField(), table = NSTableView(), drawing = PreviewView()
@@ -76,11 +77,12 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         for button in [importButton,exportButton,deleteButton] { button.isEnabled = !preview }
         let permission = NSButton(title:"Settings…  ⌘,",target:self,action:#selector(openSettings))
         permission.bezelStyle = .rounded
+        let shortcuts = NSButton(title:"Shortcuts…",target:self,action:#selector(openShortcuts)); shortcuts.bezelStyle = .rounded
         name.placeholderString = "Name the captured layout"; name.target = self; name.action = #selector(saveCapture)
         let naming = NSStackView(views:[nameLabel,name,save,cancel]); naming.orientation = .horizontal
         name.widthAnchor.constraint(greaterThanOrEqualToConstant:240).isActive = true
         let buttons = NSStackView(views:[capture,restore,establish]); buttons.spacing = 8
-        let tools = NSStackView(views:[importButton,exportButton,deleteButton,reportButton,permission]); tools.spacing = 8
+        let tools = NSStackView(views:[importButton,exportButton,deleteButton,reportButton,permission,shortcuts]); tools.spacing = 8
         shortcutHints.font = .systemFont(ofSize:11); shortcutHints.textColor = .secondaryLabelColor
         let stack = NSStackView(views:[search,split,naming,buttons,shortcutHints,status,tools])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 12
@@ -116,6 +118,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         save.title = preferences.showShortcutHints ? "Save  ↩" : "Save"
         cancel.title = preferences.showShortcutHints ? "Cancel  ⎋" : "Cancel"
     }
+    @objc func openShortcuts() { onShortcuts?() }
     @objc func openSettings() { onSettings?() }
     @objc func focusSearch() { if task == nil && frozen == nil { window.makeFirstResponder(search) } }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {

@@ -4,6 +4,8 @@ import AppKit
 final class FactoryApp: NSObject, NSApplicationDelegate {
     var library: LibraryWindow?
     var settings: SettingsWindow?
+    var shortcutReference: ShortcutReferenceWindow?
+    var stash: DirectStashControls?
     var focus: DirectFocusControls?
     var geometry: DirectWindowControls?
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -27,20 +29,28 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 store.catalog.recipes["Single-window preview"] = Recipe(name:"Single-window preview",capturedAt:"preview",windows:Array(slots.prefix(1)))
             }
             let preferences = FactoryPreferences()
+            shortcutReference = ShortcutReferenceWindow(preferences:preferences)
             settings = SettingsWindow(store:store,preferences:preferences)
             library = LibraryWindow(store:store,registry:registry,preview:preview,preferences:preferences)
+            library?.onShortcuts = { [weak self] in self?.showShortcuts(nil) }
+            settings?.onShortcuts = { [weak self] in self?.showShortcuts(nil) }
             library?.onSettings = { [weak self] in self?.showSettings(nil) }
             settings?.changed = { [weak self] in self?.library?.applyPreferences() }
             if !preview {
                 let controls = DirectWindowControls(preferences:preferences); geometry = controls
                 controls.workspaceBusy = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil }
-                controls.changed = { [weak self] in self?.settings?.refresh() }
+                controls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
                 settings?.geometry = controls
                 controls.restorePreference()
                 let focusControls = DirectFocusControls(preferences:preferences); focus = focusControls
                 focusControls.workspaceBusy = controls.workspaceBusy
-                focusControls.changed = { [weak self] in self?.settings?.refresh() }
+                focusControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
                 settings?.focus = focusControls; focusControls.restorePreference()
+                let stashControls = DirectStashControls(preferences:preferences); stash = stashControls
+                stashControls.workspaceBusy = controls.workspaceBusy
+                stashControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
+                settings?.stash = stashControls; stashControls.restorePreference()
+                shortcutReference?.geometry = controls; shortcutReference?.focus = focusControls; shortcutReference?.stash = stashControls
             }
             let menu = NSMenu(), item = NSMenuItem(), appMenu = NSMenu()
             let settingsItem = appMenu.addItem(withTitle:"Settings…",action:#selector(showSettings(_:)),keyEquivalent:",")
@@ -74,6 +84,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             layoutItem.submenu = layoutMenu; menu.addItem(layoutItem)
             let windowItem = NSMenuItem(), windowMenu = NSMenu(title:"Window")
             windowMenu.addItem(withTitle:"Close Window",action:#selector(NSWindow.performClose(_:)),keyEquivalent:"w")
+            let shortcutItem = windowMenu.addItem(withTitle:"Keyboard Shortcuts",action:#selector(showShortcuts(_:)),keyEquivalent:"?")
+            shortcutItem.keyEquivalentModifierMask = [.command]; shortcutItem.target = self
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
             NSApp.mainMenu = menu
             if !args.contains("--background") { library?.show() }
@@ -82,11 +94,12 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             alert.runModal(); NSApp.terminate(nil)
         }
     }
+    @objc func showShortcuts(_ sender: Any?) { shortcutReference?.show() }
     @objc func showSettings(_ sender: Any?) { settings?.show() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main

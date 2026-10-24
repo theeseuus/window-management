@@ -182,3 +182,28 @@ int32_t WFRequestWindowFocus(AXUIElementRef window,pid_t pid,int32_t *mainStatus
     if(status==noErr) AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue);
     return status;
 }
+
+// Independent stash group; leaves geometry and focus registrations untouched.
+static EventHotKeyRef wfStashKey;
+static EventHandlerRef wfStashHandler;
+static WFHotKeyCallback wfStashCallback;
+static void *wfStashContext;
+static OSStatus wfStashEvent(EventHandlerCallRef next,EventRef event,void *context) {
+    (void)next; (void)context; EventHotKeyID key={0};
+    OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status!=noErr || key.signature!='WFST' || !wfStashCallback) return eventNotHandledErr;
+    wfStashCallback(0,wfStashContext); return noErr;
+}
+void WFUnregisterStashHotKey(void) {
+    if(wfStashKey) { UnregisterEventHotKey(wfStashKey); wfStashKey=NULL; }
+    if(wfStashHandler) { RemoveEventHandler(wfStashHandler); wfStashHandler=NULL; }
+    wfStashCallback=NULL; wfStashContext=NULL;
+}
+int32_t WFRegisterStashHotKey(WFHotKeyCallback callback,void *context) {
+    WFUnregisterStashHotKey(); EventTypeSpec type={kEventClassKeyboard,kEventHotKeyPressed};
+    OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfStashEvent,1,&type,NULL,&wfStashHandler);
+    if(status!=noErr) return status;
+    wfStashCallback=callback; wfStashContext=context; EventHotKeyID key={'WFST',0};
+    status=RegisterEventHotKey(1,cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),0,&wfStashKey);
+    if(status!=noErr) WFUnregisterStashHotKey(); return status;
+}

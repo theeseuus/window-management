@@ -88,5 +88,12 @@ for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","focus
 for _,key in ipairs({"left","s","w"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","focus handoff retains " .. key) end
 bindings = {}; spoon.focusHotkeys = true; spoon:bindHotkeys()
 for _,key in ipairs({"h","j","k","l"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","fallback restores focus " .. key) end
+bindings = {}; spoon.stashHotkeys = false; spoon:bindHotkeys()
+equal(bindings["ctrl+alt+cmd:s"],nil,"native stash releases only S")
+equal(type(bindings["ctrl+alt+cmd+shift:s"]),"function","accordion remains in Hammerspoon")
+for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","stash handoff retains geometry " .. key) end
+for _,key in ipairs({"h","j","k","l"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","stash handoff retains focus " .. key) end
+bindings = {}; spoon.stashHotkeys = true; spoon:bindHotkeys()
+equal(type(bindings["ctrl+alt+cmd:s"]),"function","fallback restores stash S")
 hs = originalHS
 print(string.format("window_filter_lifecycle_spec: %d assertions passed", assertions))

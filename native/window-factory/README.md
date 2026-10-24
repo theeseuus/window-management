@@ -647,3 +647,68 @@ This checkpoint records the result only: no app binary, shortcut, preference,
 layout or Hammerspoon implementation changed. Hammerspoon remains available as
 the independently selectable fallback. Stash/restore is next in the agreed
 controller-port sequence and has not been handed over yet.
+
+## Stash/restore and shortcut reference pilot, 2026-10-24
+
+Build 13 ports only Hyper+S (hold Tab + S) as a stash/restore toggle. The original
+Spoon saves the focused window's frame, requests a position 40 points beyond
+the display's usable right edge without changing y/size, and restores that
+saved frame on the next toggle. Native stash preserves this contract. The
+observed macOS constraint leaves a 40-point strip visible instead of moving the
+entire window past the edge; this is accepted without repeated corrective moves.
+Hyper+Shift+S remains Hammerspoon's accordion command, which is not ported here.
+
+Stash has its own single-key Carbon registry, Settings switch and remembered
+activation preference. The accepted geometry and directional-focus source
+implementations are unchanged; their registries are not released by stash.
+A fresh profile leaves stash disabled. The managed loader independently selects
+native stash using `stashHotkeys = false`. The portable Spoon retains its
+original stash implementation and default binding behind `stashHotkeys ~= false`.
+Restore native stashed windows before disabling/quitting/updating or selecting
+the fallback. For rollback, disable native stash in Settings, set the managed
+`stashHotkeys = true`, apply and reload Hammerspoon; keep accepted geometry/focus
+ownership unchanged. Hammerspoon remains quit during this pilot.
+
+Saved frames are memory-only for this app session and keyed by process/window
+identity. Restoration deliberately permits an offscreen *recorded* window while
+retaining exact AX identity, app identity, standard-window, hidden/minimized/
+full-screen and captured ordinary-Space checks. Other-Space windows are not
+moved or followed. New stash requests that would land on another display are
+refused rather than spilling a window onto it. Frame writes are immediate;
+verification is bounded. Failure retains the original saved frame for recovery,
+and a newer toggle cancels the preceding verification. Successful restoration
+removes its record only after the original frame is confirmed. Closed records
+are skipped when recovering the most recent remaining live window.
+
+A separate **Keyboard Shortcuts** window is available from the library's
+Shortcuts… button, Settings' Keyboard Shortcuts… button and Window menu. The
+menu configures Command+? while Window Factory is active. Its scrollable,
+selectable reference shows all nineteen geometry commands, H/J/K/L, stash,
+library commands and the remaining Hammerspoon commands, with current native
+group status and whether Hammerspoon is running. Geometry rows come directly
+from the existing shortcut definitions. Escape closes the reference. Its
+Restore last stashed window button provides an explicit recovery action after
+focus has moved elsewhere, including when the stash hotkey has been disabled.
+No new global binding is assigned to the reference. Configurable bindings and
+the broader UI redesign remain later work.
+
+Validation: all native tests and required repository checks pass, including
+37 stash-geometry assertions for exact requests, macOS-constrained placement,
+shifted displays and refusal of size/y mismatches. The Spoon lifecycle suite
+has 139 assertions, covering independent stash release/restoration, retained
+geometry/focus and retained Shift+S accordion. Existing 109 geometry, 100 frame-
+application and 293 directional-focus assertions still pass. The exact production
+stash controller was exercised on the disposable Window Control Test: stash
+retained one saved frame, recovery restored its exact original frame and the
+saved count returned to zero. This is programmatic controller evidence, not
+physical-key acceptance in every app.
+
+Installed build 13 retains Accessibility, the exact six-layout catalog bytes
+and enabled 19 geometry + 4 focus registrations; the independent stash key was
+enabled in Settings. The reference was visually inspected for readable content,
+scrolling and fixed recovery/close controls. Opening it from Settings and closing
+it with Escape worked. A synthetic Command+? attempt did not open it; its normal
+physical menu-key path remains unverified, and the button/menu paths are
+available. Physical stash/restore, recovery after a focus change, and retained
+geometry/focus behaviour remain the owner's acceptance check. Chezmoi verification
+passes with only the expected pre-commit dirty-worktree diagnostic warning.

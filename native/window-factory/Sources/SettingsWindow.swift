@@ -19,6 +19,10 @@ final class FactoryPreferences {
         get { defaults.bool(forKey:"nativeFocusEnabled") }
         set { defaults.set(newValue,forKey:"nativeFocusEnabled") }
     }
+    var stashEnabled: Bool {
+        get { defaults.bool(forKey:"nativeStashEnabled") }
+        set { defaults.set(newValue,forKey:"nativeStashEnabled") }
+    }
     var keepLibraryOnTop: Bool {
         get { defaults.bool(forKey:"keepLibraryOnTop") }
         set { defaults.set(newValue,forKey:"keepLibraryOnTop") }
@@ -31,6 +35,10 @@ final class SettingsWindow: NSObject {
     let preferences: FactoryPreferences
     let store: LayoutStore
     var changed: (() -> Void)?
+    weak var stash: DirectStashControls?
+    private let stashEnabled = NSButton(checkboxWithTitle:"Enable native stash/restore shortcut",target:nil,action:nil)
+    private let stashStatus = NSTextField(wrappingLabelWithString:"")
+    var onShortcuts: (() -> Void)?
     weak var focus: DirectFocusControls?
     private let focusEnabled = NSButton(checkboxWithTitle:"Enable native directional focus shortcuts",target:nil,action:nil)
     private let focusStatus = NSTextField(wrappingLabelWithString:"")
@@ -43,19 +51,22 @@ final class SettingsWindow: NSObject {
     private var monitor: Any?
     init(store: LayoutStore,preferences: FactoryPreferences) {
         self.store = store; self.preferences = preferences
-        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:900),
+        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:1020),
             styleMask:[.titled,.closable],backing:.buffered,defer:false)
         super.init()
         window.title = "Window Factory Settings"; window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
         let general = Self.heading("General")
+        stashEnabled.target = self; stashEnabled.action = #selector(changeStash)
+        stashStatus.font = .systemFont(ofSize:11); stashStatus.textColor = .secondaryLabelColor
+        let reference = NSButton(title:"Keyboard Shortcuts…  ⌘?",target:self,action:#selector(openShortcuts)); reference.bezelStyle = .rounded
         focusEnabled.target = self; focusEnabled.action = #selector(changeFocus)
         focusStatus.font = .systemFont(ofSize:11); focusStatus.textColor = .secondaryLabelColor
         let focusKeys = NSTextField(wrappingLabelWithString:"Hold Tab + H/J/K/L: focus left/down/up/right. Same display first; current visible ordinary desktops only.")
         focusKeys.font = .systemFont(ofSize:12)
         geometryEnabled.target = self; geometryEnabled.action = #selector(changeGeometry)
         geometryStatus.font = .systemFont(ofSize:11); geometryStatus.textColor = .secondaryLabelColor
-        let geometryKeys = NSTextField(wrappingLabelWithString:"Hold Tab for Hyper (⌃⌥⌘).\n− / =  Size / position cycles; add Shift to reverse\n2 / 3 / 4 / 8  Halves / thirds / quarters / eighths; Shift reverses\n↑ / ↓  Centred half / previous frame     [ / ]  Narrow / widen\n↩  Centre horizontally     ⇧↩  Maximize     D  Minimize\nStash, switching and Space controls remain in Hammerspoon during the staged port.")
+        let geometryKeys = NSTextField(wrappingLabelWithString:"Hold Tab for Hyper (⌃⌥⌘).\n− / =  Size / position cycles; add Shift to reverse\n2 / 3 / 4 / 8  Halves / thirds / quarters / eighths; Shift reverses\n↑ / ↓  Centred half / previous frame     [ / ]  Narrow / widen\n↩  Centre horizontally     ⇧↩  Maximize     D  Minimize\nSwitching, accordion and Space controls remain in Hammerspoon during the staged port.")
         geometryKeys.font = .systemFont(ofSize:12)
         for button in [hints,floating] { button.target = self; button.action = #selector(changePreferences) }
         let keys = NSTextField(wrappingLabelWithString:
@@ -70,9 +81,10 @@ final class SettingsWindow: NSObject {
         let location = NSTextField(wrappingLabelWithString:"Version: \(version) (\(build))\nApp: \(Bundle.main.bundlePath)\nLayouts: \(store.url.path)")
         location.font = .systemFont(ofSize:11); location.isSelectable = true
         let folder = NSButton(title:"Show Layout Folder",target:self,action:#selector(showFolder)); folder.bezelStyle = .rounded
-        let stack = NSStackView(views:[general,hints,floating,Self.heading("Keyboard commands"),keys,ownership,
+        let stack = NSStackView(views:[general,hints,floating,reference,Self.heading("Keyboard commands"),keys,ownership,
             Self.heading("Direct window controls — geometry pilot"),geometryEnabled,geometryStatus,geometryKeys,
             Self.heading("Directional focus — pilot"),focusEnabled,focusStatus,focusKeys,
+            Self.heading("Stash / restore — pilot"),stashEnabled,stashStatus,
             Self.heading("Access and storage"),access,permission,location,folder])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -102,6 +114,15 @@ final class SettingsWindow: NSObject {
         } else { geometry.disable() }
         refresh()
     }
+    @objc func openShortcuts() { onShortcuts?() }
+    @objc func changeStash() {
+        guard let stash else { return }
+        if stashEnabled.state == .on {
+            do { try stash.enable() }
+            catch { let alert = NSAlert(); alert.messageText = "Stash shortcut was not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
+        } else { stash.disable() }
+        refresh()
+    }
     @objc func changeFocus() {
         guard let focus else { return }
         if focusEnabled.state == .on {
@@ -111,6 +132,9 @@ final class SettingsWindow: NSObject {
         refresh()
     }
     func refresh() {
+        stashEnabled.state = stash?.active == true ? .on : .off
+        stashEnabled.isEnabled = stash != nil
+        stashStatus.stringValue = stash?.lastResult ?? "Unavailable in preview."
         focusEnabled.state = focus?.active == true ? .on : .off
         focusEnabled.isEnabled = focus != nil
         focusStatus.stringValue = focus?.lastResult ?? "Unavailable in preview."

@@ -1041,11 +1041,13 @@ function obj:bindHotkeys()
 
   end -- geometry size/position cycles
 
+  if self.stashHotkeys ~= false then
   -- Stash toggle: Hyper + S
   hs.hotkey.bind(h, "s", function()
     local w = hs.window.focusedWindow()
     if w then toggleStash(w) end
   end)
+  end
 
   -- Accordion: Hyper + Shift + S
   -- Uses focused window as the anchor; does NOT resize/move it.
