@@ -69,7 +69,14 @@ final class ShortcutReferenceWindow: NSObject {
         columns.tabStops = [NSTextTab(textAlignment:.right,location:55),NSTextTab(textAlignment:.left,location:72),NSTextTab(textAlignment:.left,location:210)]
         columns.defaultTabInterval = 210; columns.headIndent = 210
         (body.string as NSString).enumerateSubstrings(in:NSRange(location:0,length:body.length),options:.byParagraphs) { line,range,_,_ in
-            if line?.contains("\t") == true { body.addAttribute(.paragraphStyle,value:columns,range:range) }
+            if let line,line.contains("\t") {
+                body.addAttribute(.paragraphStyle,value:columns,range:range)
+                let fields = line.components(separatedBy:"\t")
+                if fields.count>=4 {
+                    let count = fields[1].utf16.count
+                    if count>1 { body.addAttribute(.kern,value:ShortcutChord.modifierTracking,range:NSRange(location:range.location+1,length:count-1)) }
+                }
+            }
         }
         text.textStorage?.setAttributedString(body)
         restore.isEnabled = (stash?.count ?? 0)>0

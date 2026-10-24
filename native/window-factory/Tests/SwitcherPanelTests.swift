@@ -147,6 +147,13 @@ import AppKit
         reference.refresh(); layout.ensureLayout(for:container)
         check(abs(mainKeyX("Next size")-mainKeyX("Previous size"))<0.1,"custom key names retain their column")
         check(abs(commandX("Next size")-commandX("Previous size"))<0.1,"custom key names retain the action column")
+        let recorder = ShortcutRecorder(nextSize,manager:nil)
+        check(recorder.alignment == .right,"Settings shortcut buttons align to the right")
+        let attributes = recorder.attributedTitle
+        check((attributes.attribute(.paragraphStyle,at:0,effectiveRange:nil) as? NSParagraphStyle)?.alignment == .right,"attributed button text preserves right alignment")
+        check((attributes.attribute(.kern,at:0,effectiveRange:nil) as? NSNumber)?.doubleValue == ShortcutChord.modifierTracking,"Settings modifier symbols receive subtle tracking")
+        check(attributes.attribute(.kern,at:nextSize.standard.modifierLabel.utf16.count-1,effectiveRange:nil) == nil,"no tracking trails the last modifier")
+        check(recorder.title == nextSize.standard.label,"visual formatting preserves shortcut text")
         reference.stop()
         settings.stop()
         print("native switcher panel: \(assertions) assertions passed; no windows shown or controlled")

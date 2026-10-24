@@ -47,10 +47,19 @@ final class ShortcutRecorder: NSButton {
     init(_ definition: ShortcutDefinition,manager: KeybindingManager?) {
         self.definition = definition; self.manager = manager
         super.init(frame:.zero)
-        title = manager?.store.chord(definition).label ?? definition.standard.label
         bezelStyle = .rounded; target = self; action = #selector(start)
-        setAccessibilityLabel("\(definition.title) shortcut"); setAccessibilityValue(title)
+        setAccessibilityLabel("\(definition.title) shortcut"); displayChord()
         toolTip = "Change \(definition.title.lowercased()) shortcut"
+    }
+    private func caption(_ value: String,modifierCount: Int = 0) {
+        let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .right
+        let text = NSMutableAttributedString(string:value,attributes:[.font:font ?? NSFont.systemFont(ofSize:NSFont.systemFontSize),.foregroundColor:NSColor.controlTextColor,.paragraphStyle:paragraph])
+        if modifierCount>1 { text.addAttribute(.kern,value:ShortcutChord.modifierTracking,range:NSRange(location:0,length:modifierCount-1)) }
+        alignment = .right; attributedTitle = text
+    }
+    private func displayChord() {
+        let chord = manager?.store.chord(definition) ?? definition.standard
+        caption(chord.label,modifierCount:chord.modifierLabel.utf16.count); setAccessibilityValue(chord.label)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override var acceptsFirstResponder: Bool { true }
@@ -58,7 +67,7 @@ final class ShortcutRecorder: NSButton {
         guard manager != nil,let window else { return }
         window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
         Self.current?.cancel(); Self.current = self
-        window.makeFirstResponder(self); recording = true; accepted = false; title = "Press shortcut"; setAccessibilityValue("Recording")
+        window.makeFirstResponder(self); recording = true; accepted = false; caption("Press shortcut"); setAccessibilityValue("Recording")
         WFSetShortcutCapture({ key,modifiers,context in
             MainActor.assumeIsolated {
                 guard let context else { return }
@@ -91,7 +100,7 @@ final class ShortcutRecorder: NSButton {
         if key == 53 { cancel(); return }
         do {
             try manager?.set(ShortcutChord(key:key,modifiers:modifiers,name:ShortcutChord.keyName(key)),for:definition)
-            accepted = true; title = manager?.store.chord(definition).label ?? definition.standard.label; setAccessibilityValue(title)
+            accepted = true; displayChord()
         } catch {
             let owner = window; cancel()
             let alert = NSAlert(); alert.messageText = "Shortcut not changed"; alert.informativeText = error.localizedDescription
@@ -104,7 +113,7 @@ final class ShortcutRecorder: NSButton {
         WFSetShortcutCapture(nil,nil)
         if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil
         if let observer { NotificationCenter.default.removeObserver(observer) }; observer = nil
-        title = manager?.store.chord(definition).label ?? definition.standard.label; setAccessibilityValue(title)
+        displayChord()
         finished?()
     }
     override func resignFirstResponder() -> Bool { cancel(); return super.resignFirstResponder() }

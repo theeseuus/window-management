@@ -5,6 +5,7 @@ struct ShortcutChord: Codable,Equatable,Hashable {
     let modifiers: UInt32
     let name: String
     static let command: UInt32 = 256,shift: UInt32 = 512,option: UInt32 = 2048,control: UInt32 = 4096
+    static let modifierTracking = 1.0
     static let hyper = command|option|control
     var identity: String { "\(key):\(modifiers)" }
     var modifierLabel: String {

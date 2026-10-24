@@ -1549,3 +1549,22 @@ including 191 AppKit assertions with actual glyph-position checks for shifted,
 unshifted, unmodified and custom-key rows. Repository validation passes.
 Signed build 28 is installed and its reference was visually inspected; the
 layout catalog is byte-identical and the existing signing identity is retained.
+
+### Build 29 modifier tracking, 2026-10-25
+
+The reference adds one point of tracking between modifier symbols, excluding
+the final symbol so there is no trailing spacing. The right-aligned modifier
+column and fixed main-key/action columns remain in place. Settings shortcut buttons use the same tracking and right-aligned captions.
+The recording prompt remains plain; the formatted chord returns after cancellation
+or a saved change. This changes typography only; shortcut values, recording
+logic, controls and CLI are unchanged.
+
+Build 29 was installed with the existing signature/Accessibility identity and an
+unchanged catalog. Both reference and Settings typography were visually inspected.
+Recording was started and cancelled without changing the binding, restoring the
+formatted caption. The full native suites pass, including 196 AppKit assertions
+for right alignment, tracking boundaries, preserved label text and reference
+column positions, plus the existing 41 agent-interface assertions and controller
+regressions. Repository validation passes. Settings → Shortcuts was left open
+for the owner's appearance review; this does not claim a new physical-control
+acceptance test.
