@@ -32,7 +32,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             let menu = NSMenu(), item = NSMenuItem(), appMenu = NSMenu()
             let settingsItem = appMenu.addItem(withTitle:"Settings…",action:#selector(showSettings(_:)),keyEquivalent:",")
             settingsItem.target = self; appMenu.addItem(.separator())
-            appMenu.addItem(withTitle:"Quit Window Factory Native",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
+            appMenu.addItem(withTitle:"Quit Window Factory",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
             item.submenu = appMenu; menu.addItem(item)
             let editItem = NSMenuItem(), edit = NSMenu(title:"Edit")
             edit.addItem(withTitle:"Undo",action:Selector(("undo:")),keyEquivalent:"z")

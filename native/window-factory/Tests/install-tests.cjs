@@ -19,6 +19,13 @@ try {
   reject(['--source',source,'--target',target],/symlink/);
   assert.equal(fs.readlinkSync(target),source); checks++;
   fs.unlinkSync(target);
+  reject(['--source',source,'--target',target,'--previous-target',path.join(root,'missing.app')],/Rename requires/);
+  fs.mkdirSync(target);
+  reject(['--source',source,'--target',target,'--previous-target',source],/Rename requires/);
+  fs.rmdirSync(target);
+  const oldLink = path.join(root,'old-link.app'); fs.symlinkSync(source,oldLink);
+  reject(['--source',source,'--target',target,'--previous-target',oldLink],/symlink previous/);
+  fs.unlinkSync(oldLink);
   reject(['--source',source,'--target',target],/codesign/);
   assert.equal(fs.existsSync(target),false); checks++;
   assert.deepEqual(fs.readdirSync(root),['fake.app']); checks++;

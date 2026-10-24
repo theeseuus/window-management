@@ -48,7 +48,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         window = NSWindow(contentRect:NSRect(x:0,y:0,width:760,height:550),
             styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
         super.init()
-        window.title = preview ? "Window Factory Native — Preview" : "Window Factory Native"
+        window.title = preview ? "Window Factory — Preview" : "Window Factory"
         window.minSize = NSSize(width:660,height:480); window.delegate = self
         window.isReleasedWhenClosed = false
         // A summoned library belongs on the user's selected desktop. AppKit

@@ -4,15 +4,17 @@ const path = require('node:path');
 const os = require('node:os');
 const {execFileSync} = require('node:child_process');
 const args = process.argv.slice(2);
-const allowed = new Set(['--source','--target','--data-dir','--import-catalog']);
+const allowed = new Set(['--source','--target','--data-dir','--import-catalog','--previous-target']);
 for (let i=0;i<args.length;i+=2) {
   if (!allowed.has(args[i]) || !args[i+1] || args[i+1].startsWith('--')) throw Error('Expected named installer path arguments');
 }
 function option(key, fallback) { const i = args.indexOf(key); if (i < 0) return fallback; if (!args[i+1] || args[i+1].startsWith('--')) throw Error(`Missing ${key}`); return path.resolve(args[i+1]); }
 const source = option('--source');
-const target = option('--target','/Applications/Window Factory Native.app');
+const target = option('--target','/Applications/Window Factory.app');
 const dataDir = option('--data-dir',path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(),'.local/share'),'window-factory-native'));
 const catalog = option('--import-catalog');
+const previousTarget = option('--previous-target');
+const previousInstall = previousTarget || target;
 const requirement = '=identifier "local.windowfactory.native" and anchor apple generic and certificate leaf[subject.OU] = "S5V98VJ2UV" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists';
 function verify(app) { execFileSync('/usr/bin/codesign',['--verify','--strict',app],{stdio:'pipe'}); execFileSync('/usr/bin/codesign',['--verify','-R',requirement,app],{stdio:'pipe'}); }
 function dr(app) { const value = execFileSync('/usr/bin/codesign',['-d','-r-',app],{encoding:'utf8',stdio:['ignore','pipe','pipe']}); if (!value.includes('designated =>')) throw Error('Designated requirement unavailable'); return value.trim(); }
@@ -20,9 +22,11 @@ function run() {
   if (!source || !fs.existsSync(source)) throw Error('--source must name the signed candidate');
   if (source === target || fs.lstatSync(source).isSymbolicLink()) throw Error('Source must be a separate real app bundle');
   if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink()) throw Error('Refusing a symlink install target');
+  if (previousTarget && (previousTarget === target || fs.existsSync(target) || !fs.existsSync(previousTarget))) throw Error('Rename requires one existing old app and an unused new target');
+  if (fs.existsSync(previousInstall) && fs.lstatSync(previousInstall).isSymbolicLink()) throw Error('Refusing a symlink previous install');
   verify(source);
-  if (fs.existsSync(target)) { verify(target); if (dr(source) !== dr(target)) throw Error('Designated requirement changed; refusing update'); }
-  try { execFileSync('/usr/bin/pgrep',['-f','/Contents/MacOS/WindowFactoryNative([[:space:]]|$)'],{stdio:'pipe'}); throw Error('Quit Window Factory Native before installing'); }
+  if (fs.existsSync(previousInstall)) { verify(previousInstall); if (dr(source) !== dr(previousInstall)) throw Error('Designated requirement changed; refusing update'); }
+  try { execFileSync('/usr/bin/pgrep',['-f','/Contents/MacOS/WindowFactoryNative([[:space:]]|$)'],{stdio:'pipe'}); throw Error('Quit Window Factory before installing'); }
   catch (e) { if (e.status !== 1) throw e; }
   let catalogBytes;
   const destination = path.join(dataDir,'layouts.json');
@@ -33,15 +37,15 @@ function run() {
   }
   fs.mkdirSync(path.dirname(target),{recursive:true});
   const stage = fs.mkdtempSync(path.join(path.dirname(target),'.window-factory-install-'));
-  const staged = path.join(stage,'Window Factory Native.app'), previous = path.join(stage,'previous.app');
+  const staged = path.join(stage,'Window Factory.app'), previous = path.join(stage,'previous.app');
   let replaced = false;
   try {
     execFileSync('/usr/bin/ditto',[source,staged]); verify(staged);
-    if (fs.existsSync(target)) {
+    if (fs.existsSync(previousInstall)) {
       const backupRoot = path.join(dataDir,'install-backups'); fs.mkdirSync(backupRoot,{recursive:true,mode:0o700});
-      const backup = path.join(backupRoot,`${Date.now()}-Window Factory Native.app`);
-      execFileSync('/usr/bin/ditto',[target,backup]); verify(backup);
-      fs.renameSync(target,previous);
+      const backup = path.join(backupRoot,`${Date.now()}-Window Factory.app`);
+      execFileSync('/usr/bin/ditto',[previousInstall,backup]); verify(backup);
+      fs.renameSync(previousInstall,previous);
     }
     fs.renameSync(staged,target); replaced = true; verify(target);
     if (catalogBytes && !fs.existsSync(destination)) {
@@ -53,7 +57,7 @@ function run() {
     console.log(`Installed ${target}\nLayouts: ${destination}\nSigned identity verified; no permission grants or shortcut changes.`);
   } catch (error) {
     if (replaced && fs.existsSync(target)) fs.renameSync(target,path.join(stage,'failed-candidate.app'));
-    if (fs.existsSync(previous)) fs.renameSync(previous,target);
+    if (fs.existsSync(previous)) fs.renameSync(previous,previousInstall);
     throw Error(`Install failed; previous app restored where available. Evidence: ${stage}. ${error.message}`);
   }
 }

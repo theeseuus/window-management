@@ -1,4 +1,4 @@
-# Window Factory Native candidate
+# Window Factory candidate
 
 A separate Swift/AppKit port of Factory Workspace. It leaves the tagged working
 Hammerspoon implementation, deployed Spoons, recipes and global shortcuts alone.
@@ -7,7 +7,7 @@ Hammerspoon Window Factory.
 
 ## Stable build, installation and updates
 
-The local app lives at `/Applications/Window Factory Native.app`. Native layouts
+The local app lives at `/Applications/Window Factory.app`. Native layouts
 live at `~/.local/share/window-factory-native/layouts.json`. The first stable
 installation copied the six existing native layouts byte-for-byte from the
 pilot catalog; that original pilot catalog remains recoverable. Hammerspoon's
@@ -20,7 +20,7 @@ mise run native-build
 mise run native-test
 ```
 
-Output now defaults to `~/.cache/window-factory-native/build/Window Factory Native.app`,
+Output now defaults to `~/.cache/window-factory-native/build/Window Factory.app`,
 outside the File Provider-managed source checkout. `WINDOW_FACTORY_BUILD_DIR`
 can select another local output directory. Do not put signed app bundles in the
 iCloud-managed source tree: Finder metadata previously invalidated their strict
@@ -35,11 +35,11 @@ Private keys are never exported or stored here. macOS owns signing-key access;
 any key-access prompt belongs to the owner. There is no ad hoc fallback. Local
 installation does not submit the app for notarization or publish an artifact.
 
-Quit only Window Factory Native before installing or updating:
+Quit only Window Factory before installing or updating:
 
 ```fish
 mise run native-install
-open '/Applications/Window Factory Native.app'
+open '/Applications/Window Factory.app'
 ```
 
 The installer verifies the candidate and existing signatures, rejects a changed
@@ -72,7 +72,7 @@ it. Keep Hammerspoon as fallback during that check.
 A harmless synthetic preview is still available:
 
 ```fish
-open '/Applications/Window Factory Native.app' --args --preview
+open '/Applications/Window Factory.app' --args --preview
 ```
 
 Quit a running normal instance first. Preview uses synthetic layouts in memory,
@@ -290,3 +290,30 @@ Initial Accessibility approval for the installed signed identity and a live
 signed-update retention check are pending; matching requirements alone do not
 establish permission retention. No Hammerspoon files, runtime, shortcuts or
 Hammerspoon catalog were changed.
+
+
+## Signed rename/update check, 2026-10-24
+
+The owner requested the visible name `Window Factory`. Build 0.2.0/4 changes the
+bundle filename, display name, library title and Quit menu to that name. The
+bundle identifier `local.windowfactory.native`, Developer ID/Team, executable
+name, data directory and preferences domain remain unchanged intentionally.
+The guarded installer accepts `--previous-target` for this explicit move from
+`/Applications/Window Factory Native.app` to `/Applications/Window Factory.app`.
+It rejects ambiguous old/new installations or a symlink old app, verifies both
+signatures and identical designated requirements, and retains the previous app
+for recovery. On failure it restores the original path.
+
+The signed update and path migration completed. Strict signature verification
+passes. The pre/post designated requirements match exactly, and all six native
+layouts match the pre-update catalog byte-for-byte and appear in the library.
+The interface and app menu show Window Factory; no layout operations were run.
+
+Permission acceptance remains open: after restarting the original installed
+build, it already reported Accessibility denied while System Settings showed
+its old named entry on. The renamed build likewise reports denied. This is not
+a demonstrated loss of a working grant during update, and cannot be counted as
+a permission-retention test. The owner has been asked to remove the old entry
+and add the current signed Applications copy. A subsequent signed update must
+start from verified enabled controls before claiming access continuity.
+Hammerspoon remains unchanged throughout.
