@@ -103,7 +103,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         }
         applyPreferences(); reload()
         status.stringValue = preview ? "Preview only. Window operations and catalog changes are disabled."
-            : "Global shortcuts remain with Hammerspoon. " + (AXIsProcessTrusted() ? "Ready." : "Accessibility access is needed for capture and placement.")
+            : "" + (AXIsProcessTrusted() ? "Ready." : "Accessibility access is needed for capture and placement.")
     }
     var selected: Recipe? { filtered.indices.contains(table.selectedRow) ? filtered[table.selectedRow] : nil }
     func show() { window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true); window.makeFirstResponder(search) }

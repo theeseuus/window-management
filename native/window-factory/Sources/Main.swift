@@ -4,6 +4,7 @@ import AppKit
 final class FactoryApp: NSObject, NSApplicationDelegate {
     var library: LibraryWindow?
     var settings: SettingsWindow?
+    var geometry: DirectWindowControls?
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
             let args = CommandLine.arguments
@@ -29,6 +30,13 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             library = LibraryWindow(store:store,registry:registry,preview:preview,preferences:preferences)
             library?.onSettings = { [weak self] in self?.showSettings(nil) }
             settings?.changed = { [weak self] in self?.library?.applyPreferences() }
+            if !preview {
+                let controls = DirectWindowControls(preferences:preferences); geometry = controls
+                controls.workspaceBusy = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil }
+                controls.changed = { [weak self] in self?.settings?.refresh() }
+                settings?.geometry = controls
+                controls.restorePreference()
+            }
             let menu = NSMenu(), item = NSMenuItem(), appMenu = NSMenu()
             let settingsItem = appMenu.addItem(withTitle:"Settings…",action:#selector(showSettings(_:)),keyEquivalent:",")
             settingsItem.target = self; appMenu.addItem(.separator())
@@ -63,7 +71,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             windowMenu.addItem(withTitle:"Close Window",action:#selector(NSWindow.performClose(_:)),keyEquivalent:"w")
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
             NSApp.mainMenu = menu
-            library?.show()
+            if !args.contains("--background") { library?.show() }
         } catch {
             let alert = NSAlert(); alert.messageText = "Window Factory could not start"; alert.informativeText = error.localizedDescription
             alert.runModal(); NSApp.terminate(nil)
@@ -73,7 +81,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main

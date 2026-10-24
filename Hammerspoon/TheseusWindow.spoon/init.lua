@@ -22,6 +22,7 @@ obj.hyper      = {"ctrl", "alt", "cmd"}
 obj.hyperShift = {"ctrl", "alt", "cmd", "shift"}
 
 -- User configuration
+obj.geometryHotkeys          = true -- false releases only the native geometry pilot group
 obj.showSpaceIndicator       = false
 obj.widthStep                = 80
 obj.minWindowWidth           = 360
@@ -986,6 +987,7 @@ function obj:bindHotkeys()
     focusDirectionalWindow("right")
   end)
 
+  if self.geometryHotkeys ~= false then
   -- Experiment: derive geometry directly from the current frame. Shift runs
   -- the same stateless cycles in reverse; legacy Hyper + 2/3/4/8 remain intact.
   hs.hotkey.bind(h, "-", cycleCanonicalSize)
@@ -1035,6 +1037,8 @@ function obj:bindHotkeys()
     if w then cycleWindow(w, eighths, -1, "8") end
   end)
 
+  end -- geometry size/position cycles
+
   -- Stash toggle: Hyper + S
   hs.hotkey.bind(h, "s", function()
     local w = hs.window.focusedWindow()
@@ -1064,6 +1068,7 @@ function obj:bindHotkeys()
     self:moveFocusedWindowToAdjacentSpace(1)
   end)
 
+  if self.geometryHotkeys ~= false then
   -- Hyper+Up = centred half-width/full-height; Hyper+Down = restore.
   hs.hotkey.bind(h, "up", function()
     local w = hs.window.focusedWindow()
@@ -1103,6 +1108,8 @@ function obj:bindHotkeys()
     local w = hs.window.focusedWindow()
     if w then w:minimize() end
   end)
+
+  end -- geometry placement/maximize/minimize
 
   return self
 end

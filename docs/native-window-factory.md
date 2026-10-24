@@ -134,3 +134,24 @@ with no duplicates, current-Space isolation, honest failure/cancellation, and
 clean restart before the Hyper+R handoff. Validate the full carried-over adapter
 list; port broader window controls in separate accepted changes. The tagged Hammerspoon version remains
 the fallback until the replacement has had ordinary daily use.
+
+
+## Complete controller port selected, 2026-10-24
+
+The owner selected the complete TheseusWindow controller for native Window
+Factory, in this order: (1) size/position cycles, centring, frame restore,
+width changes and maximize/minimize; (2) directional focus; (3) stash/restore;
+(4) the window switcher; (5) native Space move-and-follow and its indicator.
+Existing physical shortcuts remain the contract. Each group needs a harmless
+live pilot before acceptance; retain the Hammerspoon implementation and a
+reversible binding handoff until then. Configurable command bindings and the
+main-window/settings redesign follow the controller port, not this first group.
+
+The geometry pilot adds nineteen native Carbon hotkeys, disabled by default,
+and a settings switch for activating/releasing that group. The managed loader
+can release only the Hammerspoon geometry group via `geometryHotkeys = false`;
+the Spoon defaults to true for standalone/fallback use. Do not register both
+implementations. Registration is exclusive and all-or-nothing on a reported
+conflict, but explicit loader ownership remains necessary. No input monitor or
+Space mutation is needed for geometry. The app may start with `--background`
+to register accepted controls without presenting its library.

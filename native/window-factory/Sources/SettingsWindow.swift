@@ -11,6 +11,10 @@ final class FactoryPreferences {
         get { defaults.bool(forKey:"showShortcutHints") }
         set { defaults.set(newValue,forKey:"showShortcutHints") }
     }
+    var geometryEnabled: Bool {
+        get { defaults.bool(forKey:"nativeGeometryEnabled") }
+        set { defaults.set(newValue,forKey:"nativeGeometryEnabled") }
+    }
     var keepLibraryOnTop: Bool {
         get { defaults.bool(forKey:"keepLibraryOnTop") }
         set { defaults.set(newValue,forKey:"keepLibraryOnTop") }
@@ -23,23 +27,30 @@ final class SettingsWindow: NSObject {
     let preferences: FactoryPreferences
     let store: LayoutStore
     var changed: (() -> Void)?
+    weak var geometry: DirectWindowControls?
+    private let geometryEnabled = NSButton(checkboxWithTitle:"Enable native geometry shortcuts",target:nil,action:nil)
+    private let geometryStatus = NSTextField(wrappingLabelWithString:"")
     private let hints = NSButton(checkboxWithTitle:"Show keyboard shortcuts beside actions",target:nil,action:nil)
     private let floating = NSButton(checkboxWithTitle:"Keep the library above other windows",target:nil,action:nil)
     private let access = NSTextField(wrappingLabelWithString:"")
     private var monitor: Any?
     init(store: LayoutStore,preferences: FactoryPreferences) {
         self.store = store; self.preferences = preferences
-        window = NSWindow(contentRect:NSRect(x:0,y:0,width:620,height:580),
+        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:780),
             styleMask:[.titled,.closable],backing:.buffered,defer:false)
         super.init()
         window.title = "Window Factory Settings"; window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
         let general = Self.heading("General")
+        geometryEnabled.target = self; geometryEnabled.action = #selector(changeGeometry)
+        geometryStatus.font = .systemFont(ofSize:11); geometryStatus.textColor = .secondaryLabelColor
+        let geometryKeys = NSTextField(wrappingLabelWithString:"Hold Tab for Hyper (⌃⌥⌘).\n− / =  Size / position cycles; add Shift to reverse\n2 / 3 / 4 / 8  Halves / thirds / quarters / eighths; Shift reverses\n↑ / ↓  Centred half / previous frame     [ / ]  Narrow / widen\n↩  Centre horizontally     ⇧↩  Maximize     D  Minimize\nFocus, stash, switching and Space controls remain in Hammerspoon during the staged port.")
+        geometryKeys.font = .systemFont(ofSize:12)
         for button in [hints,floating] { button.target = self; button.action = #selector(changePreferences) }
         let keys = NSTextField(wrappingLabelWithString:
             "⌘N  Capture a layout\n↑ / ↓  Select a layout\n↩  Restore existing windows    ⌘↩  Establish missing windows\n⌘F  Search    ⌘⌫  Delete selected layout (with confirmation)\n⌘I  Import    ⇧⌘E  Export\n↩  Save a named capture    ⎋  Cancel or close\n⌘,  Settings    ⌘W  Close window    ⌘Q  Quit")
         keys.font = .systemFont(ofSize:13)
-        let ownership = NSTextField(wrappingLabelWithString:"These commands work inside Window Factory. Hyper+R and the other global window shortcuts remain with Hammerspoon.")
+        let ownership = NSTextField(wrappingLabelWithString:"These commands work inside the library. The geometry group is shown below. Hammerspoon still owns the Tab+R launcher and the groups awaiting their native pilots.")
         ownership.textColor = .secondaryLabelColor
         let permission = NSButton(title:"Open Accessibility Settings…",target:self,action:#selector(openAccess))
         permission.bezelStyle = .rounded
@@ -49,6 +60,7 @@ final class SettingsWindow: NSObject {
         location.font = .systemFont(ofSize:11); location.isSelectable = true
         let folder = NSButton(title:"Show Layout Folder",target:self,action:#selector(showFolder)); folder.bezelStyle = .rounded
         let stack = NSStackView(views:[general,hints,floating,Self.heading("Keyboard commands"),keys,ownership,
+            Self.heading("Direct window controls — geometry pilot"),geometryEnabled,geometryStatus,geometryKeys,
             Self.heading("Access and storage"),access,permission,location,folder])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -70,7 +82,19 @@ final class SettingsWindow: NSObject {
     static func heading(_ text: String) -> NSTextField {
         let field = NSTextField(labelWithString:text); field.font = .systemFont(ofSize:14,weight:.semibold); return field
     }
+    @objc func changeGeometry() {
+        guard let geometry else { return }
+        if geometryEnabled.state == .on {
+            do { try geometry.enable() }
+            catch { let alert = NSAlert(); alert.messageText = "Geometry shortcuts were not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
+        } else { geometry.disable() }
+        refresh()
+    }
     func refresh() {
+        geometryEnabled.state = geometry?.active == true ? .on : .off
+        geometryEnabled.isEnabled = geometry != nil
+        geometryStatus.stringValue = geometry?.lastResult ?? "Unavailable in preview."
+
         hints.state = preferences.showShortcutHints ? .on : .off
         floating.state = preferences.keepLibraryOnTop ? .on : .off
         access.stringValue = AXIsProcessTrusted() ? "Accessibility: enabled." : "Accessibility: not enabled. Grant access to this installed app in System Settings, then restart it."

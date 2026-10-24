@@ -9,3 +9,10 @@ BOOL WFReadFrame(AXUIElementRef _Nonnull window, CGRect * _Nonnull frame);
 AXError WFSetPosition(AXUIElementRef _Nonnull window, CGPoint position);
 AXError WFSetSize(AXUIElementRef _Nonnull window, CGSize size);
 NS_ASSUME_NONNULL_END
+
+// Exclusive Carbon hotkeys; the callback is delivered on the AppKit event loop.
+typedef void (*WFHotKeyCallback)(uint32_t index, void * _Nonnull context);
+int32_t WFRegisterHotKeys(const uint32_t * _Nonnull keys, const uint32_t * _Nonnull modifiers,
+                         uint32_t count, WFHotKeyCallback _Nonnull callback, void * _Nonnull context,
+                         uint32_t * _Nonnull failedIndex);
+void WFUnregisterHotKeys(void);

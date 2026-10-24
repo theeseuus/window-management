@@ -69,5 +69,18 @@ for _, failure in ipairs({ "collection", "setup" }) do
   equal(focused, 0, "do not focus after " .. failure .. " failure")
   equal(active, 0, "release tracking after " .. failure .. " failure")
 end
+local geometryKeys = { "ctrl+alt+cmd:-", "ctrl+alt+cmd+shift:-", "ctrl+alt+cmd:=", "ctrl+alt+cmd+shift:=",
+  "ctrl+alt+cmd:2", "ctrl+alt+cmd+shift:2", "ctrl+alt+cmd:3", "ctrl+alt+cmd+shift:3",
+  "ctrl+alt+cmd:4", "ctrl+alt+cmd+shift:4", "ctrl+alt+cmd:8", "ctrl+alt+cmd+shift:8",
+  "ctrl+alt+cmd:up", "ctrl+alt+cmd:down", "ctrl+alt+cmd:[", "ctrl+alt+cmd:]",
+  "ctrl+alt+cmd:return", "ctrl+alt+cmd+shift:return", "ctrl+alt+cmd:d" }
+for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","default fallback retains " .. key) end
+bindings = {}; spoon.geometryHotkeys = false; spoon:bindHotkeys()
+for _,key in ipairs(geometryKeys) do equal(bindings[key],nil,"native pilot releases " .. key) end
+for _,key in ipairs({"ctrl+alt+cmd:l","ctrl+alt+cmd:left","ctrl+alt+cmd:s","ctrl+alt+cmd+shift:s","ctrl+alt+cmd:w"}) do
+  equal(type(bindings[key]),"function","unported controls retained " .. key)
+end
+bindings = {}; spoon.geometryHotkeys = true; spoon:bindHotkeys()
+for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","fallback restores " .. key) end
 hs = originalHS
 print(string.format("window_filter_lifecycle_spec: %d assertions passed", assertions))
