@@ -1126,3 +1126,18 @@ Deployment is held with build 19 running: the shortcut reference reports one
 session-only stash. The owner has been asked to restore it before restart. The
 build 20 candidate is prepared; no installed app or saved layout changes are
 included in this checkpoint.
+
+
+### Build 20 installed and restarted, 2026-10-24
+
+After the owner reported restoring the stash, the reference initially still
+showed one saved frame. The normal Restore last stashed window action completed
+with “Restored Google Chrome”; reopening the reference confirmed zero session
+stashes before quitting. The guarded installer then replaced the app with signed
+build 20 at the stable Applications path. Signature verification passes, and the
+restarted Settings pane reports Accessibility enabled and all five native groups
+enabled, including accordion. The six-layout catalog retains its exact previous
+SHA-256, and Hammerspoon remains stopped. No control or fallback source changes
+were made during this deployment. A physical test of staircase overlap, anchor
+frontmost/focus, repetition and accepted-control regression is requested;
+acceptance remains pending.
