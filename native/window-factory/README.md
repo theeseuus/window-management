@@ -1036,3 +1036,15 @@ confirm Accessibility and all four native groups remain enabled; strict
 signature verification passes and the six-layout catalog is byte-for-byte
 unchanged. Hammerspoon remains stopped. A physical arrow-scrolling and switching
 regression pilot is requested; its acceptance is pending.
+
+
+### Build 18 physical scrolling retest accepted, 2026-10-24
+
+The owner confirmed that scrolling is now normal and the switcher controls
+still work. This accepts the build 18 scrolling fix in the owner's normal
+keyboard workflow, alongside the previously accepted persistent Tab+W toggle,
+window/desktop arrow navigation, Enter selection and Escape dismissal. The
+reported roulette-wheel scrolling defect is closed for these tested cases.
+Build 18 remains installed and running. This checkpoint changes documentation
+only; Hammerspoon, bindings, application code, preferences and saved layouts
+are unchanged.
