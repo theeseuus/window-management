@@ -445,3 +445,50 @@ Up then Down; horizontal-centre Return; bracket width steps; Shift+Return
 maximize; and D minimize. Reopen the test app from its Dock icon after minimize.
 Settings shows the last verified result or failure. Do not test against an
 unsaved working document. Record differences before starting the focus group.
+
+### Geometry first-press diagnosis and correction, 2026-10-24
+
+The owner's physical pilot passed the geometry group except that thirds and
+some other resizes sometimes reached a reduced frame on the first press and
+needed another press. The owner quit Hammerspoon to rule out its interference;
+it remained stopped throughout this investigation and native update.
+
+A disposable standard AppKit window reproduced the issue with Hammerspoon
+absent. AX size/position setters returned success even when the final frame was
+wrong. Growing a low/right window was constrained at its old origin; rapid
+successive AX setters also overlapped the application's frame animation. The
+old native handler issued size then position immediately and checked once at
+160 ms. Its geometry calculation tests did not exercise this application layer.
+The Hammerspoon 1.1.1 frame helper additionally reapplies size and temporarily
+manages AXEnhancedUserInterface. Merely adding that third immediate setter did
+not fix this test app; its Enhanced UI disable request was unsupported. The
+candidate does not change that application attribute.
+
+Build 9 confines the correction to direct geometry controls. It moves, resizes,
+then repositions, waiting for observed frames to settle between changes. Each
+wait has a 400 ms minimum, three unchanged 40 ms samples and a 1.2-second limit;
+position-only operations omit resize. Focus, exact window and current ordinary
+Space are rechecked throughout, cancellation stops subsequent writes, setter
+errors are reported and the final actual frame must match the target. Genuine
+app size/position constraints remain failures rather than being reported as
+success. This is a bounded response to a command, with no ongoing enforcement.
+The wait can make a resize more deliberate; physical responsiveness remains an
+owner acceptance check. Layout Restore/Establish placement and Rex adapters are
+unchanged by this correction, as are the shortcuts and Hammerspoon fallback.
+
+The automated suite adds 52 assertions covering a delayed application model,
+clipping from different origins, all thirds, maximize/half/quarter targets,
+real minimum-size refusal, focus loss and cancellation. The fixture also proves
+that the previous immediate size/move sequence fails. The existing 109 geometry
+assertions (96 Lua comparisons), core/catalog/installer tests and repository
+validation pass. Installed build 9 retains Accessibility, all nineteen native
+registrations and the exact six-layout catalog bytes. Physical acceptance of
+the corrected geometry path is still pending.
+
+Live application-layer validation used the exact production frame applier on
+only the disposable test window: 24/24 cases passed (four starting origins ×
+six targets: left/middle/right thirds, maximize, centred half and lower-right
+quarter). Its original frame was restored afterward. No working app windows
+were moved. This verifies the frame application primitive with Hammerspoon
+stopped; it does not substitute for the owner's physical shortcut retest or
+claim every third-party app has identical animation/minimum-size behaviour.

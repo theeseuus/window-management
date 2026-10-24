@@ -153,16 +153,23 @@ final class DirectWindowControls {
                 default: throw FactoryError("Unsupported geometry command.")
                 }
             }
-            try sameFocus(window,context); try window.eligible(in:context)
-            if abs(frame.w-target.w)>2 || abs(frame.h-target.h)>2 {
-                _ = WFSetSize(window.element,CGSize(width:target.w,height:target.h))
-            }
-            try sameFocus(window,context); try window.eligible(in:context)
-            _ = WFSetPosition(window.element,CGPoint(x:target.x,y:target.y))
-            try await Task.sleep(for:.milliseconds(160)); try sameFocus(window,context); try window.eligible(in:context)
-            var actual = CGRect.zero
-            guard WFReadFrame(window.element,&actual), Frame(x:actual.minX,y:actual.minY,w:actual.width,h:actual.height).matches(target) else {
-                throw FactoryError("Application did not reach the requested frame (it may enforce a minimum size).")
+            let actual = try await DirectFrameApplication.apply(target:target,from:frame,
+                check: { try self.sameFocus(window,context); try window.eligible(in:context) },
+                read: {
+                    var rect = CGRect.zero
+                    guard WFReadFrame(window.element,&rect) else { throw FactoryError("Window frame unavailable during placement.") }
+                    return Frame(x:rect.minX,y:rect.minY,w:rect.width,h:rect.height)
+                },
+                write: { change,goal in
+                    let status: AXError
+                    switch change {
+                    case .position: status = WFSetPosition(window.element,CGPoint(x:goal.x,y:goal.y))
+                    case .size: status = WFSetSize(window.element,CGSize(width:goal.w,height:goal.h))
+                    }
+                    guard status == .success else { throw FactoryError("Application rejected the frame change (Accessibility status \(status.rawValue)).") }
+                })
+            guard actual.matches(target) else {
+                throw FactoryError("Application did not reach the requested frame after settling (size or position may be constrained).")
             }
         }
         lastResult = "\(command.title): verified."; hud.show(command.title,on:context.screen)

@@ -19,3 +19,9 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     "$native_root/Sources/Core.swift" "$native_root/Sources/DirectGeometry.swift" \
     "$native_root/Tests/GeometryTests.swift" -o "$native_root/.build/geometry-tests"
 "$native_root/.build/geometry-tests" "$native_root/.build/geometry-oracle.json"
+
+xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
+    -module-cache-path "$native_root/.build/ModuleCache" \
+    "$native_root/Sources/Core.swift" "$native_root/Sources/DirectFrameApplication.swift" \
+    "$native_root/Tests/FrameApplicationTests.swift" -o "$native_root/.build/frame-application-tests"
+"$native_root/.build/frame-application-tests"
