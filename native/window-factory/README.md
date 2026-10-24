@@ -1141,3 +1141,15 @@ SHA-256, and Hammerspoon remains stopped. No control or fallback source changes
 were made during this deployment. A physical test of staircase overlap, anchor
 frontmost/focus, repetition and accepted-control regression is requested;
 acceptance remains pending.
+
+
+### Build 20 physical accordion stacking retest accepted, 2026-10-24
+
+The owner confirmed correct staircase stacking with the anchor frontmost and
+continued operation of the switcher, geometry, focus and stash controls in the
+requested repeat/regression pilot. This accepts the native accordion placement
+and stacking path for the tested cases and closes the reported overlap-order
+issue. Build 20 remains installed. This checkpoint changes documentation only;
+application code, shortcuts, preferences, saved layouts and the Hammerspoon
+fallback remain unchanged. Space movement, the Space indicator and launcher/
+startup ownership remain the migration work listed in the keyboard reference.
