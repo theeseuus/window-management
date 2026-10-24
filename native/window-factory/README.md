@@ -1205,3 +1205,17 @@ suite does not move real windows or switch desktops.
 After this pilot, the remaining Hammerspoon migration work is the menu-bar Space
 indicator and native launcher/startup ownership. The Lua library and original
 controls remain retained fallbacks, not missing native layout features.
+
+
+### Build 21 physical Space move-and-follow pilot accepted, 2026-10-24
+
+The owner confirmed the disposable-window round trip, retained original frame
+and exact focus, user-only native Control+Left/Right navigation, and continued
+operation of geometry, directional focus, stash, switcher and accordion in the
+requested regression pilot. This accepts native Tab+Left/Right move-and-follow
+for the tested ordinary-desktop scenario. It is not exhaustive app, multi-display,
+OS-version or boundary-behaviour coverage beyond the automated policy checks.
+Build 21 remains installed. This checkpoint changes documentation only; code,
+shortcuts, preferences, layouts and the Hammerspoon fallback are unchanged.
+The remaining Hammerspoon migration work is the menu-bar Space indicator and
+launcher/startup ownership; original controls and the Lua library remain fallbacks.
