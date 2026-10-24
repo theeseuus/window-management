@@ -634,3 +634,16 @@ focus, 109 geometry and 100 frame-application assertions. Installed build 12
 retains Accessibility, 19 geometry and 4 focus registrations. The geometry
 controller/algorithms/frame handler, catalog and managed fallback are unchanged.
 Hammerspoon remains quit.
+
+### Build 12 physical directional focus retest accepted, 2026-10-24
+
+The owner confirmed that directional focus changes now work and geometry still
+behaves as expected. This accepts the normal physical-key focus path after the
+build 12 activation correction and confirms that the accepted geometry group
+continues to work. Acceptance covers the owner's tested windows and directions;
+it is not an exhaustive claim across every app, display or edge case.
+
+This checkpoint records the result only: no app binary, shortcut, preference,
+layout or Hammerspoon implementation changed. Hammerspoon remains available as
+the independently selectable fallback. Stash/restore is next in the agreed
+controller-port sequence and has not been handed over yet.
