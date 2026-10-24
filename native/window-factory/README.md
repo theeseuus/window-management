@@ -970,3 +970,17 @@ Deployment is held with build 16 running: one window has a session-only saved
 stash frame that must be restored before quitting. No installed app, saved
 layouts, preferences or working Hammerspoon configuration has been changed by
 this checkpoint.
+
+
+### Build 17 installed and restarted, 2026-10-24
+
+After the owner restored the stashed window, the running shortcut reference
+confirmed zero session stashes. The guarded installer replaced the quit app
+with signed build 17 at `/Applications/Window Factory.app`. The restarted
+Settings pane reports version 0.2.0 (17), Accessibility enabled, and all four
+native control groups enabled. Strict signature verification passes, and the
+six-layout catalog retains its exact pre-update SHA-256
+`19b64c7cc973a977dc0fd0a46d99c20f68637397a2628768df8c9be2f4455867`.
+Hammerspoon remains stopped and its configuration unchanged. A physical keyboard
+pilot of persistent toggle, arrows, Enter selection and dismissal is requested;
+installation checks alone do not establish acceptance of that interaction.
