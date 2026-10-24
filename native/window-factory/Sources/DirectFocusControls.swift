@@ -123,12 +123,10 @@ final class DirectFocusControls {
             lastResult = "No window \(direction.rawValue)."; return
         }
         try checkSource(source,context); try target.eligible(in:targetContext)
-        guard let app = NSRunningApplication(processIdentifier:target.pid) else { throw FactoryError("Target app closed.") }
-        _ = AXUIElementSetAttributeValue(target.element,kAXMainAttribute as CFString,kCFBooleanTrue)
-        guard AXUIElementPerformAction(target.element,kAXRaiseAction as CFString) == .success,
-              app.activate(options:[]) else { throw FactoryError("Application refused directional focus.") }
-        // Activation can finish asynchronously. Only retry this exact target,
-        // on the captured desktops, while focus is still source or target.
+        var mainStatus: Int32 = 0, raiseStatus: Int32 = 0
+        let activationStatus = WFRequestWindowFocus(target.element,target.pid,&mainStatus,&raiseStatus)
+        // API dispatch is evidence, not proof of focus. Confirm the exact
+        // target independently, including apps that reject optional AXRaise.
         for _ in 0..<8 {
             try await Task.sleep(for:.milliseconds(30)); try context.check(); try target.eligible(in:targetContext)
             let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
@@ -138,7 +136,7 @@ final class DirectFocusControls {
                 lastResult = "Focus \(direction.rawValue): \(target.appName), verified."; return
             }
         }
-        throw FactoryError("Exact target focus was not confirmed.")
+        throw FactoryError("\(target.appName): exact focus was not confirmed (main \(mainStatus), raise \(raiseStatus), activation \(activationStatus)).")
     }
     func stop() { WFUnregisterFocusHotKeys(); task?.cancel(); active = false; hud.stop() }
 }

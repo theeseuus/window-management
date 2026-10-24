@@ -600,3 +600,37 @@ and nineteen geometry registrations; the independent four focus registrations
 were enabled in Settings. These are algorithm/registration checks. Normal
 physical-key focus, its responsiveness and live cross-display selection require
 the owner's pilot; no automated live focus success is claimed at this point.
+
+### Focus activation correction, 2026-10-24
+
+The owner reported applications refusing directional focus in build 11; Settings
+showed the generic `Application refused directional focus` result. That guard
+combined AXRaise success with `NSRunningApplication.activate(options: [])`, so
+the message did not identify which dispatch step failed. This physical pilot
+was a failure, not acceptance of the focus group.
+
+Build 12 replaces that activation branch with the original Hammerspoon 1.1.1
+front-window approach: mark the exact target main, attempt AXRaise without making
+it a prerequisite, then `GetProcessForPID`/`SetFrontProcessWithOptions` with
+`kSetFrontProcessFrontWindowOnly`, and reassert the selected main window. These
+are the legacy Carbon process APIs used by Hammerspoon's `HSapplication
+setFrontmost:` helper, not a new Space-movement capability. Deprecated API use
+is isolated in the bridge. The caller retains eligibility/identity/current-
+desktop guards and confirms the exact resulting focused window independently
+of request return values. A failed confirmation now includes separate main,
+raise and activation statuses and the target app name.
+
+A live comparison on the existing disposable test app confirmed the revised
+bridge focused its exact window (main 0, raise 0, activation 0); the prior focused
+window was restored on the same desktop. The old AppKit request was accepted
+in this small probe, so it did not reproduce the owner's specific failing
+app/dispatch step. The probe initially read stale foreground state while blocking
+its event loop; running the event loop corrected that diagnostic error. This
+is limited activation evidence, not normal physical-key acceptance in Rex,
+Safari, Codex or every app. The owner must retest the directional shortcuts.
+
+All native tests and repository validation pass, including the 293 directional
+focus, 109 geometry and 100 frame-application assertions. Installed build 12
+retains Accessibility, 19 geometry and 4 focus registrations. The geometry
+controller/algorithms/frame handler, catalog and managed fallback are unchanged.
+Hammerspoon remains quit.

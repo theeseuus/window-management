@@ -22,3 +22,7 @@ void WFUnregisterHotKeys(void);
 int32_t WFRegisterFocusHotKeys(const uint32_t * _Nonnull keys,uint32_t count,
     WFHotKeyCallback _Nonnull callback,void * _Nonnull context,uint32_t * _Nonnull failedIndex);
 void WFUnregisterFocusHotKeys(void);
+
+// Hammerspoon-compatible front-window activation; exact focus is verified by caller.
+int32_t WFRequestWindowFocus(AXUIElementRef _Nonnull window,pid_t pid,
+    int32_t * _Nonnull mainStatus,int32_t * _Nonnull raiseStatus);

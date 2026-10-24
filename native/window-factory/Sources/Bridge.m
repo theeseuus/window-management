@@ -161,3 +161,24 @@ int32_t WFRegisterFocusHotKeys(const uint32_t *keys,uint32_t count,WFHotKeyCallb
     }
     return noErr;
 }
+
+int32_t WFRequestWindowFocus(AXUIElementRef window,pid_t pid,int32_t *mainStatus,int32_t *raiseStatus) {
+    pid_t actual=0;
+    AXError identity=AXUIElementGetPid(window,&actual);
+    *mainStatus=kAXErrorFailure; *raiseStatus=kAXErrorFailure;
+    if(identity!=kAXErrorSuccess || actual!=pid) return paramErr;
+    *mainStatus=AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue);
+    // Raise is useful where supported, but some apps reject it. It must not
+    // prevent the front-window activation used by the original Spoon.
+    *raiseStatus=AXUIElementPerformAction(window,kAXRaiseAction);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    ProcessSerialNumber psn={0,0};
+    OSStatus status=GetProcessForPID(pid,&psn);
+    if(status==noErr) status=SetFrontProcessWithOptions(&psn,kSetFrontProcessFrontWindowOnly);
+#pragma clang diagnostic pop
+    // Preserve the selected window when activation chooses an app's old main
+    // window (notably Finder). Never activate all windows or another Space.
+    if(status==noErr) AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue);
+    return status;
+}
