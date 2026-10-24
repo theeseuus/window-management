@@ -55,6 +55,13 @@ import AppKit
         check(scroll.documentView !== document,"new session must rebuild its list")
         check(scroll.documentView!.bounds.height>=scroll.contentSize.height,"short lists must fill the viewport")
         picker.stop()
+        for label in ["1","12","123","?","—"] {
+            let image = SpaceIndicator.image(label)
+            check(image.isTemplate,"indicator adapts to menu-bar appearance")
+            check(image.size.height == 18 && image.size.width>=24,"compact outlined badge dimensions")
+            let bitmap = NSBitmapImageRep(data:image.tiffRepresentation!)!
+            check(bitmap.colorAt(x:0,y:0)!.alphaComponent == 0,"rounded badge corner stays transparent")
+        }
         print("native switcher panel: \(assertions) assertions passed; no windows shown or controlled")
     }
 }

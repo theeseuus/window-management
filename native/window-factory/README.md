@@ -1219,3 +1219,52 @@ Build 21 remains installed. This checkpoint changes documentation only; code,
 shortcuts, preferences, layouts and the Hammerspoon fallback are unchanged.
 The remaining Hammerspoon migration work is the menu-bar Space indicator and
 launcher/startup ownership; original controls and the Lua library remain fallbacks.
+
+
+### Build 22 native menu-bar Space indicator pilot, 2026-10-24
+
+The menu-bar indicator now has its own persisted General setting and a separate
+read-only native component. It retains the transparent rounded outline, centred
+13-point numeral and macOS template-image appearance. Numbers are ordinals in
+native ordinary-desktop order, excluding full-screen Spaces and opaque IDs.
+The tooltip gives the ordinal, total and display name; `?` reports unavailable or
+ambiguous data and `—` identifies a known full-screen/tiled Space. Malformed
+metadata never becomes an invented desktop number.
+
+Refresh is event driven: immediate reads plus one cancellable 100ms settling
+read on Space changes, app activation, wake, display changes and this app's key
+window changes. Native move-and-follow and switcher completion explicitly
+reconcile even if macOS emits no Space notification; directional focus also
+refreshes display choice. There is no permanent timer, keyboard interception,
+predictive counting or desktop/window mutation. Where existing AX access is
+available, the front app's focused-window frame selects the display; credential
+apps are excluded, and the fallback is NSScreen.main/first. No new permission is
+requested. Same-app cross-display manual focus changes and rapid intermediate
+traversal retain their separate physical coverage limits.
+
+Images are cached by label and cleared on stop. Disabling removes the status
+item, observers and settling task without releasing any shortcut group. The
+badge menu opens the library, Settings or shortcut reference; it does not offer
+Space-switching actions. All accepted control implementation and bridge files
+are unchanged. Only Main callback wiring reconciles the indicator after relevant
+commands. The Hammerspoon indicator algorithm is unchanged; the managed loader
+sets `showSpaceIndicator = false`. Fallback: turn the native indicator off, set
+that managed flag true, apply and reload Hammerspoon. Do not enable both badges.
+
+Validation passes: 1,064 pure state assertions cover desktop ordering/counts,
+full-screen exclusion/marker, unknown types, invalid IDs, duplicate/current
+ambiguity and tooltips. Fifteen real AppKit image assertions check template
+rendering, dimensions and transparent corners for one/two/three digits and both
+markers, bringing that panel suite to 142 assertions. All existing native suites
+and repository validation pass. The normal tests create no status items and do
+not move windows or switch desktops.
+
+Build 22 was signed, installed at the existing Applications path and restarted
+after confirming zero session stashes. Strict installed signature verification
+passes; Accessibility, all six enabled control groups and the exact six-layout
+catalog are preserved. The indicator was enabled and reported Active user Space
+3 of 7 on LG ULTRAFINE. Settings disable/re-enable passed independently of the
+controls, leaving it enabled. Hammerspoon remains stopped. Physical badge/menu,
+desktop traversal, native command updates and regression acceptance are pending.
+After this pilot, launcher/startup ownership is the remaining Hammerspoon port;
+the Lua library and original controls remain retained fallbacks.

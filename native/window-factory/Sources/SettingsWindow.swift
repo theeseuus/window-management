@@ -11,6 +11,10 @@ final class FactoryPreferences {
         get { defaults.bool(forKey:"showShortcutHints") }
         set { defaults.set(newValue,forKey:"showShortcutHints") }
     }
+    var spaceIndicatorEnabled: Bool {
+        get { defaults.bool(forKey:"nativeSpaceIndicatorEnabled") }
+        set { defaults.set(newValue,forKey:"nativeSpaceIndicatorEnabled") }
+    }
     var geometryEnabled: Bool {
         get { defaults.bool(forKey:"nativeGeometryEnabled") }
         set { defaults.set(newValue,forKey:"nativeGeometryEnabled") }
@@ -47,6 +51,9 @@ final class SettingsWindow: NSObject {
     let preferences: FactoryPreferences
     let store: LayoutStore
     var changed: (() -> Void)?
+    weak var spaceIndicator: SpaceIndicator?
+    private let indicatorEnabled = NSButton(checkboxWithTitle:"Show menu-bar Space indicator",target:nil,action:nil)
+    private let indicatorStatus = NSTextField(wrappingLabelWithString:"")
     weak var spaceMove: DirectSpaceMoveControls?
     private let spaceMoveEnabled = NSButton(checkboxWithTitle:"Enable native Space move-and-follow shortcuts",target:nil,action:nil)
     private let spaceMoveStatus = NSTextField(wrappingLabelWithString:"")
@@ -72,12 +79,14 @@ final class SettingsWindow: NSObject {
     private var monitor: Any?
     init(store: LayoutStore,preferences: FactoryPreferences) {
         self.store = store; self.preferences = preferences
-        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:1330),
+        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:1390),
             styleMask:[.titled,.closable],backing:.buffered,defer:false)
         super.init()
         window.title = "Window Factory Settings"; window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
         let general = Self.heading("General")
+        indicatorEnabled.target = self; indicatorEnabled.action = #selector(changeIndicator)
+        indicatorStatus.font = .systemFont(ofSize:11); indicatorStatus.textColor = .secondaryLabelColor
         spaceMoveEnabled.target = self; spaceMoveEnabled.action = #selector(changeSpaceMove)
         spaceMoveStatus.font = .systemFont(ofSize:11); spaceMoveStatus.textColor = .secondaryLabelColor
         accordionEnabled.target = self; accordionEnabled.action = #selector(changeAccordion)
@@ -108,7 +117,7 @@ final class SettingsWindow: NSObject {
         let location = NSTextField(wrappingLabelWithString:"Version: \(version) (\(build))\nApp: \(Bundle.main.bundlePath)\nLayouts: \(store.url.path)")
         location.font = .systemFont(ofSize:11); location.isSelectable = true
         let folder = NSButton(title:"Show Layout Folder",target:self,action:#selector(showFolder)); folder.bezelStyle = .rounded
-        let stack = NSStackView(views:[general,hints,floating,reference,Self.heading("Keyboard commands"),keys,ownership,
+        let stack = NSStackView(views:[general,hints,floating,indicatorEnabled,indicatorStatus,reference,Self.heading("Keyboard commands"),keys,ownership,
             Self.heading("Direct window controls — geometry pilot"),geometryEnabled,geometryStatus,geometryKeys,
             Self.heading("Directional focus — pilot"),focusEnabled,focusStatus,focusKeys,
             Self.heading("Stash / restore — pilot"),stashEnabled,stashStatus,
@@ -135,6 +144,11 @@ final class SettingsWindow: NSObject {
     }
     static func heading(_ text: String) -> NSTextField {
         let field = NSTextField(labelWithString:text); field.font = .systemFont(ofSize:14,weight:.semibold); return field
+    }
+    @objc func changeIndicator() {
+        guard let spaceIndicator else { return }
+        if indicatorEnabled.state == .on { spaceIndicator.enable() } else { spaceIndicator.disable() }
+        refresh()
     }
     @objc func changeSpaceMove() {
         guard let spaceMove else { return }
@@ -186,6 +200,9 @@ final class SettingsWindow: NSObject {
         refresh()
     }
     func refresh() {
+        indicatorEnabled.state = spaceIndicator?.active == true ? .on : .off
+        indicatorEnabled.isEnabled = spaceIndicator != nil
+        indicatorStatus.stringValue = spaceIndicator?.lastResult ?? "Unavailable in preview."
         spaceMoveEnabled.state = spaceMove?.active == true ? .on : .off
         spaceMoveEnabled.isEnabled = spaceMove != nil
         spaceMoveStatus.stringValue = spaceMove?.lastResult ?? "Unavailable in preview."

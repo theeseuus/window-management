@@ -6,6 +6,7 @@ final class ShortcutReferenceWindow: NSObject {
     private let preferences: FactoryPreferences
     private let text = NSTextView()
     private let restore = NSButton(title:"Restore last stashed window",target:nil,action:nil)
+    weak var spaceIndicator: SpaceIndicator?
     weak var spaceMove: DirectSpaceMoveControls?
     weak var accordion: DirectAccordionControls?
     weak var geometry: DirectWindowControls?
@@ -82,6 +83,10 @@ final class ShortcutReferenceWindow: NSObject {
           Hyper + ← / →     Move the focused window to the adjacent desktop and follow
           Same display; ordinary desktops only; no wrapping at the ends.
           Original frame and exact window focus are verified.
+
+        MENU-BAR SPACE INDICATOR  [\(state(spaceIndicator?.active == true))]
+          Number: active desktop ordinal     ?: unavailable     —: full-screen/tiled
+          No shortcut. Click the badge for library, settings and shortcut reference.
 
         REMAINING HAMMERSPOON CONTROLS  [\(hammerspoon)]
           Hyper + R         Open native Window Factory

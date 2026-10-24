@@ -72,3 +72,9 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     "$native_root/Sources/Core.swift" "$native_root/Sources/SpaceMovement.swift" \
     "$native_root/Tests/SpaceMovementTests.swift" -o "$native_root/.build/space-movement-tests"
 "$native_root/.build/space-movement-tests"
+
+xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
+    -module-cache-path "$native_root/.build/ModuleCache" \
+    "$native_root/Sources/SpaceIndicatorState.swift" "$native_root/Tests/SpaceIndicatorTests.swift" \
+    -o "$native_root/.build/space-indicator-tests"
+"$native_root/.build/space-indicator-tests"
