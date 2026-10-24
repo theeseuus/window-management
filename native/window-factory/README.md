@@ -317,3 +317,34 @@ a permission-retention test. The owner has been asked to remove the old entry
 and add the current signed Applications copy. A subsequent signed update must
 start from verified enabled controls before claiming access continuity.
 Hammerspoon remains unchanged throughout.
+
+## Live signed-update acceptance, 2026-10-24
+
+After the owner replaced the stale permission entry with the installed
+`/Applications/Window Factory.app` entry and enabled it, build 0.2.0/4 was
+restarted. Capture, Restore and Establish became enabled. Command–N performed
+a real current-desktop capture of six windows; Escape cancelled it without
+saving. This established a working baseline before the update.
+
+Build 0.2.0/5 was compiled and Developer ID signed with the same certificate,
+Team, bundle identifier and designated requirement. Its executable SHA-256
+changed from `3b58b5dba543370ddd05898e8e70a90593dee17c9e02cb9d99779da84183d102`
+to `46f17ff4538633a33b6169be0ab43e2148820477a4fd4ca69b70e292556bf5de`.
+The normal guarded installer replaced the quit app at the same Applications
+path, verified signatures and retained a verified previous bundle for recovery.
+No permission setting was touched during this replacement or relaunch.
+
+After relaunch, all three operation controls remained enabled. Command–N again
+captured six real windows and Escape cancelled without saving. Settings showed
+version `0.2.0 (5)`, the correct Applications path and `Accessibility: enabled`.
+Both existing preference values were retained (keyboard hints and keep-on-top
+were enabled). All six saved layouts remained visible, and catalog bytes match
+the baseline exactly, including after both cancelled captures; SHA-256 is
+`19b64c7cc973a977dc0fd0a46d99c20f68637397a2628768df8c9be2f4455867`.
+
+This closes the pending same-identity signed-update Accessibility/layout
+acceptance. It does not prove certificate rotation, notarized distribution or
+all future OS versions. No Restore/Establish or other app-window mutation was
+needed for this update check. Hammerspoon files, runtime, global bindings and
+Hammerspoon saved layouts remain unchanged. Current default build is 0.2.0/5;
+the visible product name is Window Factory.
