@@ -801,3 +801,30 @@ with only the expected pre-commit dirty-worktree warning. Physical forward/
 reverse selection, modifier release, Escape cancellation, cross-Space activation
 and retained existing controls remain the owner's pilot check. Preview capture
 with pre-existing Screen Recording permission has not been live-validated here.
+
+### Build 15 physical switcher retest: same-Space pass, cross-Space gap, 2026-10-24
+
+The owner confirmed forward/backward cycling, release-to-select and Escape-to-
+cancel work in the normal physical keyboard path. Geometry, directional focus
+and stash/restore still behave as expected. This accepts the switcher interaction
+for windows on the current Space and retains the earlier control-group acceptance.
+
+The owner also reported that Tab+W lists windows only on the current Space;
+windows on other Spaces are absent. **Cross-Space discovery is an open defect,
+not accepted functionality or an untested success.** The implementation and
+reference UI intend to include those windows, but that intention is not the
+observed result. Cross-Space activation cannot be accepted while discovery
+omits its targets. The earlier same-desktop service probe and selector tests do
+not close this gap. Native switching has not yet reached full parity with the
+original Hammerspoon cross-Space switcher.
+
+Next investigation: determine where eligible other-Space windows are lost in
+collection, membership validation or display mapping, then run an owner-observed
+cross-Space discovery/activation test without changing the accepted controls.
+No cause is established by this report. The original independent Hammerspoon
+switcher fallback remains available. Accordion remains unported.
+
+This checkpoint records the result only; no app binary, shortcut, preference,
+layout or Hammerspoon implementation changed. The owner reported pushing the
+implementation; both local repositories matched their tracked remotes before
+these documentation updates.
