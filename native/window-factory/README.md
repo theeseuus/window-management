@@ -50,8 +50,8 @@ Remaining verification and polish, before adding a new feature:
 - Review deliberate, consistent visible stash edges. The current native command
   requests a right-edge stash and accepts macOS constraints; it does not promise
   a chosen visible strip width or provide a left/right stash selector.
-- Compare the old layout row thumbnails/app icons with the native list/selected
-  preview. Build 33 adds the Restore/Establish/Delete right-click menu.
+- Observe the new row thumbnails/app icons in ordinary use. Build 34 implements
+  these visual affordances; build 33 supplies the row context menu.
 
 Deferred feature choices, with none selected by this review:
 
@@ -212,7 +212,8 @@ optional and initially off; a quit app must be reopened from the Dock/Applicatio
 - Capture eligible standard windows on the selected ordinary desktop/display;
   exclude hidden, minimized, full-screen, other-Space, own and credential-manager
   windows. Freeze the snapshot before naming; cancel does not save.
-- Search layouts/applications, select with arrows, preview normalized outlines;
+- Search layouts/applications, select with arrows, preview normalized outlines
+  in row thumbnails and the selected-layout pane; row icons identify saved apps;
   Return restores existing windows, Command–Return establishes missing ones,
   Escape cancels an operation/capture or closes the library. Double-click
   restores; Command–Delete requests confirmed deletion. Right-click a layout for
@@ -392,3 +393,31 @@ and was also cancelled. Both current/previous catalog hashes and app-owned
 settings hashes remained unchanged. The live CLI confirmed Accessibility and
 Agent access remained enabled. No saved layout was deleted during verification.
 The successful signed update retained only backup builds 32 and 31.
+
+
+## Library row thumbnails and app icons (build 34)
+
+Rows show a compact outline thumbnail drawn from the saved normalized window
+frames, the layout name and up to four distinct app icons. The thumbnail is a
+geometry illustration, not a live screenshot or a capture of application content.
+App icons resolve by saved bundle ID through NSWorkspace without launching apps
+and are cached for the library lifetime. Unavailable apps use a generic app icon.
+Repeated windows in one app share an icon and show a saved-window count. Extra
+apps appear as +N with their names available on hover. App icons have accessible
+names/counts; the native row title and full summary tooltip remain available.
+
+Row height is 68 points, with a fixed 84×52-point thumbnail, a truncating title
+and a bounded icon strip. Search still matches saved names and app summaries;
+selection, keyboard handling, double-click Restore and the row-targeted context
+menu use their existing code paths. Layout schema, catalogs, operations, direct
+controls and Hammerspoon fallback are unchanged.
+
+
+Build 34 passed the full native suite (217 AppKit assertions), including grouping,
+window counts, normalized thumbnail geometry, missing-icon fallback and bounded
+many-app rows. Repository validation and strict installed-signature verification
+passed. Live visual inspection confirmed the current saved rows, installed icons
+and the Dual Finder ×2 count. App-name search found Dual Finder, clearing search
+restored the full list, and right-clicking its icon selected that row and showed
+the existing context actions; the menu was cancelled without executing them.
+Current/previous catalog and app-owned settings hashes remained unchanged.

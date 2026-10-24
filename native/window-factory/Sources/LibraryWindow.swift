@@ -53,6 +53,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     let cancel = NSButton(title:"Cancel",target:nil,action:nil)
     let shortcuts = NSButton(title:"Shortcuts…",target:nil,action:nil)
     var filtered: [Recipe] = [], frozen: Recipe?, task: Task<Void,Never>?, monitor: Any?
+    private var appIcons: [String:NSImage] = [:]
     var lastReceipt: Receipt?
     init(store: LayoutStore,registry: AdapterRegistry,preview: Bool,preferences: FactoryPreferences) {
         self.store = store; self.coordinator = Coordinator(registry:registry); self.preview = preview; self.preferences = preferences
@@ -68,7 +69,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         search.placeholderString = "Search layouts or applications"; search.delegate = self
         let column = NSTableColumn(identifier:NSUserInterfaceItemIdentifier("layout"))
         column.title = "Layouts"; table.addTableColumn(column); table.headerView = nil
-        table.rowHeight = 48; table.dataSource = self; table.delegate = self
+        table.rowHeight = 68; table.dataSource = self; table.delegate = self
         table.menuForRow = { [weak self] row in self?.contextMenu(for:row) }
         table.target = self; table.doubleAction = #selector(restoreLayout)
         let scroll = NSScrollView(); scroll.documentView = table; scroll.hasVerticalScroller = true
@@ -175,12 +176,13 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     }
     func numberOfRows(in tableView: NSTableView) -> Int { filtered.count }
     func tableView(_ tableView: NSTableView,viewFor tableColumn: NSTableColumn?,row: Int) -> NSView? {
-        let recipe = filtered[row]
-        let title = NSTextField(labelWithString:recipe.name); title.font = .systemFont(ofSize:13,weight:.semibold)
-        let subtitle = NSTextField(labelWithString:recipe.summary); subtitle.font = .systemFont(ofSize:11)
-        subtitle.textColor = .secondaryLabelColor; subtitle.lineBreakMode = .byTruncatingTail
-        let view = NSStackView(views:[title,subtitle]); view.orientation = .vertical; view.alignment = .leading; view.spacing = 3
-        return view
+        LayoutRowView(recipe:filtered[row]) { [self] bundleID in
+            if let cached = appIcons[bundleID] { return cached }
+            let image = NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundleID).map { NSWorkspace.shared.icon(forFile:$0.path) }
+                ?? NSImage(systemSymbolName:"app",accessibilityDescription:"Application")
+            appIcons[bundleID] = image
+            return image
+        }
     }
     func tableViewSelectionDidChange(_ notification: Notification) { drawing.recipe = selected; updateButtons() }
     func controlTextDidChange(_ obj: Notification) { if obj.object as? NSSearchField === search { reload() } }

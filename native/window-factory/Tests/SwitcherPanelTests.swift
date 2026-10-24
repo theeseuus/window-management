@@ -101,6 +101,24 @@ import AppKit
         layoutUI.frozen = nil; layoutUI.table.deselectAll(nil); layoutUI.updateButtons()
         check(!layoutUI.delete.isEnabled,"Delete disabled without selection")
         check(settingsStore.catalog.recipes.isEmpty,"menu tests do not mutate catalogs")
+        let rowRecipe = Recipe(name:"Two windows",capturedAt:"fixture",windows:[
+            Slot(bundleID:"test.app",appName:"Test",ordinal:1,frame:Frame(x:0,y:0,w:0.5,h:1)),
+            Slot(bundleID:"test.app",appName:"Test",ordinal:2,frame:Frame(x:0.5,y:0,w:0.5,h:1))])
+        var lookups: [String] = []
+        let richRow = LayoutRowView(recipe:rowRecipe) { id in lookups.append(id); return nil }
+        richRow.frame = NSRect(x:0,y:0,width:320,height:68); richRow.layoutSubtreeIfNeeded()
+        check(richRow.apps.count == 1 && richRow.apps[0].count == 2,"one icon per app with an accurate saved-window count")
+        check(lookups == ["test.app"],"icons resolve once per distinct app without querying window contents")
+        check(richRow.icons.arrangedSubviews.count == 1,"repeated app windows do not duplicate icons")
+        check(richRow.nameLabel.stringValue == rowRecipe.name && richRow.textField === richRow.nameLabel,"row retains a native accessible title")
+        let rects = richRow.thumbnail.rectangles(in:NSRect(x:0,y:0,width:84,height:52))
+        check(rects.count == 2 && rects[0].minX == 4 && rects[1].minX == 42,"thumbnail reflects normalized left/right layout geometry")
+        check(rects.allSatisfy{NSRect(x:0,y:0,width:84,height:52).contains($0)},"thumbnail stays within its canvas")
+        check((richRow.icons.arrangedSubviews[0] as! NSStackView).arrangedSubviews.compactMap{$0 as? NSImageView}.first?.image != nil,"missing apps retain a visible fallback icon")
+        let manyRecipe = Recipe(name:"Many apps",capturedAt:"fixture",windows:(0..<8).map { index in
+            Slot(bundleID:"test.\(index)",appName:"App \(index)",ordinal:1,frame:Frame(x:0,y:0,w:1,h:1)) })
+        let manyRow = LayoutRowView(recipe:manyRecipe) { _ in nil }
+        check(manyRow.icons.arrangedSubviews.count == 5 && (manyRow.icons.arrangedSubviews.last as? NSTextField)?.stringValue == "+4","many-app rows cap icons and expose the remainder")
         let settings = SettingsWindow(store:settingsStore,preferences:FactoryPreferences())
         settings.refresh(); settings.window.contentView!.layoutSubtreeIfNeeded()
         let settingsTabs = settings.window.contentView!.subviews.compactMap{$0 as? NSTabView}.first!
