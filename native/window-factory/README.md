@@ -2,8 +2,8 @@
 
 A separate Swift/AppKit port of Factory Workspace. It leaves the tagged working
 Hammerspoon implementation, deployed Spoons, recipes and global shortcuts alone.
-This is an installed development candidate; Hyper+R still opens the working
-Hammerspoon Window Factory.
+This is an installed development candidate; Hyper+R opens the installed app; Hyper+Shift+R keeps the
+Hammerspoon Window Factory available as fallback.
 
 ## Stable build, installation and updates
 
@@ -105,7 +105,9 @@ library footer display the main commands; the settings pane lists the full map:
 
 Layout menu commands are scoped to the active library and disabled during a
 capture/operation or in preview as appropriate. Settings remains available via
-the app menu. Hyper+R stays with Hammerspoon; this app registers no global chord.
+the app menu. The managed Hammerspoon loader now uses Hyper+R to launch this installed app
+and Hyper+Shift+R to open the Hammerspoon fallback. This app registers no global
+chord; holding Tab supplies the Hyper modifiers through Karabiner.
 
 ## Implemented contract
 
@@ -167,9 +169,8 @@ native pilots separately from the older Hammerspoon/private-helper evidence.
 The initial live smoke test is Rex/Safari/Codex; the full adapter list still
 requires compatibility checks before claiming native parity.
 
-Hyper+R continues opening Hammerspoon. Karabiner and Raycast remain unchanged.
-Use this app's Dock icon during the pilot. Move the binding only after live
-acceptance, releasing the old owner before registering the native chord.
+Hyper+R now opens this installed app through the managed launcher;
+Hyper+Shift+R opens the Hammerspoon fallback. Karabiner and Raycast remain unchanged.
 The broader TheseusWindow controls remain available throughout.
 
 See the [build/transition plan](../../docs/native-window-factory.md) for scope
@@ -348,3 +349,19 @@ all future OS versions. No Restore/Establish or other app-window mutation was
 needed for this update check. Hammerspoon files, runtime, global bindings and
 Hammerspoon saved layouts remain unchanged. Current default build is 0.2.0/5;
 the visible product name is Window Factory.
+
+
+## Managed launcher handoff, 2026-10-24
+
+The owner selected the native app as the primary Window Factory. The approved
+chezmoi loader uses Hyper+R (hold Tab + R) to dispatch `/usr/bin/open` with the
+exact `/Applications/Window Factory.app` path. It handles a quit app as well as
+reopening the library on the selected desktop. Hammerspoon owns this small
+launcher binding; the native app still registers no global chord. The existing
+TheseusWorkspace Spoon remains loaded on Hyper+Shift+R (hold Tab + Shift + R),
+with its own recipes and original implementation. No app rebuild or additional
+permission grant is required. The machine's canonical map and rollback are in
+chezmoi `docs/reference/keyboard-shortcuts.md`; native/Hammerspoon catalogs stay
+separate. TheseusWindow geometry/Space controls and general Raycast launchers
+are unchanged. This handoff changes the managed loader only, not the portable
+Spoon implementation or the historical baseline tag.

@@ -166,5 +166,15 @@ menu with visible keyboard equivalents. Its buttons and optional hint row show
 Restore, Establish, Capture, search and cancel commands. The complete current
 in-app map and preferences are documented in the
 [native candidate guide](native/window-factory/README.md#settings-and-visible-keyboard-commands).
-These commands apply inside the native app. Hyper+R remains owned by the working
-Hammerspoon Window Factory; no global shortcut has been transferred.
+These commands apply inside the native app. The current personal launcher handoff is recorded below; the native app itself
+registers no global shortcut.
+
+
+## Personal machine native-app handoff
+
+On the owner's installed setup, hold Tab + R opens the native Window Factory;
+hold Tab + Shift + R opens the Hammerspoon fallback. The chezmoi-managed loader
+owns this installed-app dispatch and the machine's canonical shortcut map.
+The portable `Hammerspoon/init.lua` example above retains the standalone Spoon
+binding for users who have not installed the native app. The Spoon code and
+its recipes are unchanged by the personal launcher handoff.
