@@ -984,3 +984,24 @@ six-layout catalog retains its exact pre-update SHA-256
 Hammerspoon remains stopped and its configuration unchanged. A physical keyboard
 pilot of persistent toggle, arrows, Enter selection and dismissal is requested;
 installation checks alone do not establish acceptance of that interaction.
+
+
+### Build 17 physical keyboard pilot accepted; scrolling defect open, 2026-10-24
+
+The owner confirmed that Tab+W leaves the picker open after key release, arrows
+navigate desktop groups and windows, Enter selects correctly, and Tab+W again
+or Escape dismisses. This accepts those keyboard interactions in the owner's
+tested cases. Build 17 remains installed; Hammerspoon is unchanged.
+
+The owner also reported that arrow navigation makes the list scroll past like a
+roulette wheel before reaching the next item. Functional selection passes, but
+scroll presentation remains an open defect. Source inspection found that every
+selection render recreates all rows, replaces `scroll.documentView`, and then
+requests visibility of the selected row together with its group heading when
+that combined rectangle fits. Replacing the document on every step is a likely
+source of viewport resets, with the heading request potentially amplifying the
+travel; this is a source-based diagnosis, not a verified live reproduction.
+A targeted follow-up should retain the document and viewport while updating the
+selection highlight, scrolling only enough to expose a row outside the visible
+area. This checkpoint changes documentation only; no runtime, bindings, layouts,
+stash behaviour or Hammerspoon files are changed.
