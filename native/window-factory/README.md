@@ -365,3 +365,12 @@ chezmoi `docs/reference/keyboard-shortcuts.md`; native/Hammerspoon catalogs stay
 separate. TheseusWindow geometry/Space controls and general Raycast launchers
 are unchanged. This handoff changes the managed loader only, not the portable
 Spoon implementation or the historical baseline tag.
+
+
+### Physical shortcut acceptance, 2026-10-24
+
+The owner confirmed that holding Tab + R opens the native Window Factory and
+holding Tab + Shift + R opens the Hammerspoon fallback. Both normal physical
+keyboard paths work; the earlier synthetic-input gap is closed. This record
+changes documentation only. No application binary, runtime configuration,
+layout catalog, Spoon implementation or additional controller feature changed.
