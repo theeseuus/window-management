@@ -492,3 +492,44 @@ quarter). Its original frame was restored afterward. No working app windows
 were moved. This verifies the frame application primitive with Hammerspoon
 stopped; it does not substitute for the owner's physical shortcut retest or
 claim every third-party app has identical animation/minimum-size behaviour.
+
+### Geometry responsiveness regression and replacement, 2026-10-24
+
+The owner rejected build 9: its three mandatory settling waits made resizing
+noticeably slow, another press during verification was rejected, and bracket
+width changes on a centred half window appeared to fail. The 24-case primitive
+check above established final geometry only; it did not establish acceptable
+interactive performance. Build 9's settling strategy is superseded by build 10.
+
+Build 10 submits the first frame immediately using a synchronous size-position-
+size helper with scoped AXEnhancedUserInterface handling, following the original
+Hammerspoon helper's approach. Unsupported Enhanced UI writes are left alone;
+a successfully disabled attribute is restored before the helper returns. A
+position-only request omits resize. Subsequent verification waits run after the
+submission, and repair only one mismatched component per interval, for a bounded
+maximum of two seconds. There is no mandatory wait before the first write.
+
+A new geometry shortcut cancels the previous command's verification/repair
+rather than being rejected as busy. For the same exact window, the new target
+is calculated from the pending requested frame so repeated width/size commands
+are cumulative even during an app animation. An operation serial prevents an
+older task's cleanup from clearing a newer command. Workspace operations retain
+their exclusion, and focus/identity/Space/cancellation guards still stop writes.
+
+Validation: 100 frame-application assertions cover immediate dispatch, delayed
+animations, width changes, constraints and interruption; existing native and
+repository checks pass. The responsive production primitive passed 26/26 live
+disposable-window cases, including narrower/wider from a centred half. After the
+position-only optimization, a further three cases passed (both bracket targets
+and position-only centring); the longest synchronous frame submission measured
+17 ms in that small probe. This is submission time, not end-to-end animation
+latency or keyboard acceptance. Both probes restored the original disposable
+frame. Build 10 retains Accessibility, nineteen registrations and the exact six
+saved layouts. Hammerspoon remained quit and unchanged. Physical key acceptance
+and responsiveness in the owner's regular apps remain pending.
+
+Binding check against the original Spoon: Hyper+Up sets the existing window to
+centred half-width/full-height; Hyper+Return centres horizontally without
+resizing; Hyper+Shift+Return maximizes. These geometry commands do not create
+application windows. Plain Command+Return is not a geometry-controller binding;
+in the Window Factory library it is Establish. No bindings changed in this fix.

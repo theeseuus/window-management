@@ -35,13 +35,18 @@ private enum Interrupted: Error { case focus }
         var assertions = 0
         func check(_ condition: Bool,_ message: String) { precondition(condition,message); assertions += 1 }
         let origins = [Frame(x:0,y:30,w:300,h:240),Frame(x:900,y:590,w:300,h:240),Frame(x:400,y:300,w:300,h:240),Frame(x:0,y:30,w:1200,h:800)]
-        let goals = [Frame(x:0,y:30,w:400,h:800),Frame(x:400,y:30,w:400,h:800),Frame(x:800,y:30,w:400,h:800),Frame(x:0,y:30,w:1200,h:800),Frame(x:300,y:30,w:600,h:800),Frame(x:600,y:430,w:600,h:400)]
+        let goals = [Frame(x:0,y:30,w:400,h:800),Frame(x:400,y:30,w:400,h:800),Frame(x:800,y:30,w:400,h:800),Frame(x:0,y:30,w:1200,h:800),Frame(x:300,y:30,w:600,h:800),Frame(x:600,y:430,w:600,h:400),Frame(x:340,y:30,w:520,h:800),Frame(x:260,y:30,w:680,h:800)]
         for origin in origins { for goal in goals {
             let window = AnimatedWindow(origin)
+            var immediate = true
             let result = try await DirectFrameApplication.apply(target:goal,from:origin,
-                check:{},read:{window.frame},write:{window.write($0,$1)},pause:{window.tick()})
+                check:{},read:{window.frame},write:{
+                    if window.writes == 0 { immediate = window.samples == 0 }
+                    window.write($0,$1)
+                },pause:{window.tick()})
             check(result.matches(goal),"Settled resize from \(origin) to \(goal)")
-            check(window.samples<=90,"Bounded settling")
+            check(immediate,"First write has no wait")
+            check(window.samples<=50,"Bounded settling")
         } }
         let low = origins[1], goal = goals[0]
         let old = AnimatedWindow(low)
@@ -58,13 +63,13 @@ private enum Interrupted: Error { case focus }
                 check:{if interrupted.samples>0 {throw Interrupted.focus}},read:{interrupted.frame},
                 write:{interrupted.write($0,$1)},pause:{interrupted.tick()})
             preconditionFailure("Focus change must stop placement")
-        } catch Interrupted.focus { check(interrupted.writes == 1,"No subsequent write after focus changes") }
+        } catch Interrupted.focus { check(interrupted.writes == 3,"No subsequent write after focus changes") }
         let cancelled = AnimatedWindow(low)
         do {
             _ = try await DirectFrameApplication.apply(target:goal,from:low,
                 check:{},read:{cancelled.frame},write:{cancelled.write($0,$1)},pause:{throw CancellationError()})
             preconditionFailure("Cancellation must stop placement")
-        } catch is CancellationError { check(cancelled.writes == 1,"No subsequent write after cancellation") }
+        } catch is CancellationError { check(cancelled.writes == 3,"No subsequent write after cancellation") }
         print("native frame application: \(assertions) assertions passed")
     }
 }

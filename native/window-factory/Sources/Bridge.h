@@ -8,6 +8,7 @@ CGWindowID WFWindowID(AXUIElementRef _Nonnull window);
 BOOL WFReadFrame(AXUIElementRef _Nonnull window, CGRect * _Nonnull frame);
 AXError WFSetPosition(AXUIElementRef _Nonnull window, CGPoint position);
 AXError WFSetSize(AXUIElementRef _Nonnull window, CGSize size);
+AXError WFApplyDirectFrame(AXUIElementRef window, CGRect frame);
 NS_ASSUME_NONNULL_END
 
 // Exclusive Carbon hotkeys; the callback is delivered on the AppKit event loop.

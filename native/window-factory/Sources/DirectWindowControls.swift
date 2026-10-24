@@ -35,6 +35,8 @@ final class DirectWindowControls {
     private let preferences: FactoryPreferences
     private let hud = GeometryHUD()
     private var task: Task<Void,Never>?
+    private var operationSerial = 0
+    private var pendingFrame: (pid: pid_t, id: CGWindowID, frame: Frame)?
     private var cycles: [String:Int] = [:]
     private var restores: [String:Frame] = [:]
     var active = false
@@ -75,17 +77,21 @@ final class DirectWindowControls {
     }
     func run(_ command: GeometryCommand) {
         guard active else { return }
-        guard task == nil, !workspaceBusy() else { hud.show("Finish the current Window Factory operation first."); return }
+        guard !workspaceBusy() else { hud.show("Finish the current Window Factory operation first."); return }
         // Capture the event's target now. An async task must never resolve a
         // different focused window after the user's focus has moved.
         let target: (LiveWindow,Context)
         do { target = try focused() }
         catch { lastResult = "\(command.title): \(error.localizedDescription)"; hud.show(lastResult); changed?(); return }
+        let frame = pendingFrame.flatMap { $0.pid == target.0.pid && $0.id == target.0.id ? $0.frame : nil } ?? target.0.frame
+        task?.cancel()
+        operationSerial += 1
+        let serial = operationSerial
         task = Task { @MainActor [weak self] in
             guard let self else { return }
-            defer { task = nil; changed?() }
-            do { try await perform(command,window:target.0,context:target.1) }
-            catch is CancellationError { lastResult = "Window command cancelled." }
+            defer { if operationSerial == serial { task = nil; pendingFrame = nil; changed?() } }
+            do { try await perform(command,window:target.0,context:target.1,frame:frame) }
+            catch is CancellationError { if operationSerial == serial { lastResult = "Window command cancelled." } }
             catch { lastResult = "\(command.title): \(error.localizedDescription)"; hud.show(lastResult) }
         }
     }
@@ -125,8 +131,8 @@ final class DirectWindowControls {
             throw FactoryError("Focused window changed; command stopped.")
         }
     }
-    private func perform(_ command: GeometryCommand,window: LiveWindow,context: Context) async throws {
-        let frame = window.frame, screen = context.frame
+    private func perform(_ command: GeometryCommand,window: LiveWindow,context: Context,frame: Frame) async throws {
+        let screen = context.frame
         let identity = "\(window.pid):\(window.id)"
         if cycles.count+restores.count>512 { cycles.removeAll(); restores.removeAll() }
         if command == .minimize {
@@ -153,6 +159,7 @@ final class DirectWindowControls {
                 default: throw FactoryError("Unsupported geometry command.")
                 }
             }
+            pendingFrame = (window.pid,window.id,target)
             let actual = try await DirectFrameApplication.apply(target:target,from:frame,
                 check: { try self.sameFocus(window,context); try window.eligible(in:context) },
                 read: {
@@ -166,6 +173,9 @@ final class DirectWindowControls {
                     case .position: status = WFSetPosition(window.element,CGPoint(x:goal.x,y:goal.y))
                     case .size: status = WFSetSize(window.element,CGSize(width:goal.w,height:goal.h))
                     }
+                    guard status == .success else { throw FactoryError("Application rejected the frame change (Accessibility status \(status.rawValue)).") }
+                },submit: {
+                    let status = WFApplyDirectFrame(window.element,CGRect(x:target.x,y:target.y,width:target.w,height:target.h))
                     guard status == .success else { throw FactoryError("Application rejected the frame change (Accessibility status \(status.rawValue)).") }
                 })
             guard actual.matches(target) else {

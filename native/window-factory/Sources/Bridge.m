@@ -76,6 +76,28 @@ AXError WFSetSize(AXUIElementRef window,CGSize size) {
     AXError error=AXUIElementSetAttributeValue(window,kAXSizeAttribute,value); CFRelease(value); return error;
 }
 
+// Scoped Enhanced UI handling follows the Hammerspoon 1.1.1 frame helper.
+// Unsupported attributes are left alone; never leave an app's setting changed.
+AXError WFApplyDirectFrame(AXUIElementRef window,CGRect frame) {
+    CGRect current=CGRectZero;
+    if (WFReadFrame(window,&current) && fabs(current.size.width-frame.size.width)<=2
+        && fabs(current.size.height-frame.size.height)<=2) return WFSetPosition(window,frame.origin);
+    pid_t pid=0; AXUIElementGetPid(window,&pid);
+    AXUIElementRef app=AXUIElementCreateApplication(pid);
+    CFTypeRef enhanced=NULL; BOOL changed=NO;
+    if (AXUIElementCopyAttributeValue(app,CFSTR("AXEnhancedUserInterface"),&enhanced)==kAXErrorSuccess
+        && enhanced && CFGetTypeID(enhanced)==CFBooleanGetTypeID() && CFBooleanGetValue(enhanced)) {
+        changed=AXUIElementSetAttributeValue(app,CFSTR("AXEnhancedUserInterface"),kCFBooleanFalse)==kAXErrorSuccess;
+    }
+    AXError first=WFSetSize(window,frame.size);
+    AXError position=WFSetPosition(window,frame.origin);
+    AXError last=WFSetSize(window,frame.size);
+    if (changed) AXUIElementSetAttributeValue(app,CFSTR("AXEnhancedUserInterface"),kCFBooleanTrue);
+    if (enhanced) CFRelease(enhanced);
+    CFRelease(app);
+    return first ? first : position ? position : last;
+}
+
 #import <Carbon/Carbon.h>
 static EventHotKeyRef wfKeys[64];
 static EventHandlerRef wfHandler;
