@@ -95,5 +95,14 @@ for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","stash
 for _,key in ipairs({"h","j","k","l"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","stash handoff retains focus " .. key) end
 bindings = {}; spoon.stashHotkeys = true; spoon:bindHotkeys()
 equal(type(bindings["ctrl+alt+cmd:s"]),"function","fallback restores stash S")
+bindings = {}; spoon.switcherHotkeys = false; spoon:bindHotkeys()
+equal(bindings["ctrl+alt+cmd:w"],nil,"native switcher releases forward W")
+equal(bindings["ctrl+alt+cmd+shift:w"],nil,"native switcher releases reverse W")
+for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","switcher handoff retains geometry " .. key) end
+for _,key in ipairs({"h","j","k","l","s","left","right"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","switcher handoff retains " .. key) end
+equal(type(bindings["ctrl+alt+cmd+shift:s"]),"function","accordion remains in Hammerspoon after switcher handoff")
+bindings = {}; spoon.switcherHotkeys = true; spoon:bindHotkeys()
+equal(type(bindings["ctrl+alt+cmd:w"]),"function","fallback restores forward W")
+equal(type(bindings["ctrl+alt+cmd+shift:w"]),"function","fallback restores reverse W")
 hs = originalHS
 print(string.format("window_filter_lifecycle_spec: %d assertions passed", assertions))

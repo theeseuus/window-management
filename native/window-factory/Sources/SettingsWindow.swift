@@ -23,6 +23,10 @@ final class FactoryPreferences {
         get { defaults.bool(forKey:"nativeStashEnabled") }
         set { defaults.set(newValue,forKey:"nativeStashEnabled") }
     }
+    var switcherEnabled: Bool {
+        get { defaults.bool(forKey:"nativeSwitcherEnabled") }
+        set { defaults.set(newValue,forKey:"nativeSwitcherEnabled") }
+    }
     var keepLibraryOnTop: Bool {
         get { defaults.bool(forKey:"keepLibraryOnTop") }
         set { defaults.set(newValue,forKey:"keepLibraryOnTop") }
@@ -35,6 +39,9 @@ final class SettingsWindow: NSObject {
     let preferences: FactoryPreferences
     let store: LayoutStore
     var changed: (() -> Void)?
+    weak var switcher: DirectSwitcherControls?
+    private let switcherEnabled = NSButton(checkboxWithTitle:"Enable native window switching shortcuts",target:nil,action:nil)
+    private let switcherStatus = NSTextField(wrappingLabelWithString:"")
     weak var stash: DirectStashControls?
     private let stashEnabled = NSButton(checkboxWithTitle:"Enable native stash/restore shortcut",target:nil,action:nil)
     private let stashStatus = NSTextField(wrappingLabelWithString:"")
@@ -51,12 +58,14 @@ final class SettingsWindow: NSObject {
     private var monitor: Any?
     init(store: LayoutStore,preferences: FactoryPreferences) {
         self.store = store; self.preferences = preferences
-        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:1020),
+        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:1130),
             styleMask:[.titled,.closable],backing:.buffered,defer:false)
         super.init()
         window.title = "Window Factory Settings"; window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
         let general = Self.heading("General")
+        switcherEnabled.target = self; switcherEnabled.action = #selector(changeSwitcher)
+        switcherStatus.font = .systemFont(ofSize:11); switcherStatus.textColor = .secondaryLabelColor
         stashEnabled.target = self; stashEnabled.action = #selector(changeStash)
         stashStatus.font = .systemFont(ofSize:11); stashStatus.textColor = .secondaryLabelColor
         let reference = NSButton(title:"Keyboard Shortcuts…  ⌘?",target:self,action:#selector(openShortcuts)); reference.bezelStyle = .rounded
@@ -66,7 +75,7 @@ final class SettingsWindow: NSObject {
         focusKeys.font = .systemFont(ofSize:12)
         geometryEnabled.target = self; geometryEnabled.action = #selector(changeGeometry)
         geometryStatus.font = .systemFont(ofSize:11); geometryStatus.textColor = .secondaryLabelColor
-        let geometryKeys = NSTextField(wrappingLabelWithString:"Hold Tab for Hyper (⌃⌥⌘).\n− / =  Size / position cycles; add Shift to reverse\n2 / 3 / 4 / 8  Halves / thirds / quarters / eighths; Shift reverses\n↑ / ↓  Centred half / previous frame     [ / ]  Narrow / widen\n↩  Centre horizontally     ⇧↩  Maximize     D  Minimize\nSwitching, accordion and Space controls remain in Hammerspoon during the staged port.")
+        let geometryKeys = NSTextField(wrappingLabelWithString:"Hold Tab for Hyper (⌃⌥⌘).\n− / =  Size / position cycles; add Shift to reverse\n2 / 3 / 4 / 8  Halves / thirds / quarters / eighths; Shift reverses\n↑ / ↓  Centred half / previous frame     [ / ]  Narrow / widen\n↩  Centre horizontally     ⇧↩  Maximize     D  Minimize\nAccordion and Space controls remain in Hammerspoon during the staged port.")
         geometryKeys.font = .systemFont(ofSize:12)
         for button in [hints,floating] { button.target = self; button.action = #selector(changePreferences) }
         let keys = NSTextField(wrappingLabelWithString:
@@ -85,6 +94,7 @@ final class SettingsWindow: NSObject {
             Self.heading("Direct window controls — geometry pilot"),geometryEnabled,geometryStatus,geometryKeys,
             Self.heading("Directional focus — pilot"),focusEnabled,focusStatus,focusKeys,
             Self.heading("Stash / restore — pilot"),stashEnabled,stashStatus,
+            Self.heading("Window switching — pilot"),switcherEnabled,switcherStatus,
             Self.heading("Access and storage"),access,permission,location,folder])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -114,6 +124,14 @@ final class SettingsWindow: NSObject {
         } else { geometry.disable() }
         refresh()
     }
+    @objc func changeSwitcher() {
+        guard let switcher else { return }
+        if switcherEnabled.state == .on {
+            do { try switcher.enable() }
+            catch { let alert = NSAlert(); alert.messageText = "Switcher shortcuts were not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
+        } else { switcher.disable() }
+        refresh()
+    }
     @objc func openShortcuts() { onShortcuts?() }
     @objc func changeStash() {
         guard let stash else { return }
@@ -132,6 +150,9 @@ final class SettingsWindow: NSObject {
         refresh()
     }
     func refresh() {
+        switcherEnabled.state = switcher?.active == true ? .on : .off
+        switcherEnabled.isEnabled = switcher != nil
+        switcherStatus.stringValue = switcher?.lastResult ?? "Unavailable in preview."
         stashEnabled.state = stash?.active == true ? .on : .off
         stashEnabled.isEnabled = stash != nil
         stashStatus.stringValue = stash?.lastResult ?? "Unavailable in preview."

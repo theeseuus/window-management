@@ -726,3 +726,78 @@ remain unverified. No app binary, bindings, preferences, saved layouts or
 Hammerspoon implementation changed for this documentation checkpoint. The
 independent Hammerspoon fallback remains available. Window switching is next
 in the agreed controller-port sequence and has not been handed over yet.
+
+## Window switching pilot, 2026-10-24
+
+Build 15 adds the existing Hyper+W / Hyper+Shift+W window switcher as a separate
+native group. Keep Tab held, cycle forward/backward, then release the modifiers
+to activate the selected window. The candidate list is frozen during a gesture,
+wraps in both directions and selects the next/previous entry relative to the
+current window. Escape cancels while Tab or Tab+Shift is still held; temporary
+plain/Shift/Hyper/Hyper+Shift Escape registrations exist only during the picker.
+Clicking a row also selects it. The new group's registrations are exclusive and
+independent of the accepted geometry, directional focus and stash registries.
+The source implementations for those three groups are unchanged.
+
+The nonactivating panel shows app icons, titles, selected position and whether
+a window is on the current or another Space. It does not activate Window Factory
+or move a working window while choosing. Previews use ScreenCaptureKit only
+after `CGPreflightScreenCaptureAccess` confirms existing access, and only for the
+selected eligible app/window identity. No access request is made; missing access
+or capture errors retain the app icon. Images are temporary UI state, not saved.
+The panel was rendered with harmless sample rows for visual inspection; live
+keyboard interaction and preview capture require their own acceptance evidence.
+
+The original Hammerspoon switcher includes windows across Spaces. Native
+collection therefore considers regular apps' standard windows across readable
+ordinary/full-screen Spaces, excluding hidden/minimized windows, credential
+apps, native controller/Hammerspoon windows and ambiguous/non-singleton Space
+membership. AX-only windows can still be included if absent from the global
+window metadata list. Window IDs, app identity and membership are revalidated
+before activation. No window geometry, minimization, unhide, creation or Space
+transfer is performed. Native front-window activation intentionally may follow
+the selected window to another Space, then verifies both its exact focus and
+current target Space. This cross-Space allowance belongs only to the switcher;
+directional focus retains its accepted current-desktop restrictions.
+
+Ordering uses the current window first, observed recency, then initial window
+stacking order. Recency is bounded, memory-only and updated on app activation,
+invocation and successful switching; it is not a complete historical record of
+every within-app focus change before invocation. There are no persistent AX
+window watchers. Source focus/current desktops and workspace availability are
+checked while collecting and choosing; manual changes cancel the session.
+Modifier polling runs every 20 ms only while choosing. Activation verification
+is bounded at 1.2 seconds and does not enforce focus continuously.
+
+Settings → Enable native window switching shortcuts remembers successful
+activation; fresh profiles leave it disabled. The shortcut reference now lists
+native switching separately and still identifies **accordion as unported**:
+Hyper+Shift+S stays in Hammerspoon, along with window Space movement and its
+indicator. The portable Spoon gates only W/Shift+W behind
+`switcherHotkeys ~= false`, preserving the original UI/algorithm for fallback.
+The managed loader uses `switcherHotkeys = false` for this pilot. To restore only
+switching, disable native switching, set the managed flag true, apply and reload
+Hammerspoon. Leave accepted geometry/focus/stash ownership unchanged. Hammerspoon
+remains quit during this deployment. The canonical machine map and rollback
+are in chezmoi `docs/reference/keyboard-shortcuts.md`.
+
+Validation: 968 switcher assertions cover initial forward/reverse selection,
+repeated wrapping, direction changes, empty/missing/duplicate identities,
+recency ordering and bounded history. The 170-assertion Spoon lifecycle suite
+checks independent switcher release/restoration and retained geometry, focus,
+stash, accordion and Space bindings. All existing native tests and required
+repository validation pass. The production collection/activation services
+collected nine eligible windows and focused only the disposable Window Control
+Test target, confirmed exact focus, checked its frame was unchanged and restored
+prior focus. This was a current-desktop probe; live cross-Space switching is not
+yet claimed. A separate native registration probe passed geometry, focus, stash,
+switcher, all Escape variants and switcher re-enabling, and verified releasing
+the switcher retained the other three groups. It released its probe keys.
+
+Installed build 15 retains Accessibility, the exact six-layout catalog bytes,
+enabled 19 geometry + 4 focus + 1 stash keys and the independent two switcher
+keys. There were zero session stashes before restart. Chezmoi verification passes
+with only the expected pre-commit dirty-worktree warning. Physical forward/
+reverse selection, modifier release, Escape cancellation, cross-Space activation
+and retained existing controls remain the owner's pilot check. Preview capture
+with pre-existing Screen Recording permission has not been live-validated here.

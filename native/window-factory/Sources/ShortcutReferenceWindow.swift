@@ -8,6 +8,7 @@ final class ShortcutReferenceWindow: NSObject {
     private let restore = NSButton(title:"Restore last stashed window",target:nil,action:nil)
     weak var geometry: DirectWindowControls?
     weak var focus: DirectFocusControls?
+    weak var switcher: DirectSwitcherControls?
     weak var stash: DirectStashControls?
     private var monitor: Any?
     init(preferences: FactoryPreferences) {
@@ -62,8 +63,12 @@ final class ShortcutReferenceWindow: NSObject {
           Click Restore last stashed window below to recover one after
           focus has moved elsewhere. Restore stashed windows before quitting.
 
+        WINDOW SWITCHING  [\(state(switcher?.active == true))]
+          Hyper + W / ⇧W    Forward / backward through windows
+          Keep Tab held to choose; release it to switch. Esc cancels.
+          Windows on other Spaces are included; the selected Space is followed.
+
         REMAINING HAMMERSPOON CONTROLS  [\(hammerspoon)]
-          Hyper + W / ⇧W    Window switcher forward / backward
           Hyper + ⇧S        Accordion the active app's windows
           Hyper + ← / →     Move window to adjacent Space and follow
           Hyper + R         Open native Window Factory

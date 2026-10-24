@@ -29,3 +29,8 @@ int32_t WFRequestWindowFocus(AXUIElementRef _Nonnull window,pid_t pid,
 
 int32_t WFRegisterStashHotKey(WFHotKeyCallback _Nonnull callback,void * _Nonnull context);
 void WFUnregisterStashHotKey(void);
+
+int32_t WFSpaceKind(uint64_t space);
+int32_t WFRegisterSwitcherHotKeys(WFHotKeyCallback _Nonnull callback,void * _Nonnull context,uint32_t * _Nonnull failedIndex);
+int32_t WFSetSwitcherEscape(BOOL enabled);
+void WFUnregisterSwitcherHotKeys(void);

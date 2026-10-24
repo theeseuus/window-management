@@ -178,7 +178,7 @@ int32_t WFRequestWindowFocus(AXUIElementRef window,pid_t pid,int32_t *mainStatus
     if(status==noErr) status=SetFrontProcessWithOptions(&psn,kSetFrontProcessFrontWindowOnly);
 #pragma clang diagnostic pop
     // Preserve the selected window when activation chooses an app's old main
-    // window (notably Finder). Never activate all windows or another Space.
+    // window (notably Finder). Space eligibility is enforced by the caller.
     if(status==noErr) AXUIElementSetAttributeValue(window,kAXMainAttribute,kCFBooleanTrue);
     return status;
 }
@@ -206,4 +206,51 @@ int32_t WFRegisterStashHotKey(WFHotKeyCallback callback,void *context) {
     wfStashCallback=callback; wfStashContext=context; EventHotKeyID key={'WFST',0};
     status=RegisterEventHotKey(1,cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),0,&wfStashKey);
     if(status!=noErr) WFUnregisterStashHotKey(); return status;
+}
+
+int32_t WFSpaceKind(uint64_t space) {
+    load(); return connection && spaceType ? spaceType(connection(),space) : -1;
+}
+// Independent switcher registry: W, Shift+W; Escape exists only during a session.
+static EventHotKeyRef wfSwitchKeys[6];
+static EventHandlerRef wfSwitchHandler;
+static WFHotKeyCallback wfSwitchCallback;
+static void *wfSwitchContext;
+static OSStatus wfSwitchEvent(EventHandlerCallRef next,EventRef event,void *context) {
+    (void)next; (void)context; EventHotKeyID key={0};
+    OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status!=noErr || key.signature!='WFSW' || !wfSwitchCallback) return eventNotHandledErr;
+    wfSwitchCallback(key.id,wfSwitchContext); return noErr;
+}
+int32_t WFSetSwitcherEscape(BOOL enabled) {
+    for(unsigned i=2;i<6;i++) if(wfSwitchKeys[i]) { UnregisterEventHotKey(wfSwitchKeys[i]); wfSwitchKeys[i]=NULL; }
+    if(!enabled) return noErr;
+    UInt32 modifiers[]={0,cmdKey|optionKey|controlKey,cmdKey|optionKey|controlKey|shiftKey,shiftKey};
+    for(unsigned i=0;i<4;i++) {
+        EventHotKeyID key={'WFSW',2};
+        OSStatus status=RegisterEventHotKey(53,modifiers[i],key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSwitchKeys[i+2]);
+        if(status!=noErr) {
+            for(unsigned j=2;j<6;j++) if(wfSwitchKeys[j]) { UnregisterEventHotKey(wfSwitchKeys[j]); wfSwitchKeys[j]=NULL; }
+            return status;
+        }
+    }
+    return noErr;
+}
+void WFUnregisterSwitcherHotKeys(void) {
+    for(unsigned i=0;i<6;i++) if(wfSwitchKeys[i]) { UnregisterEventHotKey(wfSwitchKeys[i]); wfSwitchKeys[i]=NULL; }
+    if(wfSwitchHandler) { RemoveEventHandler(wfSwitchHandler); wfSwitchHandler=NULL; }
+    wfSwitchCallback=NULL; wfSwitchContext=NULL;
+}
+int32_t WFRegisterSwitcherHotKeys(WFHotKeyCallback callback,void *context,uint32_t *failedIndex) {
+    WFUnregisterSwitcherHotKeys(); *failedIndex=0;
+    EventTypeSpec type={kEventClassKeyboard,kEventHotKeyPressed};
+    OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfSwitchEvent,1,&type,NULL,&wfSwitchHandler);
+    if(status!=noErr) return status;
+    wfSwitchCallback=callback; wfSwitchContext=context;
+    for(unsigned i=0;i<2;i++) {
+        EventHotKeyID key={'WFSW',i};
+        status=RegisterEventHotKey(13,cmdKey|optionKey|controlKey|(i ? shiftKey : 0),key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSwitchKeys[i]);
+        if(status!=noErr) { *failedIndex=i; WFUnregisterSwitcherHotKeys(); return status; }
+    }
+    return noErr;
 }

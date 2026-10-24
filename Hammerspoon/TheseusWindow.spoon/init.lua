@@ -962,6 +962,7 @@ function obj:bindHotkeys()
   local h      = self.hyper
   local hshift = self.hyperShift
 
+  if self.switcherHotkeys ~= false then
   -- Cross-app window cycling (jumps Spaces implicitly)
   -- Hyper + W / Hyper + Shift + W
   hs.hotkey.bind(h, "w", function()
@@ -971,6 +972,7 @@ function obj:bindHotkeys()
   hs.hotkey.bind(hshift, "w", function()
     windowSwitcher:previous()
   end)
+  end
 
   if self.focusHotkeys ~= false then
   -- Spatial window focus: current Space only; current-screen candidates win.
