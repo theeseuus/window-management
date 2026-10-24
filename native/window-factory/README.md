@@ -712,3 +712,17 @@ physical menu-key path remains unverified, and the button/menu paths are
 available. Physical stash/restore, recovery after a focus change, and retained
 geometry/focus behaviour remain the owner's acceptance check. Chezmoi verification
 passes with only the expected pre-commit dirty-worktree diagnostic warning.
+
+### Build 13 physical stash/restore retest accepted, 2026-10-24
+
+The owner confirmed that stash and restore work, geometry and directional focus
+still work as expected, and the shortcut reference window is useful. This accepts
+the normal physical stash/restore path and the reference window for continued
+use, alongside the previously accepted geometry and focus groups.
+
+This confirmation does not separately establish the Command+? physical menu-key
+path or recovery-button behaviour after a focus change; those specific checks
+remain unverified. No app binary, bindings, preferences, saved layouts or
+Hammerspoon implementation changed for this documentation checkpoint. The
+independent Hammerspoon fallback remains available. Window switching is next
+in the agreed controller-port sequence and has not been handed over yet.
