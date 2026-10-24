@@ -99,6 +99,7 @@ AXError WFApplyDirectFrame(AXUIElementRef window,CGRect frame) {
 }
 
 #import <Carbon/Carbon.h>
+#import "ShortcutRegistry.h"
 static EventHotKeyRef wfKeys[64];
 static EventHandlerRef wfHandler;
 static WFHotKeyCallback wfKeyCallback;
@@ -107,11 +108,12 @@ static OSStatus wfHotKeyEvent(EventHandlerCallRef next,EventRef event,void *cont
     (void)next; (void)context;
     EventHotKeyID hotkey={0};
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(hotkey),NULL,&hotkey);
+    if(status==noErr && WFHandleShortcutCapture(hotkey)) return noErr;
     if (status!=noErr || hotkey.signature!='WFGC' || !wfKeyCallback) return eventNotHandledErr;
     wfKeyCallback(hotkey.id,wfKeyContext); return noErr;
 }
 void WFUnregisterHotKeys(void) {
-    for (unsigned i=0;i<64;i++) if (wfKeys[i]) { UnregisterEventHotKey(wfKeys[i]); wfKeys[i]=NULL; }
+    for (unsigned i=0;i<64;i++) if (wfKeys[i]) { WFUnregisterConfiguredHotKey(wfKeys[i]); wfKeys[i]=NULL; }
     if (wfHandler) { RemoveEventHandler(wfHandler); wfHandler=NULL; }
     wfKeyCallback=NULL; wfKeyContext=NULL;
 }
@@ -125,7 +127,7 @@ int32_t WFRegisterHotKeys(const uint32_t *keys,const uint32_t *modifiers,uint32_
     wfKeyCallback=callback; wfKeyContext=context;
     for (uint32_t i=0;i<count;i++) {
         EventHotKeyID id={'WFGC',i};
-        result=RegisterEventHotKey(keys[i],modifiers[i],id,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfKeys[i]);
+        result=WFRegisterConfiguredHotKey(keys[i],modifiers[i],id,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfKeys[i]);
         if (result!=noErr) { *failedIndex=i; WFUnregisterHotKeys(); return result; }
     }
     return noErr;
@@ -139,11 +141,12 @@ static void *wfFocusContext;
 static OSStatus wfFocusEvent(EventHandlerCallRef next,EventRef event,void *context) {
     (void)next; (void)context; EventHotKeyID key={0};
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status==noErr && WFHandleShortcutCapture(key)) return noErr;
     if (status!=noErr || key.signature!='WFFC' || !wfFocusCallback) return eventNotHandledErr;
     wfFocusCallback(key.id,wfFocusContext); return noErr;
 }
 void WFUnregisterFocusHotKeys(void) {
-    for(unsigned i=0;i<4;i++) if(wfFocusKeys[i]) { UnregisterEventHotKey(wfFocusKeys[i]); wfFocusKeys[i]=NULL; }
+    for(unsigned i=0;i<4;i++) if(wfFocusKeys[i]) { WFUnregisterConfiguredHotKey(wfFocusKeys[i]); wfFocusKeys[i]=NULL; }
     if(wfFocusHandler) { RemoveEventHandler(wfFocusHandler); wfFocusHandler=NULL; }
     wfFocusCallback=NULL; wfFocusContext=NULL;
 }
@@ -156,7 +159,7 @@ int32_t WFRegisterFocusHotKeys(const uint32_t *keys,uint32_t count,WFHotKeyCallb
     wfFocusCallback=callback; wfFocusContext=context;
     for(unsigned i=0;i<count;i++) {
         EventHotKeyID key={'WFFC',i};
-        status=RegisterEventHotKey(keys[i],cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),0,&wfFocusKeys[i]);
+        status=WFRegisterConfiguredHotKey(keys[i],cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),0,&wfFocusKeys[i]);
         if(status!=noErr) { *failedIndex=i; WFUnregisterFocusHotKeys(); return status; }
     }
     return noErr;
@@ -191,11 +194,12 @@ static void *wfStashContext;
 static OSStatus wfStashEvent(EventHandlerCallRef next,EventRef event,void *context) {
     (void)next; (void)context; EventHotKeyID key={0};
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status==noErr && WFHandleShortcutCapture(key)) return noErr;
     if(status!=noErr || key.signature!='WFST' || !wfStashCallback) return eventNotHandledErr;
     wfStashCallback(0,wfStashContext); return noErr;
 }
 void WFUnregisterStashHotKey(void) {
-    if(wfStashKey) { UnregisterEventHotKey(wfStashKey); wfStashKey=NULL; }
+    if(wfStashKey) { WFUnregisterConfiguredHotKey(wfStashKey); wfStashKey=NULL; }
     if(wfStashHandler) { RemoveEventHandler(wfStashHandler); wfStashHandler=NULL; }
     wfStashCallback=NULL; wfStashContext=NULL;
 }
@@ -204,7 +208,7 @@ int32_t WFRegisterStashHotKey(WFHotKeyCallback callback,void *context) {
     OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfStashEvent,1,&type,NULL,&wfStashHandler);
     if(status!=noErr) return status;
     wfStashCallback=callback; wfStashContext=context; EventHotKeyID key={'WFST',0};
-    status=RegisterEventHotKey(1,cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),0,&wfStashKey);
+    status=WFRegisterConfiguredHotKey(1,cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),0,&wfStashKey);
     if(status!=noErr) WFUnregisterStashHotKey(); return status;
 }
 
@@ -216,11 +220,12 @@ static void *wfAccordionContext;
 static OSStatus wfAccordionEvent(EventHandlerCallRef next,EventRef event,void *context) {
     (void)next; (void)context; EventHotKeyID key={0};
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status==noErr && WFHandleShortcutCapture(key)) return noErr;
     if(status!=noErr || key.signature!='WFAC' || !wfAccordionCallback) return eventNotHandledErr;
     wfAccordionCallback(0,wfAccordionContext); return noErr;
 }
 void WFUnregisterAccordionHotKey(void) {
-    if(wfAccordionKey) { UnregisterEventHotKey(wfAccordionKey); wfAccordionKey=NULL; }
+    if(wfAccordionKey) { WFUnregisterConfiguredHotKey(wfAccordionKey); wfAccordionKey=NULL; }
     if(wfAccordionHandler) { RemoveEventHandler(wfAccordionHandler); wfAccordionHandler=NULL; }
     wfAccordionCallback=NULL; wfAccordionContext=NULL;
 }
@@ -229,7 +234,7 @@ int32_t WFRegisterAccordionHotKey(WFHotKeyCallback callback,void *context) {
     OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfAccordionEvent,1,&type,NULL,&wfAccordionHandler);
     if(status!=noErr) return status;
     wfAccordionCallback=callback; wfAccordionContext=context; EventHotKeyID key={'WFAC',0};
-    status=RegisterEventHotKey(1,cmdKey|optionKey|controlKey|shiftKey,key,GetApplicationEventTarget(),0,&wfAccordionKey);
+    status=WFRegisterConfiguredHotKey(1,cmdKey|optionKey|controlKey|shiftKey,key,GetApplicationEventTarget(),0,&wfAccordionKey);
     if(status!=noErr) WFUnregisterAccordionHotKey(); return status;
 }
 
@@ -244,25 +249,26 @@ static void *wfSwitchContext;
 static OSStatus wfSwitchEvent(EventHandlerCallRef next,EventRef event,void *context) {
     (void)next; (void)context; EventHotKeyID key={0};
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status==noErr && WFHandleShortcutCapture(key)) return noErr;
     if(status!=noErr || key.signature!='WFSW' || !wfSwitchCallback) return eventNotHandledErr;
     wfSwitchCallback(key.id,wfSwitchContext); return noErr;
 }
 int32_t WFSetSwitcherEscape(BOOL enabled) {
-    for(unsigned i=2;i<6;i++) if(wfSwitchKeys[i]) { UnregisterEventHotKey(wfSwitchKeys[i]); wfSwitchKeys[i]=NULL; }
+    for(unsigned i=2;i<6;i++) if(wfSwitchKeys[i]) { WFUnregisterConfiguredHotKey(wfSwitchKeys[i]); wfSwitchKeys[i]=NULL; }
     if(!enabled) return noErr;
     UInt32 modifiers[]={0,cmdKey|optionKey|controlKey,cmdKey|optionKey|controlKey|shiftKey,shiftKey};
     for(unsigned i=0;i<4;i++) {
         EventHotKeyID key={'WFSW',2};
-        OSStatus status=RegisterEventHotKey(53,modifiers[i],key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSwitchKeys[i+2]);
+        OSStatus status=WFRegisterConfiguredHotKey(53,modifiers[i],key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSwitchKeys[i+2]);
         if(status!=noErr) {
-            for(unsigned j=2;j<6;j++) if(wfSwitchKeys[j]) { UnregisterEventHotKey(wfSwitchKeys[j]); wfSwitchKeys[j]=NULL; }
+            for(unsigned j=2;j<6;j++) if(wfSwitchKeys[j]) { WFUnregisterConfiguredHotKey(wfSwitchKeys[j]); wfSwitchKeys[j]=NULL; }
             return status;
         }
     }
     return noErr;
 }
 void WFUnregisterSwitcherHotKeys(void) {
-    for(unsigned i=0;i<6;i++) if(wfSwitchKeys[i]) { UnregisterEventHotKey(wfSwitchKeys[i]); wfSwitchKeys[i]=NULL; }
+    for(unsigned i=0;i<6;i++) if(wfSwitchKeys[i]) { WFUnregisterConfiguredHotKey(wfSwitchKeys[i]); wfSwitchKeys[i]=NULL; }
     if(wfSwitchHandler) { RemoveEventHandler(wfSwitchHandler); wfSwitchHandler=NULL; }
     wfSwitchCallback=NULL; wfSwitchContext=NULL;
 }
@@ -274,7 +280,7 @@ int32_t WFRegisterSwitcherHotKeys(WFHotKeyCallback callback,void *context,uint32
     wfSwitchCallback=callback; wfSwitchContext=context;
     for(unsigned i=0;i<2;i++) {
         EventHotKeyID key={'WFSW',i};
-        status=RegisterEventHotKey(13,cmdKey|optionKey|controlKey|(i ? shiftKey : 0),key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSwitchKeys[i]);
+        status=WFRegisterConfiguredHotKey(13,cmdKey|optionKey|controlKey|(i ? shiftKey : 0),key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSwitchKeys[i]);
         if(status!=noErr) { *failedIndex=i; WFUnregisterSwitcherHotKeys(); return status; }
     }
     return noErr;
@@ -389,11 +395,12 @@ static void *wfSpaceMoveContext;
 static OSStatus wfSpaceMoveEvent(EventHandlerCallRef next,EventRef event,void *context) {
     (void)next; (void)context; EventHotKeyID key={0};
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status==noErr && WFHandleShortcutCapture(key)) return noErr;
     if(status!=noErr || key.signature!='WFSM' || key.id>=2 || !wfSpaceMoveCallback) return eventNotHandledErr;
     wfSpaceMoveCallback(key.id,wfSpaceMoveContext); return noErr;
 }
 void WFUnregisterSpaceMoveHotKeys(void) {
-    for(unsigned i=0;i<2;i++) if(wfSpaceMoveKeys[i]) { UnregisterEventHotKey(wfSpaceMoveKeys[i]); wfSpaceMoveKeys[i]=NULL; }
+    for(unsigned i=0;i<2;i++) if(wfSpaceMoveKeys[i]) { WFUnregisterConfiguredHotKey(wfSpaceMoveKeys[i]); wfSpaceMoveKeys[i]=NULL; }
     if(wfSpaceMoveHandler) { RemoveEventHandler(wfSpaceMoveHandler); wfSpaceMoveHandler=NULL; }
     wfSpaceMoveCallback=NULL; wfSpaceMoveContext=NULL;
 }
@@ -406,7 +413,7 @@ int32_t WFRegisterSpaceMoveHotKeys(WFHotKeyCallback callback,void *context,uint3
     const UInt32 keys[]={123,124};
     for(unsigned i=0;i<2;i++) {
         EventHotKeyID key={'WFSM',i};
-        status=RegisterEventHotKey(keys[i],cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSpaceMoveKeys[i]);
+        status=WFRegisterConfiguredHotKey(keys[i],cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfSpaceMoveKeys[i]);
         if(status!=noErr) { *failedIndex=i; WFUnregisterSpaceMoveHotKeys(); return status; }
     }
     return noErr;
@@ -420,11 +427,12 @@ static void *wfLauncherContext;
 static OSStatus wfLauncherEvent(EventHandlerCallRef next,EventRef event,void *context) {
     (void)next; (void)context; EventHotKeyID key={0};
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status==noErr && WFHandleShortcutCapture(key)) return noErr;
     if(status!=noErr || key.signature!='WFLA' || !wfLauncherCallback) return eventNotHandledErr;
     wfLauncherCallback(0,wfLauncherContext); return noErr;
 }
 void WFUnregisterLauncherHotKey(void) {
-    if(wfLauncherKey) { UnregisterEventHotKey(wfLauncherKey); wfLauncherKey=NULL; }
+    if(wfLauncherKey) { WFUnregisterConfiguredHotKey(wfLauncherKey); wfLauncherKey=NULL; }
     if(wfLauncherHandler) { RemoveEventHandler(wfLauncherHandler); wfLauncherHandler=NULL; }
     wfLauncherCallback=NULL; wfLauncherContext=NULL;
 }
@@ -433,6 +441,6 @@ int32_t WFRegisterLauncherHotKey(WFHotKeyCallback callback,void *context) {
     OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfLauncherEvent,1,&type,NULL,&wfLauncherHandler);
     if(status!=noErr) return status;
     wfLauncherCallback=callback; wfLauncherContext=context; EventHotKeyID key={'WFLA',0};
-    status=RegisterEventHotKey(15,cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfLauncherKey);
+    status=WFRegisterConfiguredHotKey(15,cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfLauncherKey);
     if(status!=noErr) WFUnregisterLauncherHotKey(); return status;
 }

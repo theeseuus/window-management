@@ -6,6 +6,33 @@ library or closes it when focused, while the app is running. Optional start at l
 Tab+Shift+R retains the Hammerspoon library fallback when Hammerspoon is running.
 The dated records below preserve implementation and physical acceptance evidence.
 
+## Configurable shortcuts and compact Settings (build 25)
+
+Settings has four tabs: General, Shortcuts, Layouts and About. General uses
+concise labelled switches. Shortcuts offers all 30 global commands in the seven
+existing groups, with a group switch and a recorder beside each action. Click a
+binding, press a new combination, or Escape to cancel. Individual reset buttons
+and a confirmed Reset All restore defaults. The Keyboard Shortcuts window reads
+the same saved bindings, including changes after restart. Local library and
+switcher navigation remains conventional and fixed.
+
+The default chords, callback IDs and controller algorithms are unchanged.
+Bindings use physical macOS key codes; display names currently use the US key
+map. A versioned overrides envelope lives in app preferences, not chezmoi or the
+layout catalog. Validation rejects duplicates (including disabled groups),
+malformed entries, standard app/system commands and the retained Hyper+Shift+R
+Hammerspoon fallback. Recording uses existing owned-hotkey callbacks plus a
+Settings-window event monitor; it stops on Escape, focus loss, tab/window close
+or key release. It does not request Input Monitoring or disable controller groups.
+Registration changes preserve callbacks and session state; rejected drafts roll
+back and are not persisted. Partial rollback failures are reported explicitly.
+
+Import/Export/Last Report moved to Settings → Layouts. Delete remains in the
+Layout menu and Command+Delete. About contains access status and diagnostics.
+The library keeps Capture, Restore, Establish, Settings and Shortcuts; permanent
+instruction footers and internal pilot labels are removed. Switcher grouping,
+navigation and window-control primitives are unchanged.
+
 ## Stable build, installation and updates
 
 The local app lives at `/Applications/Window Factory.app`. Native layouts
@@ -1365,3 +1392,29 @@ was not started for a new physical fallback test. No functional Hammerspoon port
 remains for the normal workflow. The Lua implementation remains a recovery
 fallback; configurable keybindings and further UI refinement are later work.
 This acceptance checkpoint changes documentation only.
+
+### Build 25 verification
+
+Repository validation and the full native suites pass, including 181 AppKit
+assertions, saved-binding/default/collision checks and a fake-Carbon registry
+suite covering live reconfiguration, cancellation routing, duplicate Escape
+callback IDs, rejection, rollback and explicit rollback failure. These registry
+tests do not register real OS shortcuts. Existing geometry/focus Lua comparisons
+and all prior control suites remain unchanged and passing.
+
+The signed candidate was installed at the stable app path. A temporary Library
+binding to Hyper+F18 updated the Settings row and Keyboard Shortcuts immediately,
+survived a signed update/restart, and a conflicting Hyper+S was rejected without
+changing it. The row reset restored the original Hyper+R. The six-layout catalog
+is byte-identical to the accepted baseline. Accessibility access survived;
+all seven shortcut groups are enabled, Dock visibility and login startup remain
+off, and Hammerspoon source/runtime ownership was not changed. General and
+Shortcuts were inspected in the installed AppKit UI. Modifier symbols and the
+chosen key have a separating space in both views. Recorder focus is explicitly
+acquired on click; Escape is reserved for cancellation while recording.
+
+The final installed recorder was checked: clicking acquires keyboard focus;
+Escape cancels recording and leaves Settings open. A fresh owner check of
+physical shortcuts and the simplified Settings interface remains pending.
+Automated input changes app focus,
+so it does not establish the normal physical-key interaction result.

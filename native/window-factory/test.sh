@@ -45,6 +45,10 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     -o "$native_root/.build/switcher-tests"
 "$native_root/.build/switcher-tests"
 
+xcrun --sdk macosx clang -fobjc-arc -Wall -Wextra -Werror \
+    "$native_root/Tests/ShortcutRegistryTests.m" -framework Carbon -framework Cocoa -o "$native_root/.build/shortcut-registry-tests"
+"$native_root/.build/shortcut-registry-tests"
+
 # Exercise the real AppKit document/viewport without showing or controlling windows.
 xcrun --sdk macosx clang -fobjc-arc -Wall -Wextra -Werror \
     -c "$native_root/Sources/Bridge.m" -o "$native_root/.build/panel-test-bridge.o"

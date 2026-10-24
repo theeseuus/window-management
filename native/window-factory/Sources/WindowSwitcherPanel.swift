@@ -38,11 +38,8 @@ final class WindowSwitcherPanel: NSObject, NSWindowDelegate {
         title.frame = NSRect(x:362,y:393,width:398,height:72); title.font = .systemFont(ofSize:14)
         title.maximumNumberOfLines = 3
         position.frame = NSRect(x:362,y:360,width:398,height:22); position.font = .systemFont(ofSize:12); position.textColor = .secondaryLabelColor
-        scroll.frame = NSRect(x:20,y:58,width:740,height:276); scroll.hasVerticalScroller = true; scroll.drawsBackground = false
-        let hint = NSTextField(labelWithString:"Tab+W closes · ↑↓ windows · ←→ desktops · Return/Enter selects · Esc cancels")
-        hint.font = .systemFont(ofSize:12); hint.textColor = .secondaryLabelColor
-        hint.frame = NSRect(x:20,y:20,width:740,height:22)
-        for view in [preview,desktopTitle,appTitle,title,position,scroll,hint] { content.addSubview(view) }
+        scroll.frame = NSRect(x:20,y:20,width:740,height:314); scroll.hasVerticalScroller = true; scroll.drawsBackground = false
+        for view in [preview,desktopTitle,appTitle,title,position,scroll] { content.addSubview(view) }
         panel.contentView = content
         monitor = NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
             let handled = MainActor.assumeIsolated {

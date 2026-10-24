@@ -1,14 +1,12 @@
 import AppKit
 
-@MainActor private final class SettingsDocument: NSView {
-    override var isFlipped: Bool { true }
-}
-
 @MainActor
 final class FactoryPreferences {
     private let defaults: UserDefaults
+    let shortcuts: KeybindingStore
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        shortcuts = KeybindingStore(defaults:defaults)
         defaults.register(defaults:["showShortcutHints":true,"keepLibraryOnTop":false,"launcherEnabled":true,"showDockIcon":true])
     }
     var showShortcutHints: Bool {
@@ -58,264 +56,204 @@ final class FactoryPreferences {
 }
 
 @MainActor
-final class SettingsWindow: NSObject {
+final class ShortcutEditor: NSObject,NSTableViewDataSource,NSTableViewDelegate {
+    let view = NSView()
+    let groups = NSPopUpButton()
+    let enabled = NSSwitch()
+    private let table = NSTableView()
+    private var recorders: [ShortcutRecorder] = []
+    private let manager: KeybindingManager?
+    var isEnabled: ((ShortcutGroup)->Bool)?
+    var changeEnabled: ((ShortcutGroup,Bool)->Void)?
+    private var definitions: [ShortcutDefinition] = []
+    init(manager: KeybindingManager?) {
+        self.manager = manager
+        super.init()
+        for group in ShortcutGroup.allCases { groups.addItem(withTitle:group.title) }
+        groups.setAccessibilityLabel("Shortcut group"); groups.target = self; groups.action = #selector(changeGroup)
+        enabled.target = self; enabled.action = #selector(toggleGroup)
+        let header = NSStackView(views:[groups,NSView(),enabled]); header.spacing = 12
+        let command = NSTableColumn(identifier:NSUserInterfaceItemIdentifier("command")); command.title = "Command"; command.width = 360
+        let key = NSTableColumn(identifier:NSUserInterfaceItemIdentifier("key")); key.title = "Shortcut"; key.width = 190
+        table.addTableColumn(command); table.addTableColumn(key); table.rowHeight = 36
+        table.dataSource = self; table.delegate = self; table.usesAlternatingRowBackgroundColors = false
+        table.style = .fullWidth; table.setAccessibilityLabel("Configurable shortcuts")
+        let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.documentView = table; scroll.borderType = .bezelBorder
+        let reset = NSButton(title:"Reset All…",target:self,action:#selector(resetAll)); reset.bezelStyle = .rounded
+        let actions = NSStackView(views:[NSView(),reset])
+        for child in [header,scroll,actions] { child.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(child) }
+        NSLayoutConstraint.activate([header.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:20),header.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-20),header.topAnchor.constraint(equalTo:view.topAnchor,constant:20),
+            scroll.leadingAnchor.constraint(equalTo:header.leadingAnchor),scroll.trailingAnchor.constraint(equalTo:header.trailingAnchor),scroll.topAnchor.constraint(equalTo:header.bottomAnchor,constant:16),
+            actions.leadingAnchor.constraint(equalTo:header.leadingAnchor),actions.trailingAnchor.constraint(equalTo:header.trailingAnchor),actions.topAnchor.constraint(equalTo:scroll.bottomAnchor,constant:14),actions.bottomAnchor.constraint(equalTo:view.bottomAnchor,constant:-20)])
+        reset.isEnabled = manager != nil; changeGroup()
+    }
+    var group: ShortcutGroup { ShortcutGroup.allCases[max(0,groups.indexOfSelectedItem)] }
+    @objc private func changeGroup() { cancelRecording(); definitions = ShortcutDefinition.all.filter{$0.group == group}; table.reloadData(); refresh() }
+    func refresh() { enabled.state = isEnabled?(group) == true ? .on : .off; enabled.isEnabled = manager != nil && changeEnabled != nil; enabled.setAccessibilityLabel("\(group.title) shortcuts") }
+    @objc private func toggleGroup() { changeEnabled?(group,enabled.state == .on); refresh() }
+    var isRecording: Bool { ShortcutRecorder.current?.isRecording == true }
+    func cancelRecording() { ShortcutRecorder.current?.cancel(); let old = recorders; recorders = []; old.forEach{$0.cancel()} }
+    func numberOfRows(in tableView: NSTableView) -> Int { definitions.count }
+    func tableView(_ tableView: NSTableView,viewFor column: NSTableColumn?,row: Int) -> NSView? {
+        let definition = definitions[row]
+        if column?.identifier.rawValue == "command" {
+            let label = NSTextField(labelWithString:definition.title); label.font = .systemFont(ofSize:13); label.lineBreakMode = .byTruncatingTail
+            let cell = NSTableCellView(); label.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(label); cell.textField = label
+            NSLayoutConstraint.activate([label.leadingAnchor.constraint(equalTo:cell.leadingAnchor,constant:4),label.trailingAnchor.constraint(equalTo:cell.trailingAnchor,constant:-4),label.centerYAnchor.constraint(equalTo:cell.centerYAnchor)])
+            return cell
+        }
+        let recorder = ShortcutRecorder(definition,manager:manager)
+        recorder.isEnabled = manager != nil
+        let reset = NSButton(image:NSImage(systemSymbolName:"arrow.uturn.backward",accessibilityDescription:"Reset \(definition.title) shortcut")!,target:self,action:#selector(resetRow(_:)))
+        reset.tag = row; reset.bezelStyle = .inline; reset.isEnabled = manager?.store.overrides[definition.id] != nil
+        let stack = NSStackView(views:[recorder,reset]); stack.spacing = 8
+        recorder.widthAnchor.constraint(equalToConstant:140).isActive = true
+        recorders.append(recorder)
+        recorder.finished = { [weak self,weak reset] in reset?.isEnabled = self?.manager?.store.overrides[definition.id] != nil }
+        return stack
+    }
+    @objc private func resetRow(_ sender: NSButton) {
+        cancelRecording()
+        do { try manager?.set(nil,for:definitions[sender.tag]); table.reloadData() } catch { showError(error) }
+    }
+    @objc private func resetAll() {
+        cancelRecording()
+        let alert = NSAlert(); alert.messageText = "Reset all shortcuts?"; alert.addButton(withTitle:"Cancel"); alert.addButton(withTitle:"Reset All")
+        if alert.runModal() == .alertSecondButtonReturn {
+            do { try manager?.reset(); table.reloadData() } catch { showError(error) }
+        }
+    }
+    private func showError(_ error: Error) {
+        let alert = NSAlert(); alert.messageText = "Shortcuts not changed"; alert.informativeText = error.localizedDescription
+        if let window = view.window { alert.beginSheetModal(for:window) } else { alert.runModal() }
+    }
+}
+
+@MainActor
+final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
     let window: NSWindow
     let preferences: FactoryPreferences
     let store: LayoutStore
+    let tabs = NSTabView()
+    let shortcutEditor: ShortcutEditor
     var changed: (() -> Void)?
-    weak var launcher: LauncherControls?
-    private let launcherEnabled = NSButton(checkboxWithTitle:"Enable Tab+R launcher",target:nil,action:nil)
-    private let launcherStatus = NSTextField(wrappingLabelWithString:"")
-    private let loginEnabled = NSButton(checkboxWithTitle:"Start Window Factory at login",target:nil,action:nil)
-    private let loginStatus = NSTextField(wrappingLabelWithString:"")
-    weak var spaceIndicator: SpaceIndicator?
-    private let indicatorEnabled = NSButton(checkboxWithTitle:"Show menu-bar Space indicator",target:nil,action:nil)
-    private let indicatorStatus = NSTextField(wrappingLabelWithString:"")
-    weak var spaceMove: DirectSpaceMoveControls?
-    private let spaceMoveEnabled = NSButton(checkboxWithTitle:"Enable native Space move-and-follow shortcuts",target:nil,action:nil)
-    private let spaceMoveStatus = NSTextField(wrappingLabelWithString:"")
-    weak var accordion: DirectAccordionControls?
-    private let accordionEnabled = NSButton(checkboxWithTitle:"Enable native accordion shortcut",target:nil,action:nil)
-    private let accordionStatus = NSTextField(wrappingLabelWithString:"")
-    weak var switcher: DirectSwitcherControls?
-    private let switcherEnabled = NSButton(checkboxWithTitle:"Enable native window switching shortcuts",target:nil,action:nil)
-    private let switcherStatus = NSTextField(wrappingLabelWithString:"")
-    weak var stash: DirectStashControls?
-    private let stashEnabled = NSButton(checkboxWithTitle:"Enable native stash/restore shortcut",target:nil,action:nil)
-    private let stashStatus = NSTextField(wrappingLabelWithString:"")
     var onShortcuts: (() -> Void)?
+    var onImport: (() -> Void)?,onExport: (() -> Void)?,onReport: (() -> Void)?
+    var layoutActionsAvailable: (() -> Bool)?
+    weak var launcher: LauncherControls?
+    weak var spaceIndicator: SpaceIndicator?
+    weak var spaceMove: DirectSpaceMoveControls?
+    weak var accordion: DirectAccordionControls?
+    weak var switcher: DirectSwitcherControls?
+    weak var stash: DirectStashControls?
     weak var focus: DirectFocusControls?
-    private let focusEnabled = NSButton(checkboxWithTitle:"Enable native directional focus shortcuts",target:nil,action:nil)
-    private let focusStatus = NSTextField(wrappingLabelWithString:"")
     weak var geometry: DirectWindowControls?
-    private let geometryEnabled = NSButton(checkboxWithTitle:"Enable native geometry shortcuts",target:nil,action:nil)
-    private let geometryStatus = NSTextField(wrappingLabelWithString:"")
-    private let dockIcon = NSButton(checkboxWithTitle:"Show Dock icon",target:nil,action:nil)
-    private let hints = NSButton(checkboxWithTitle:"Show keyboard shortcuts beside actions",target:nil,action:nil)
-    private let floating = NSButton(checkboxWithTitle:"Keep the library above other windows",target:nil,action:nil)
-    private let access = NSTextField(wrappingLabelWithString:"")
+    private let dockIcon = NSSwitch(),indicatorEnabled = NSSwitch(),loginEnabled = NSSwitch(),floating = NSSwitch(),hints = NSSwitch()
+    private let loginSettings = NSButton(title:"Login Items…",target:nil,action:nil)
+    private let access = NSTextField(labelWithString:"")
+    private let importButton = NSButton(title:"Import…",target:nil,action:nil),exportButton = NSButton(title:"Export…",target:nil,action:nil),reportButton = NSButton(title:"Last Report…",target:nil,action:nil)
     private var monitor: Any?
-    init(store: LayoutStore,preferences: FactoryPreferences) {
-        self.store = store; self.preferences = preferences
-        window = NSWindow(contentRect:NSRect(x:0,y:0,width:660,height:min(900,max(500,(NSScreen.main?.visibleFrame.height ?? 1000)-100))),
-            styleMask:[.titled,.closable],backing:.buffered,defer:false)
+    init(store: LayoutStore,preferences: FactoryPreferences,keybindings: KeybindingManager? = nil) {
+        self.store = store; self.preferences = preferences; shortcutEditor = ShortcutEditor(manager:keybindings)
+        window = NSWindow(contentRect:NSRect(x:0,y:0,width:720,height:540),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
         super.init()
-        window.title = "Window Factory Settings"; window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.moveToActiveSpace]
-        let general = Self.heading("General")
-        dockIcon.target = self; dockIcon.action = #selector(changeDockIcon)
-        let dockHelp = NSTextField(wrappingLabelWithString:"When hidden, Window Factory stays out of the Dock and Command+Tab. Use its menu-bar badge, Tab+R, or reopen it from Applications.")
-        dockHelp.font = .systemFont(ofSize:12)
-        launcherEnabled.target = self; launcherEnabled.action = #selector(changeLauncher)
-        loginEnabled.target = self; loginEnabled.action = #selector(changeLogin)
-        loginEnabled.allowsMixedState = true
-        for label in [launcherStatus,loginStatus] { label.font = .systemFont(ofSize:11); label.textColor = .secondaryLabelColor }
-        let loginSettings = NSButton(title:"Login Items Settings…",target:self,action:#selector(openLoginSettings)); loginSettings.bezelStyle = .rounded
-        let launcherHelp = NSTextField(wrappingLabelWithString:"Tab+R works while Window Factory is running. After quitting, reopen it from the Dock or Applications. Start at login makes it available after signing in.")
-        launcherHelp.font = .systemFont(ofSize:12)
+        window.title = "Window Factory Settings"; window.isReleasedWhenClosed = false; window.delegate = self
+        window.minSize = NSSize(width:660,height:460); window.collectionBehavior = [.moveToActiveSpace]
+        tabs.translatesAutoresizingMaskIntoConstraints = false; tabs.delegate = self; window.contentView!.addSubview(tabs)
+        NSLayoutConstraint.activate([tabs.leadingAnchor.constraint(equalTo:window.contentView!.leadingAnchor,constant:12),tabs.trailingAnchor.constraint(equalTo:window.contentView!.trailingAnchor,constant:-12),tabs.topAnchor.constraint(equalTo:window.contentView!.topAnchor,constant:12),tabs.bottomAnchor.constraint(equalTo:window.contentView!.bottomAnchor,constant:-12)])
+        dockIcon.target = self; dockIcon.action = #selector(changeDock)
         indicatorEnabled.target = self; indicatorEnabled.action = #selector(changeIndicator)
-        indicatorStatus.font = .systemFont(ofSize:11); indicatorStatus.textColor = .secondaryLabelColor
-        spaceMoveEnabled.target = self; spaceMoveEnabled.action = #selector(changeSpaceMove)
-        spaceMoveStatus.font = .systemFont(ofSize:11); spaceMoveStatus.textColor = .secondaryLabelColor
-        accordionEnabled.target = self; accordionEnabled.action = #selector(changeAccordion)
-        accordionStatus.font = .systemFont(ofSize:11); accordionStatus.textColor = .secondaryLabelColor
-        switcherEnabled.target = self; switcherEnabled.action = #selector(changeSwitcher)
-        switcherStatus.font = .systemFont(ofSize:11); switcherStatus.textColor = .secondaryLabelColor
-        stashEnabled.target = self; stashEnabled.action = #selector(changeStash)
-        stashStatus.font = .systemFont(ofSize:11); stashStatus.textColor = .secondaryLabelColor
-        let reference = NSButton(title:"Keyboard Shortcuts…  ⌘?",target:self,action:#selector(openShortcuts)); reference.bezelStyle = .rounded
-        focusEnabled.target = self; focusEnabled.action = #selector(changeFocus)
-        focusStatus.font = .systemFont(ofSize:11); focusStatus.textColor = .secondaryLabelColor
-        let focusKeys = NSTextField(wrappingLabelWithString:"Hold Tab + H/J/K/L: focus left/down/up/right. Same display first; current visible ordinary desktops only.")
-        focusKeys.font = .systemFont(ofSize:12)
-        geometryEnabled.target = self; geometryEnabled.action = #selector(changeGeometry)
-        geometryStatus.font = .systemFont(ofSize:11); geometryStatus.textColor = .secondaryLabelColor
-        let geometryKeys = NSTextField(wrappingLabelWithString:"Hold Tab for Hyper (⌃⌥⌘).\n− / =  Size / position cycles; add Shift to reverse\n2 / 3 / 4 / 8  Halves / thirds / quarters / eighths; Shift reverses\n↑ / ↓  Centred half / previous frame     [ / ]  Narrow / widen\n↩  Centre horizontally     ⇧↩  Maximize     D  Minimize\nSpace movement has its own native pilot below.")
-        geometryKeys.font = .systemFont(ofSize:12)
-        for button in [hints,floating] { button.target = self; button.action = #selector(changePreferences) }
-        let keys = NSTextField(wrappingLabelWithString:
-            "⌘N  Capture a layout\n↑ / ↓  Select a layout\n↩  Restore existing windows    ⌘↩  Establish missing windows\n⌘F  Search    ⌘⌫  Delete selected layout (with confirmation)\n⌘I  Import    ⇧⌘E  Export\n↩  Save a named capture    ⎋  Cancel or close\n⌘,  Settings    ⌘W  Close window    ⌘Q  Quit")
-        keys.font = .systemFont(ofSize:13)
-        let ownership = NSTextField(wrappingLabelWithString:"These commands work inside the library. The geometry group is shown below. Window Factory owns the direct controls and Tab+R launcher. Tab+Shift+R remains the Hammerspoon library fallback.")
-        ownership.textColor = .secondaryLabelColor
-        let permission = NSButton(title:"Open Accessibility Settings…",target:self,action:#selector(openAccess))
-        permission.bezelStyle = .rounded
-        let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "unknown"
-        let build = Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unknown"
-        let location = NSTextField(wrappingLabelWithString:"Version: \(version) (\(build))\nApp: \(Bundle.main.bundlePath)\nLayouts: \(store.url.path)")
-        location.font = .systemFont(ofSize:11); location.isSelectable = true
-        let folder = NSButton(title:"Show Layout Folder",target:self,action:#selector(showFolder)); folder.bezelStyle = .rounded
-        let stack = NSStackView(views:[general,dockIcon,dockHelp,launcherEnabled,launcherStatus,loginEnabled,loginStatus,loginSettings,launcherHelp,hints,floating,indicatorEnabled,indicatorStatus,reference,Self.heading("Keyboard commands"),keys,ownership,
-            Self.heading("Direct window controls — geometry pilot"),geometryEnabled,geometryStatus,geometryKeys,
-            Self.heading("Directional focus — pilot"),focusEnabled,focusStatus,focusKeys,
-            Self.heading("Stash / restore — pilot"),stashEnabled,stashStatus,
-            Self.heading("Window switching — pilot"),switcherEnabled,switcherStatus,
-            Self.heading("Accordion — pilot"),accordionEnabled,accordionStatus,
-            Self.heading("Space move-and-follow — pilot"),spaceMoveEnabled,spaceMoveStatus,
-            Self.heading("Access and storage"),access,permission,location,folder])
-        stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.drawsBackground = false
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        let document = SettingsDocument(); document.translatesAutoresizingMaskIntoConstraints = false
-        scroll.documentView = document; document.addSubview(stack); window.contentView!.addSubview(scroll)
-        NSLayoutConstraint.activate([scroll.leadingAnchor.constraint(equalTo:window.contentView!.leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo:window.contentView!.trailingAnchor),
-            scroll.topAnchor.constraint(equalTo:window.contentView!.topAnchor),
-            scroll.bottomAnchor.constraint(equalTo:window.contentView!.bottomAnchor),
-            document.leadingAnchor.constraint(equalTo:scroll.contentView.leadingAnchor),
-            document.topAnchor.constraint(equalTo:scroll.contentView.topAnchor),
-            document.widthAnchor.constraint(equalTo:scroll.contentView.widthAnchor),
-            stack.leadingAnchor.constraint(equalTo:document.leadingAnchor,constant:22),
-            stack.trailingAnchor.constraint(equalTo:document.trailingAnchor,constant:-22),
-            stack.topAnchor.constraint(equalTo:document.topAnchor,constant:20),
-            stack.bottomAnchor.constraint(equalTo:document.bottomAnchor,constant:-20)])
-        for label in [keys,ownership,access,location,dockHelp,launcherHelp,launcherStatus,loginStatus,indicatorStatus,geometryKeys,focusKeys,geometryStatus,focusStatus,stashStatus,switcherStatus,accordionStatus,spaceMoveStatus] {
-            label.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive = true
-        }
+        loginEnabled.target = self; loginEnabled.action = #selector(changeLogin)
+        floating.target = self; floating.action = #selector(changePreferences)
+        hints.target = self; hints.action = #selector(changePreferences)
+        loginSettings.target = self; loginSettings.action = #selector(openLoginSettings); loginSettings.bezelStyle = .rounded
+        let general = Self.page([Self.row("Dock icon",dockIcon),Self.row("Menu-bar indicator",indicatorEnabled),Self.row("Start at login",loginEnabled),loginSettings,Self.row("Keep library on top",floating),Self.row("Shortcuts on buttons",hints)])
+        addTab("General",general); addTab("Shortcuts",shortcutEditor.view)
+        shortcutEditor.isEnabled = { [weak self] in self?.groupEnabled($0) ?? false }
+        shortcutEditor.changeEnabled = { [weak self] in self?.changeGroup($0,enabled:$1) }
+        for (button,action) in [(importButton,#selector(importLayouts)),(exportButton,#selector(exportLayouts)),(reportButton,#selector(lastReport))] { button.target = self; button.action = action; button.bezelStyle = .rounded }
+        let folder = NSButton(title:"Show Layouts Folder",target:self,action:#selector(showFolder)); folder.bezelStyle = .rounded
+        addTab("Layouts",Self.page([importButton,exportButton,reportButton,folder]))
+        let title = NSTextField(labelWithString:"Window Factory"); title.font = .systemFont(ofSize:20,weight:.semibold)
+        let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "unknown",build = Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unknown"
+        let release = NSTextField(labelWithString:"Version \(version) (\(build))")
+        let permission = NSButton(title:"Accessibility Settings…",target:self,action:#selector(openAccess)); permission.bezelStyle = .rounded
+        let diagnostics = NSButton(title:"Diagnostics…",target:self,action:#selector(showDiagnostics)); diagnostics.bezelStyle = .rounded
+        let shortcuts = NSButton(title:"Shortcut Reference",target:self,action:#selector(openShortcuts)); shortcuts.bezelStyle = .rounded
+        addTab("About",Self.page([title,release,Self.row("Accessibility",access),permission,shortcuts,diagnostics]))
         monitor = NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
-            let handled = MainActor.assumeIsolated {
-                guard let self, event.window === self.window, event.keyCode == 53 else { return false }
-                self.window.close(); return true
-            }
+            let handled = MainActor.assumeIsolated { guard let self,event.window === self.window,event.keyCode == 53,!self.shortcutEditor.isRecording else { return false }; self.window.close(); return true }
             return handled ? nil : event
         }
+        refresh()
     }
-    static func heading(_ text: String) -> NSTextField {
-        let field = NSTextField(labelWithString:text); field.font = .systemFont(ofSize:14,weight:.semibold); return field
+    private static func row(_ title: String,_ control: NSView) -> NSView {
+        let label = NSTextField(labelWithString:title); label.font = .systemFont(ofSize:13)
+        control.setAccessibilityLabel(title)
+        let row = NSStackView(views:[label,NSView(),control]); row.spacing = 20; row.alignment = .centerY
+        row.heightAnchor.constraint(greaterThanOrEqualToConstant:30).isActive = true
+        return row
     }
-    @objc func changeDockIcon() {
+    private static func page(_ views: [NSView]) -> NSView {
+        let page = NSView(),stack = NSStackView(views:views); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 14
+        stack.translatesAutoresizingMaskIntoConstraints = false; page.addSubview(stack)
+        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo:page.leadingAnchor,constant:24),stack.trailingAnchor.constraint(equalTo:page.trailingAnchor,constant:-24),stack.topAnchor.constraint(equalTo:page.topAnchor,constant:24),stack.bottomAnchor.constraint(lessThanOrEqualTo:page.bottomAnchor,constant:-24)])
+        for view in views where view is NSStackView { view.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive = true }
+        return page
+    }
+    private func addTab(_ title: String,_ view: NSView) { let item = NSTabViewItem(identifier:title); item.label = title; item.view = view; tabs.addTabViewItem(item) }
+    func tabView(_ tabView: NSTabView,didSelect tabViewItem: NSTabViewItem?) { shortcutEditor.cancelRecording(); refresh() }
+    private func groupEnabled(_ group: ShortcutGroup) -> Bool {
+        switch group { case .geometry:geometry?.active == true; case .focus:focus?.active == true; case .stash:stash?.active == true; case .switcher:switcher?.active == true; case .accordion:accordion?.active == true; case .spaces:spaceMove?.active == true; case .library:launcher?.active == true }
+    }
+    private func changeGroup(_ group: ShortcutGroup,enabled: Bool) {
+        do {
+            switch group {
+            case .geometry: if enabled { try geometry?.enable() } else { geometry?.disable() }
+            case .focus: if enabled { try focus?.enable() } else { focus?.disable() }
+            case .stash: if enabled { try stash?.enable() } else { stash?.disable() }
+            case .switcher: if enabled { try switcher?.enable() } else { switcher?.disable() }
+            case .accordion: if enabled { try accordion?.enable() } else { accordion?.disable() }
+            case .spaces: if enabled { try spaceMove?.enable() } else { spaceMove?.disable() }
+            case .library: if enabled { try launcher?.enable() } else { launcher?.disable() }
+            }
+        } catch { let alert = NSAlert(); alert.messageText = "\(group.title) could not be enabled"; alert.informativeText = error.localizedDescription; alert.beginSheetModal(for:window) }
+        refresh()
+    }
+    @objc private func changeDock() {
         let show = dockIcon.state == .on
-        guard NSApp.setActivationPolicy(show ? .regular : .accessory) else {
-            let alert = NSAlert(); alert.messageText = "Dock icon could not be changed"; alert.runModal(); refresh(); return
-        }
-        preferences.showDockIcon = show
+        if NSApp.setActivationPolicy(show ? .regular : .accessory) { preferences.showDockIcon = show }
         refresh()
     }
-    @objc func changeLauncher() {
-        guard let launcher else { return }
-        if launcherEnabled.state == .on {
-            do { try launcher.enable() }
-            catch { let alert = NSAlert(); alert.messageText = "Tab+R was not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
-        } else { launcher.disable() }
-        refresh()
-    }
-    @objc func changeLogin() {
-        guard let launcher else { return }
-        launcher.refreshLoginState()
-        launcher.setLoginEnabled(launcher.loginState != .enabled && launcher.loginState != .requiresApproval); refresh()
-    }
-    @objc func openLoginSettings() { launcher?.openLoginSettings() }
-    @objc func changeIndicator() {
-        guard let spaceIndicator else { return }
-        if indicatorEnabled.state == .on { spaceIndicator.enable() } else { spaceIndicator.disable() }
-        refresh()
-    }
-    @objc func changeSpaceMove() {
-        guard let spaceMove else { return }
-        if spaceMoveEnabled.state == .on {
-            do { try spaceMove.enable() }
-            catch { let alert = NSAlert(); alert.messageText = "Space movement was not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
-        } else { spaceMove.disable() }
-        refresh()
-    }
-    @objc func changeAccordion() {
-        guard let accordion else { return }
-        if accordionEnabled.state == .on {
-            do { try accordion.enable() }
-            catch { let alert = NSAlert(); alert.messageText = "Accordion was not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
-        } else { accordion.disable() }
-        refresh()
-    }
-    @objc func changeGeometry() {
-        guard let geometry else { return }
-        if geometryEnabled.state == .on {
-            do { try geometry.enable() }
-            catch { let alert = NSAlert(); alert.messageText = "Geometry shortcuts were not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
-        } else { geometry.disable() }
-        refresh()
-    }
-    @objc func changeSwitcher() {
-        guard let switcher else { return }
-        if switcherEnabled.state == .on {
-            do { try switcher.enable() }
-            catch { let alert = NSAlert(); alert.messageText = "Switcher shortcuts were not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
-        } else { switcher.disable() }
-        refresh()
-    }
-    @objc func openShortcuts() { onShortcuts?() }
-    @objc func changeStash() {
-        guard let stash else { return }
-        if stashEnabled.state == .on {
-            do { try stash.enable() }
-            catch { let alert = NSAlert(); alert.messageText = "Stash shortcut was not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
-        } else { stash.disable() }
-        refresh()
-    }
-    @objc func changeFocus() {
-        guard let focus else { return }
-        if focusEnabled.state == .on {
-            do { try focus.enable() }
-            catch { let alert = NSAlert(); alert.messageText = "Directional focus was not enabled"; alert.informativeText = error.localizedDescription; alert.runModal() }
-        } else { focus.disable() }
-        refresh()
+    @objc private func changeIndicator() { if indicatorEnabled.state == .on { spaceIndicator?.enable() } else { spaceIndicator?.disable() }; refresh() }
+    @objc private func changeLogin() { launcher?.setLoginEnabled(loginEnabled.state == .on); refresh() }
+    @objc private func openLoginSettings() { launcher?.openLoginSettings() }
+    @objc private func changePreferences() { preferences.keepLibraryOnTop = floating.state == .on; preferences.showShortcutHints = hints.state == .on; window.level = preferences.keepLibraryOnTop ? .floating : .normal; changed?() }
+    @objc private func importLayouts() { onImport?() }
+    @objc private func exportLayouts() { onExport?() }
+    @objc private func lastReport() { onReport?() }
+    @objc private func openShortcuts() { onShortcuts?() }
+    @objc private func openAccess() { NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!) }
+    @objc private func showFolder() { if FileManager.default.fileExists(atPath:store.url.path) { NSWorkspace.shared.activateFileViewerSelecting([store.url]) } }
+    @objc private func showDiagnostics() {
+        let alert = NSAlert(); alert.messageText = "Window Factory Diagnostics"
+        alert.informativeText = [preferences.shortcuts.loadError,launcher?.lastResult,spaceIndicator?.lastResult,geometry?.lastResult,focus?.lastResult,stash?.lastResult,switcher?.lastResult,accordion?.lastResult,spaceMove?.lastResult].compactMap{$0}.joined(separator:"\n")
+        alert.addButton(withTitle:"Close"); alert.addButton(withTitle:"Copy")
+        if alert.runModal() == .alertSecondButtonReturn { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(alert.informativeText,forType:.string) }
     }
     func refresh() {
         dockIcon.state = preferences.showDockIcon ? .on : .off
-        launcherEnabled.state = launcher?.active == true ? .on : .off
-        launcherEnabled.isEnabled = launcher != nil
-        launcherStatus.stringValue = launcher?.lastResult ?? "Unavailable in preview."
+        indicatorEnabled.state = spaceIndicator?.active == true ? .on : .off; indicatorEnabled.isEnabled = spaceIndicator != nil
         loginEnabled.isEnabled = launcher?.loginAvailable == true
-        if let launcher {
-            switch launcher.loginState {
-            case .enabled: loginEnabled.state = .on
-            case .requiresApproval: loginEnabled.state = .mixed
-            default: loginEnabled.state = .off
-            }
-        } else { loginEnabled.state = .off }
-        loginStatus.stringValue = launcher?.loginDescription ?? "Unavailable in preview."
-        indicatorEnabled.state = spaceIndicator?.active == true ? .on : .off
-        indicatorEnabled.isEnabled = spaceIndicator != nil
-        indicatorStatus.stringValue = spaceIndicator?.lastResult ?? "Unavailable in preview."
-        spaceMoveEnabled.state = spaceMove?.active == true ? .on : .off
-        spaceMoveEnabled.isEnabled = spaceMove != nil
-        spaceMoveStatus.stringValue = spaceMove?.lastResult ?? "Unavailable in preview."
-        accordionEnabled.state = accordion?.active == true ? .on : .off
-        accordionEnabled.isEnabled = accordion != nil
-        accordionStatus.stringValue = accordion?.lastResult ?? "Unavailable in preview."
-        switcherEnabled.state = switcher?.active == true ? .on : .off
-        switcherEnabled.isEnabled = switcher != nil
-        switcherStatus.stringValue = switcher?.lastResult ?? "Unavailable in preview."
-        stashEnabled.state = stash?.active == true ? .on : .off
-        stashEnabled.isEnabled = stash != nil
-        stashStatus.stringValue = stash?.lastResult ?? "Unavailable in preview."
-        focusEnabled.state = focus?.active == true ? .on : .off
-        focusEnabled.isEnabled = focus != nil
-        focusStatus.stringValue = focus?.lastResult ?? "Unavailable in preview."
-        geometryEnabled.state = geometry?.active == true ? .on : .off
-        geometryEnabled.isEnabled = geometry != nil
-        geometryStatus.stringValue = geometry?.lastResult ?? "Unavailable in preview."
-
-        hints.state = preferences.showShortcutHints ? .on : .off
-        floating.state = preferences.keepLibraryOnTop ? .on : .off
-        access.stringValue = AXIsProcessTrusted() ? "Accessibility: enabled." : "Accessibility: not enabled. Grant access to this installed app in System Settings, then restart it."
+        loginEnabled.state = launcher?.loginState == .enabled || launcher?.loginState == .requiresApproval ? .on : .off
+        loginSettings.isHidden = launcher?.loginState != .requiresApproval && launcher?.loginResult == nil
+        floating.state = preferences.keepLibraryOnTop ? .on : .off; hints.state = preferences.showShortcutHints ? .on : .off
+        access.stringValue = AXIsProcessTrusted() ? "Allowed" : "Not allowed"
+        let available = layoutActionsAvailable?() == true
+        importButton.isEnabled = available; exportButton.isEnabled = available; reportButton.isEnabled = onReport != nil
+        shortcutEditor.refresh()
     }
     func show() { launcher?.refreshLoginState(); window.level = preferences.keepLibraryOnTop ? .floating : .normal; refresh(); window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true) }
-    @objc func changePreferences() {
-        preferences.showShortcutHints = hints.state == .on
-        preferences.keepLibraryOnTop = floating.state == .on
-        window.level = preferences.keepLibraryOnTop ? .floating : .normal
-        changed?()
-    }
-    @objc func openAccess() {
-        NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-    }
-    @objc func showFolder() {
-        if FileManager.default.fileExists(atPath:store.url.path) { NSWorkspace.shared.activateFileViewerSelecting([store.url]) }
-        else {
-            let alert = NSAlert(); alert.messageText = "No saved layouts yet"
-            alert.informativeText = "The layout folder is created when you save or import your first layout."; alert.runModal()
-        }
-    }
-    func stop() { if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
+    func windowWillClose(_ notification: Notification) { shortcutEditor.cancelRecording() }
+    func stop() { shortcutEditor.cancelRecording(); if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
 }

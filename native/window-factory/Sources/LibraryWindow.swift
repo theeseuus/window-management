@@ -70,11 +70,6 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
                                 (establish,#selector(establishLayout)),(save,#selector(saveCapture)),(cancel,#selector(cancelAction))] {
             button.target = self; button.action = action; button.bezelStyle = .rounded
         }
-        let importButton = NSButton(title:"Import…",target:self,action:#selector(importLayouts))
-        let exportButton = NSButton(title:"Export…",target:self,action:#selector(exportLayouts))
-        let deleteButton = NSButton(title:"Delete…",target:self,action:#selector(deleteLayout))
-        let reportButton = NSButton(title:"Last report",target:self,action:#selector(showReport))
-        for button in [importButton,exportButton,deleteButton] { button.isEnabled = !preview }
         let permission = NSButton(title:"Settings…  ⌘,",target:self,action:#selector(openSettings))
         permission.bezelStyle = .rounded
         let shortcuts = NSButton(title:"Shortcuts…",target:self,action:#selector(openShortcuts)); shortcuts.bezelStyle = .rounded
@@ -82,9 +77,9 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         let naming = NSStackView(views:[nameLabel,name,save,cancel]); naming.orientation = .horizontal
         name.widthAnchor.constraint(greaterThanOrEqualToConstant:240).isActive = true
         let buttons = NSStackView(views:[capture,restore,establish]); buttons.spacing = 8
-        let tools = NSStackView(views:[importButton,exportButton,deleteButton,reportButton,permission,shortcuts]); tools.spacing = 8
+        let tools = NSStackView(views:[permission,shortcuts]); tools.spacing = 8
         shortcutHints.font = .systemFont(ofSize:11); shortcutHints.textColor = .secondaryLabelColor
-        let stack = NSStackView(views:[search,split,naming,buttons,shortcutHints,status,tools])
+        let stack = NSStackView(views:[search,split,naming,buttons,status,tools])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 12
         stack.edgeInsets = NSEdgeInsets(top:18,left:18,bottom:18,right:18)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -105,13 +100,13 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         }
         applyPreferences(); reload()
         status.stringValue = preview ? "Preview only. Window operations and catalog changes are disabled."
-            : "" + (AXIsProcessTrusted() ? "Ready." : "Accessibility access is needed for capture and placement.")
+            : "" + (AXIsProcessTrusted() ? "" : "Accessibility access is needed for capture and placement.")
     }
     var selected: Recipe? { filtered.indices.contains(table.selectedRow) ? filtered[table.selectedRow] : nil }
     func show() { window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true); window.makeFirstResponder(search) }
     func applyPreferences() {
         window.level = preferences.keepLibraryOnTop ? .floating : .normal
-        shortcutHints.isHidden = !preferences.showShortcutHints
+        shortcutHints.isHidden = true
         capture.title = preferences.showShortcutHints ? "Capture…  ⌘N" : "Capture…"
         restore.title = preferences.showShortcutHints ? "Restore  ↩" : "Restore"
         establish.title = preferences.showShortcutHints ? "Establish here  ⌘↩" : "Establish here"

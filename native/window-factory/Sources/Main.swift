@@ -5,6 +5,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     var library: LibraryWindow?
     var settings: SettingsWindow?
     var shortcutReference: ShortcutReferenceWindow?
+    var keybindings: KeybindingManager?
     var launcher: LauncherControls?
     private var loginLaunch = false
     func applicationWillFinishLaunching(_ notification: Notification) { loginLaunch = LauncherControls.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent) }
@@ -37,9 +38,18 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 store.catalog.recipes["Single-window preview"] = Recipe(name:"Single-window preview",capturedAt:"preview",windows:Array(slots.prefix(1)))
             }
             let preferences = FactoryPreferences()
+            let bindings = preview ? nil : KeybindingManager(store:preferences.shortcuts)
+            keybindings = bindings
+            try bindings?.restore()
             shortcutReference = ShortcutReferenceWindow(preferences:preferences)
-            settings = SettingsWindow(store:store,preferences:preferences)
+            settings = SettingsWindow(store:store,preferences:preferences,keybindings:bindings)
             library = LibraryWindow(store:store,registry:registry,preview:preview,preferences:preferences)
+            settings?.onImport = { [weak self] in self?.library?.show(); self?.library?.importLayouts() }
+            settings?.onExport = { [weak self] in self?.library?.show(); self?.library?.exportLayouts() }
+            settings?.onReport = { [weak self] in self?.library?.showReport() }
+            settings?.layoutActionsAvailable = { [weak self] in self?.library?.task == nil && self?.library?.frozen == nil }
+            bindings?.changed = { [weak self] in self?.shortcutReference?.refresh(); self?.settings?.refresh() }
+            bindings?.recoverRegistrations = { [weak self] in self?.restoreShortcutOwners() }
             library?.onShortcuts = { [weak self] in self?.showShortcuts(nil) }
             settings?.onShortcuts = { [weak self] in self?.showShortcuts(nil) }
             library?.onSettings = { [weak self] in self?.showSettings(nil) }
@@ -136,6 +146,16 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             let alert = NSAlert(); alert.messageText = "Window Factory could not start"; alert.informativeText = error.localizedDescription
             alert.runModal(); NSApp.terminate(nil)
         }
+    }
+    private func restoreShortcutOwners() {
+        if geometry?.active == true { try? geometry?.enable() }
+        if focus?.active == true { try? focus?.enable() }
+        if stash?.active == true { try? stash?.enable() }
+        if switcher?.active == true { try? switcher?.enable() }
+        if accordion?.active == true { try? accordion?.enable() }
+        if spaceMove?.active == true { try? spaceMove?.enable() }
+        if launcher?.active == true { try? launcher?.enable() }
+        settings?.refresh(); shortcutReference?.refresh()
     }
     func toggleLibrary() {
         guard let library else { return }

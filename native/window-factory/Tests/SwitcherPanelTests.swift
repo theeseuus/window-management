@@ -86,9 +86,31 @@ import AppKit
         let settingsStore = try LayoutStore(url:URL(fileURLWithPath:NSTemporaryDirectory()).appendingPathComponent("wf-settings-\(UUID().uuidString).json"))
         let settings = SettingsWindow(store:settingsStore,preferences:FactoryPreferences())
         settings.refresh(); settings.window.contentView!.layoutSubtreeIfNeeded()
-        let settingsScroll = settings.window.contentView!.subviews.compactMap{$0 as? NSScrollView}.first!
-        check(settingsScroll.documentView!.frame.height>settingsScroll.contentSize.height,"long Settings content scrolls within the window")
-        check(settings.window.frame.height<=(NSScreen.main?.visibleFrame.height ?? 2000),"Settings window stays within usable display height")
+        let settingsTabs = settings.window.contentView!.subviews.compactMap{$0 as? NSTabView}.first!
+        check(settingsTabs.tabViewItems.map(\.label) == ["General","Shortcuts","Layouts","About"],"Settings separates preferences, shortcuts, data and app information")
+        check(settings.window.frame.height<=(NSScreen.main?.visibleFrame.height ?? 2000),"Settings fits usable display height")
+        try ShortcutValidation.validate([:])
+        let definitions = ShortcutDefinition.all
+        check(definitions.count == 30 && Set(definitions.map(\.id)).count == 30,"all 30 commands have stable distinct IDs")
+        for (index,geometry) in GeometryShortcut.all.enumerated() {
+            check(definitions[index].standard.key == geometry.keyCode && definitions[index].standard.modifiers == geometry.modifiers,"geometry defaults match working controls")
+        }
+        let library = definitions.first{$0.group == .library}!
+        let custom = ShortcutChord(key:79,modifiers:ShortcutChord.hyper,name:"F18")
+        let shortcutStore = KeybindingStore(defaults:dockDefaults)
+        try shortcutStore.save([library.id:custom])
+        check(KeybindingStore(defaults:dockDefaults).chord(library) == custom,"custom binding survives reload")
+        check(shortcutStore.chord(library).label == "⌃⌥⌘ F18","display uses current binding")
+        func rejects(_ draft: [String:ShortcutChord]) -> Bool { do { try ShortcutValidation.validate(draft); return false } catch { return true } }
+        check(rejects([library.id:definitions[0].standard]),"duplicate default binding rejected")
+        check(rejects([library.id:ShortcutChord(key:15,modifiers:ShortcutChord.hyper|ShortcutChord.shift,name:"R")]),"Hammerspoon fallback reserved")
+        check(rejects([library.id:ShortcutChord(key:124,modifiers:ShortcutChord.control,name:"→")]),"macOS desktop navigation reserved")
+        check(rejects(["unknown":custom]),"unknown command rejected")
+        try shortcutStore.save([:])
+        check(KeybindingStore(defaults:dockDefaults).chord(library) == library.standard,"reset restores defaults")
+        dockDefaults.set(Data("invalid".utf8),forKey:"shortcutOverrides.v1")
+        let damaged = KeybindingStore(defaults:dockDefaults)
+        check(damaged.loadError != nil && damaged.chord(library) == library.standard,"invalid saved data safely uses defaults")
         settings.stop()
         print("native switcher panel: \(assertions) assertions passed; no windows shown or controlled")
     }
