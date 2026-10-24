@@ -1,6 +1,17 @@
-# Native Window Factory: build and transition
+# Window Factory: build and transition
 
-Updated 2026-10-23. The native build is underway on `native-window-factory`.
+Current status, 2026-10-24: Window Factory is installed with accepted layout,
+geometry, focus, stash, switcher, accordion, Space movement and indicator pilots.
+The launcher/startup handoff is implemented in builds 23–24; initial opening
+passed and toggle/Dock visibility acceptance is pending. See the
+[Window Factory guide](../native/window-factory/README.md) for current deployment,
+permissions and acceptance. The original transition plan below is retained as
+planning history; the branch name and this stable document path are historical
+identifiers rather than the app's product name.
+
+## Original transition plan, 2026-10-23
+
+The native build is underway on `native-window-factory`.
 The working Hammerspoon baseline stays in service while the separate candidate
 earns acceptance. Build and pilot instructions are in the
 [native candidate README](../native/window-factory/README.md); earlier Space

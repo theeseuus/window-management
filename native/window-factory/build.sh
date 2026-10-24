@@ -3,9 +3,9 @@ set -eu
 native_root=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo_root=${1:-$(CDPATH='' cd -- "$native_root/../.." && pwd)}
 # App bundles must stay outside the File Provider-managed source checkout.
-output=${WINDOW_FACTORY_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/window-factory-native/build}
+output=${WINDOW_FACTORY_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/window-factory/build}
 . "$native_root/signing-config.sh"
-build_number=${WINDOW_FACTORY_BUILD_NUMBER:-22}
+build_number=${WINDOW_FACTORY_BUILD_NUMBER:-24}
 case "$build_number" in ''|*[!0-9]*) echo "Build number must be numeric" >&2; exit 1;; esac
 app="$output/Window Factory.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$output/ModuleCache"
@@ -18,7 +18,7 @@ xcrun --sdk macosx clang -fobjc-arc -Wall -Wextra -Werror \
 xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
     -module-cache-path "$output/ModuleCache" -import-objc-header "$native_root/Sources/Bridge.h" \
     "$native_root"/Sources/*.swift "$output/Bridge.o" \
-    -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit -o "$app/Contents/MacOS/WindowFactoryNative"
+    -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit -o "$app/Contents/MacOS/WindowFactory"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,7 +26,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <key>CFBundleIdentifier</key><string>local.windowfactory.native</string>
 <key>CFBundleName</key><string>Window Factory</string>
 <key>CFBundleDisplayName</key><string>Window Factory</string>
-<key>CFBundleExecutable</key><string>WindowFactoryNative</string>
+<key>CFBundleExecutable</key><string>WindowFactory</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.2.0</string>
 <key>CFBundleVersion</key><string>$build_number</string>

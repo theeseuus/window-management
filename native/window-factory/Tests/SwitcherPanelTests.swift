@@ -62,6 +62,34 @@ import AppKit
             let bitmap = NSBitmapImageRep(data:image.tiffRepresentation!)!
             check(bitmap.colorAt(x:0,y:0)!.alphaComponent == 0,"rounded badge corner stays transparent")
         }
+        func event(_ id: AEEventID = AEEventID(kAEOpenApplication)) -> NSAppleEventDescriptor {
+            NSAppleEventDescriptor(eventClass:AEEventClass(kCoreEventClass),eventID:id,targetDescriptor:nil,returnID:AEReturnID(kAutoGenerateReturnID),transactionID:AETransactionID(kAnyTransactionID))
+        }
+        check(!LauncherControls.isLoginLaunch(nil),"missing launch event is a normal launch")
+        check(!LauncherControls.isLoginLaunch(event()),"ordinary open shows the library")
+        let direct = event(); direct.setParam(NSAppleEventDescriptor(boolean:true),forKeyword:AEKeyword(keyAELaunchedAsLogInItem))
+        check(LauncherControls.isLoginLaunch(direct),"login marker is recognized")
+        let property = event(); property.setParam(NSAppleEventDescriptor(enumCode:OSType(keyAELaunchedAsLogInItem)),forKeyword:AEKeyword(keyAEPropData))
+        check(LauncherControls.isLoginLaunch(property),"login property-data marker is recognized")
+        let unrelated = event(AEEventID(kAEReopenApplication)); unrelated.setParam(NSAppleEventDescriptor(boolean:true),forKeyword:AEKeyword(keyAELaunchedAsLogInItem))
+        check(!LauncherControls.isLoginLaunch(unrelated),"reopening the app is not a quiet login launch")
+        check(!FactoryLaunchPolicy.showsLibrary(arguments:[],loginLaunch:LauncherControls.isLoginLaunch(property)),"login launches keep the library closed")
+        let preferenceName = "WindowFactory.DockTest.\(UUID().uuidString)"
+        let dockDefaults = UserDefaults(suiteName:preferenceName)!
+        defer { dockDefaults.removePersistentDomain(forName:preferenceName) }
+        let dockPreferences = FactoryPreferences(defaults:dockDefaults)
+        check(dockPreferences.showDockIcon,"Dock icon starts visible")
+        dockPreferences.showDockIcon = false
+        check(!FactoryPreferences(defaults:dockDefaults).showDockIcon,"Dock visibility survives preference reload")
+        dockPreferences.showDockIcon = true
+        check(FactoryPreferences(defaults:dockDefaults).showDockIcon,"Dock visibility restores independently")
+        let settingsStore = try LayoutStore(url:URL(fileURLWithPath:NSTemporaryDirectory()).appendingPathComponent("wf-settings-\(UUID().uuidString).json"))
+        let settings = SettingsWindow(store:settingsStore,preferences:FactoryPreferences())
+        settings.refresh(); settings.window.contentView!.layoutSubtreeIfNeeded()
+        let settingsScroll = settings.window.contentView!.subviews.compactMap{$0 as? NSScrollView}.first!
+        check(settingsScroll.documentView!.frame.height>settingsScroll.contentSize.height,"long Settings content scrolls within the window")
+        check(settings.window.frame.height<=(NSScreen.main?.visibleFrame.height ?? 2000),"Settings window stays within usable display height")
+        settings.stop()
         print("native switcher panel: \(assertions) assertions passed; no windows shown or controlled")
     }
 }

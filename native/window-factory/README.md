@@ -1,14 +1,17 @@
-# Window Factory candidate
+# Window Factory
 
-A separate Swift/AppKit port of Factory Workspace. It leaves the tagged working
-Hammerspoon implementation, deployed Spoons, recipes and global shortcuts alone.
-This is an installed development candidate; Hyper+R opens the installed app; Hyper+Shift+R keeps the
-Hammerspoon Window Factory available as fallback.
+Window Factory is the installed Swift/AppKit app for saved layouts, direct window
+controls, Space move-and-follow and the menu-bar desktop badge. Tab+R opens its
+library or closes it when focused, while the app is running. Optional start at login is in Settings;
+Tab+Shift+R retains the Hammerspoon library fallback when Hammerspoon is running.
+The dated records below preserve implementation and physical acceptance evidence.
 
 ## Stable build, installation and updates
 
 The local app lives at `/Applications/Window Factory.app`. Native layouts
-live at `~/.local/share/window-factory-native/layouts.json`. The first stable
+live at `~/.local/share/window-factory-native/layouts.json`. This compatibility
+directory and the bundle ID `local.windowfactory.native` deliberately remain
+stable to preserve layouts, preferences, backups and Accessibility identity. The first stable
 installation copied the six existing native layouts byte-for-byte from the
 pilot catalog; that original pilot catalog remains recoverable. Hammerspoon's
 settings database is neither read nor modified.
@@ -20,7 +23,7 @@ mise run native-build
 mise run native-test
 ```
 
-Output now defaults to `~/.cache/window-factory-native/build/Window Factory.app`,
+Output now defaults to `~/.cache/window-factory/build/Window Factory.app`,
 outside the File Provider-managed source checkout. `WINDOW_FACTORY_BUILD_DIR`
 can select another local output directory. Do not put signed app bundles in the
 iCloud-managed source tree: Finder metadata previously invalidated their strict
@@ -105,9 +108,12 @@ library footer display the main commands; the settings pane lists the full map:
 
 Layout menu commands are scoped to the active library and disabled during a
 capture/operation or in preview as appropriate. Settings remains available via
-the app menu. The managed Hammerspoon loader now uses Hyper+R to launch this installed app
-and Hyper+Shift+R to open the Hammerspoon fallback. This app registers no global
-chord; holding Tab supplies the Hyper modifiers through Karabiner.
+the app menu. Window Factory registers Hyper+R independently of the direct
+control groups. Press again while the library is focused to close it; from
+another app it brings the library forward. Hammerspoon retains only Hyper+Shift+R
+for its library fallback.
+Holding Tab supplies the Hyper modifiers through Karabiner. Start at login is
+optional and initially off; a quit app must be reopened from the Dock/Applications.
 
 ## Implemented contract
 
@@ -128,8 +134,10 @@ chord; holding Tab supplies the Hyper modifiers through Karabiner.
   launches/moves. Display counts and failures instead of inferring success from
   an Accessibility setter's return value.
 - Recheck selected Space and exact window membership around placement. Private
-  SkyLight is used only for queries in this candidate; Space transfers remain
-  in the separate proof and Hammerspoon. Unsupported queries fail closed.
+  Space queries and the dedicated move-and-follow controller fail closed when
+  their private bridge is unavailable. Layout operations do not transfer windows
+  from other desktops. The separate Space controls verify actual membership,
+  visible destination, original frame and exact focus.
 
 The full 16-entry registry is generated at build time from
 `Hammerspoon/TheseusWorkspace.spoon/app_adapters.lua`. The committed
@@ -169,8 +177,8 @@ native pilots separately from the older Hammerspoon/private-helper evidence.
 The initial live smoke test is Rex/Safari/Codex; the full adapter list still
 requires compatibility checks before claiming native parity.
 
-Hyper+R now opens this installed app through the managed launcher;
-Hyper+Shift+R opens the Hammerspoon fallback. Karabiner and Raycast remain unchanged.
+Hyper+R is owned by the running Window Factory app; Hyper+Shift+R opens the
+Hammerspoon fallback. Karabiner and Raycast remain unchanged.
 The broader TheseusWindow controls remain available throughout.
 
 See the [build/transition plan](../../docs/native-window-factory.md) for scope
@@ -1282,3 +1290,63 @@ documentation; application code, shortcuts, preferences, layouts and the
 Hammerspoon fallback are unchanged. Launcher/startup ownership is the remaining
 functional Hammerspoon port, with the Lua library and original controls retained
 as fallbacks.
+
+
+### Builds 23–24 launcher/startup ownership and naming audit, 2026-10-24
+
+Window Factory now owns Tab+R through an independent Carbon registration and
+persisted launcher setting. The managed Hammerspoon loader retains its exact
+Tab+Shift+R library fallback but no longer binds primary R or starts Window
+Factory. A mocked execution of that actual loader verifies the retained fallback,
+all earlier ownership flags and absence of launcher/task side effects. Hammerspoon
+remains stopped; its library and control implementations are unchanged.
+
+Start Window Factory at login uses SMAppService.mainApp and is optional. Status
+is read from macOS rather than inferred from a saved checkbox. Enable/disable
+uses the standard registration APIs; approval-pending state is displayed with a
+Login Items Settings button. No registration occurs on startup/install. The owner
+chose to leave it off, and the installed app reports no login registration found.
+Recognized login Apple-event markers and --background keep the initial library
+closed; real sign-in launch/registration is untested while the option stays off.
+See Apple's [main-app service](https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp)
+and [login launch marker](https://developer.apple.com/documentation/coreservices/keyaelaunchedasloginitem).
+Native Tab+R is available only while this process runs; after quitting, reopen
+from Applications/Dock. This is a deliberate difference from an external launcher.
+
+The owner physically accepted build 23 primary Tab+R opening, repeat opening,
+the existing controls and badge, and login startup off. Subsequent steering adds
+build 24's Show Dock icon option and Tab+R toggle. The toggle closes only the
+visible, focused library on the active desktop while this app is active. It
+brings a background/away library forward and leaves modal panels alone. Closing
+uses the existing library close path (including cancellation of an in-progress
+operation); it does not quit the app. Badge Open Window Factory remains a show
+action rather than a toggle.
+
+Show Dock icon defaults to on. Turning it off uses accessory activation policy
+to hide the Dock/Command+Tab entry; badge and launcher remain available. The
+preference is applied before the app event loop on subsequent launches. Its off
+state survived an actual quit/reopen and was restored to the visible default.
+The enlarged Settings contents now scroll within the display, keeping startup
+options and all earlier controls reachable.
+
+Naming scan: current product/UI labels and active guide headings use Window
+Factory. The executable is WindowFactory; build and future pilot caches use
+~/.cache/window-factory. The installer reads the signed bundle's executable name
+and guards both current and legacy executable names during updates/imports.
+The stable bundle ID local.windowfactory.native and existing
+~/.local/share/window-factory-native data directory are deliberate compatibility
+exceptions preserving preferences, permissions, catalog and install-backup history.
+Legacy executable guards, dated records, the branch and stable document paths
+retain historical identifiers; no layout migration or branch rename was performed.
+
+Checks pass: 19 installer guards, 11 launch-policy assertions, six synthetic
+login-event checks (no event is sent), real Settings viewport checks and three
+Dock-preference assertions within the 153-assertion AppKit suite, plus all prior
+native suites and repository validation. Dock/activation preference was exercised
+without login registration. Build 24 is installed, strict signature verified,
+Accessibility retained, six control groups plus launcher and indicator enabled,
+and the exact six-layout catalog unchanged. The executable rename preserves the
+designated signing requirement; existing access survived. The normal build 23
+launcher passed the owner's physical test; build 24 toggle/Dock physical
+acceptance is pending. Existing control and bridge primitives are unchanged;
+only a separate launcher registry and app integration were added.

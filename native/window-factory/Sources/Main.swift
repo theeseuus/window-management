@@ -5,6 +5,9 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     var library: LibraryWindow?
     var settings: SettingsWindow?
     var shortcutReference: ShortcutReferenceWindow?
+    var launcher: LauncherControls?
+    private var loginLaunch = false
+    func applicationWillFinishLaunching(_ notification: Notification) { loginLaunch = LauncherControls.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent) }
     var spaceIndicator: SpaceIndicator?
     var spaceMove: DirectSpaceMoveControls?
     var accordion: DirectAccordionControls?
@@ -17,6 +20,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             let args = CommandLine.arguments
             let preview = args.contains("--preview")
             let dataIndex = args.firstIndex(of:"--data-dir")
+            // Compatibility path preserves existing layouts and install backups.
             let directory = dataIndex.flatMap { args.indices.contains($0+1) ? args[$0+1] : nil }
                 ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/share/window-factory-native").path
             let store = try LayoutStore(url:URL(fileURLWithPath:directory).appendingPathComponent("layouts.json"))
@@ -41,6 +45,11 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             library?.onSettings = { [weak self] in self?.showSettings(nil) }
             settings?.changed = { [weak self] in self?.library?.applyPreferences() }
             if !preview {
+                let launchControls = LauncherControls(preferences:preferences); launcher = launchControls
+                launchControls.toggleLibrary = { [weak self] in self?.toggleLibrary() }
+                launchControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
+                settings?.launcher = launchControls; shortcutReference?.launcher = launchControls
+                launchControls.restorePreference()
                 let indicator = SpaceIndicator(preferences:preferences); spaceIndicator = indicator
                 indicator.openLibrary = { [weak self] in self?.library?.show() }
                 indicator.openSettings = { [weak self] in self?.showSettings(nil) }
@@ -121,10 +130,19 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             shortcutItem.keyEquivalentModifierMask = [.command]; shortcutItem.target = self
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
             NSApp.mainMenu = menu
-            if !args.contains("--background") { library?.show() }
+            loginLaunch = loginLaunch || LauncherControls.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent)
+            if FactoryLaunchPolicy.showsLibrary(arguments:args,loginLaunch:loginLaunch) { library?.show() }
         } catch {
             let alert = NSAlert(); alert.messageText = "Window Factory could not start"; alert.informativeText = error.localizedDescription
             alert.runModal(); NSApp.terminate(nil)
+        }
+    }
+    func toggleLibrary() {
+        guard let library else { return }
+        switch FactoryLaunchPolicy.libraryAction(visible:library.window.isVisible,key:library.window.isKeyWindow,active:NSApp.isActive,onActiveSpace:library.window.isOnActiveSpace,modal:NSApp.modalWindow != nil || library.window.attachedSheet != nil) {
+        case .show: library.show()
+        case .close: library.window.close()
+        case .ignore: break
         }
     }
     @objc func showSwitcher(_ sender: Any?) { switcher?.toggle() }
@@ -132,8 +150,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     @objc func showSettings(_ sender: Any?) { settings?.show() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
-    func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); launcher?.refreshLoginState(); settings?.refresh() }
+    func applicationWillTerminate(_ notification: Notification) { launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main
@@ -147,7 +165,8 @@ enum FactoryMain {
             } catch { fputs("Catalog validation failed.\n",stderr); exit(1) }
         }
         let app = NSApplication.shared
-        app.setActivationPolicy(.regular)
+        let showDockIcon = UserDefaults.standard.object(forKey:"showDockIcon") as? Bool ?? true
+        app.setActivationPolicy(showDockIcon ? .regular : .accessory)
         let delegate = FactoryApp(); app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }
     }

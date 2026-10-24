@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const {execFileSync} = require('node:child_process');
+const {runningAppPattern,validateExecutable} = require('./bundle-identity.cjs');
 const args = process.argv.slice(2);
 const allowed = new Set(['--source','--target','--data-dir','--import-catalog','--previous-target']);
 for (let i=0;i<args.length;i+=2) {
@@ -11,6 +12,7 @@ for (let i=0;i<args.length;i+=2) {
 function option(key, fallback) { const i = args.indexOf(key); if (i < 0) return fallback; if (!args[i+1] || args[i+1].startsWith('--')) throw Error(`Missing ${key}`); return path.resolve(args[i+1]); }
 const source = option('--source');
 const target = option('--target','/Applications/Window Factory.app');
+// Compatibility storage name: preserve the accepted catalog and backup history.
 const dataDir = option('--data-dir',path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(),'.local/share'),'window-factory-native'));
 const catalog = option('--import-catalog');
 const previousTarget = option('--previous-target');
@@ -25,13 +27,14 @@ function run() {
   if (previousTarget && (previousTarget === target || fs.existsSync(target) || !fs.existsSync(previousTarget))) throw Error('Rename requires one existing old app and an unused new target');
   if (fs.existsSync(previousInstall) && fs.lstatSync(previousInstall).isSymbolicLink()) throw Error('Refusing a symlink previous install');
   verify(source);
+  const executableName = validateExecutable(execFileSync('/usr/libexec/PlistBuddy',['-c','Print :CFBundleExecutable',path.join(source,'Contents/Info.plist')],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim());
   if (fs.existsSync(previousInstall)) { verify(previousInstall); if (dr(source) !== dr(previousInstall)) throw Error('Designated requirement changed; refusing update'); }
-  try { execFileSync('/usr/bin/pgrep',['-f','/Contents/MacOS/WindowFactoryNative([[:space:]]|$)'],{stdio:'pipe'}); throw Error('Quit Window Factory before installing'); }
+  try { execFileSync('/usr/bin/pgrep',['-f',runningAppPattern()],{stdio:'pipe'}); throw Error('Quit Window Factory before installing'); }
   catch (e) { if (e.status !== 1) throw e; }
   let catalogBytes;
   const destination = path.join(dataDir,'layouts.json');
   if (catalog) {
-    execFileSync(path.join(source,'Contents/MacOS/WindowFactoryNative'),['--validate-catalog',catalog],{stdio:'pipe'});
+    execFileSync(path.join(source,'Contents/MacOS',executableName),['--validate-catalog',catalog],{stdio:'pipe'});
     catalogBytes = fs.readFileSync(catalog);
     if (fs.existsSync(destination) && !fs.readFileSync(destination).equals(catalogBytes)) throw Error('Existing catalog differs; use in-app Import to merge explicitly');
   }

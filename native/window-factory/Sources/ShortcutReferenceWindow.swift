@@ -6,6 +6,7 @@ final class ShortcutReferenceWindow: NSObject {
     private let preferences: FactoryPreferences
     private let text = NSTextView()
     private let restore = NSButton(title:"Restore last stashed window",target:nil,action:nil)
+    weak var launcher: LauncherControls?
     weak var spaceIndicator: SpaceIndicator?
     weak var spaceMove: DirectSpaceMoveControls?
     weak var accordion: DirectAccordionControls?
@@ -88,8 +89,12 @@ final class ShortcutReferenceWindow: NSObject {
           Number: active desktop ordinal     ?: unavailable     —: full-screen/tiled
           No shortcut. Click the badge for library, settings and shortcut reference.
 
-        REMAINING HAMMERSPOON CONTROLS  [\(hammerspoon)]
-          Hyper + R         Open native Window Factory
+        LAUNCHER  [\(state(launcher?.active == true))]
+          Hyper + R         Open library / close it when focused (while running)
+          Optional start at login is in Settings → General.
+          After quitting the app, reopen it from the Dock or Applications.
+
+        HAMMERSPOON FALLBACK  [\(hammerspoon)]
           Hyper + ⇧R        Open Hammerspoon layout fallback
           Control + ← / →   macOS: switch desktop without moving a window
 

@@ -1,10 +1,10 @@
 #!/bin/sh
 set -eu
 native_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-output="${XDG_CACHE_HOME:-$HOME/.cache}/window-factory-native/geometry-pilot"
+output="${XDG_CACHE_HOME:-$HOME/.cache}/window-factory/geometry-pilot"
 app="$output/Window Control Test.app"
 if [ "${1:-}" = --spaces ]; then
-    output="${XDG_CACHE_HOME:-$HOME/.cache}/window-factory-native/space-pilot"
+    output="${XDG_CACHE_HOME:-$HOME/.cache}/window-factory/space-pilot"
     app="$output/Space Move Test.app"
 fi
 mkdir -p "$app/Contents/MacOS" "$output/ModuleCache"

@@ -1,16 +1,14 @@
 # Window Factory: Window and Workspace Management
 
-Window Factory contains two independent components, implemented as Hammerspoon
-Spoons:
+Window Factory is the installed Swift/AppKit app for macOS window controls and
+saved workspace layouts. Its library captures, restores and establishes layouts;
+its controls cover geometry, focus, stash, switching, accordion and Space
+move-and-follow. The menu-bar desktop badge also opens the library and settings.
 
-- **Factory Window** provides deterministic macOS window placement, window
-  switching, and native Space movement.
-- **Factory Workspace** captures, restores, and establishes named,
-  cross-application window layouts in the current native user Space.
-
-The Spoon filenames and Lua API names are `TheseusWindow` for Factory Window
-and `TheseusWorkspace` for Factory Workspace, as used in the installation and
-code examples below.
+Start with the [Window Factory guide](native/window-factory/README.md) for the
+installed app. The Hammerspoon Spoons below are retained fallbacks: `TheseusWindow`
+provides direct controls and `TheseusWorkspace` provides the layout library.
+Their portable installation examples remain available independently of the app.
 
 ## Hammerspoon baseline and native successor
 
@@ -31,8 +29,9 @@ installed or connected to either Spoon. The [native build plan](docs/native-wind
 records the corrected scope, effort estimate, keybinding ownership and staged
 transition. A separate [native AppKit candidate](native/window-factory/README.md)
 now implements the core workflow and carries all 16 existing adapter entries.
-It is a development build awaiting live acceptance; the Spoons remain the
-working installation.
+The installed app has passed the recorded layout and direct-control pilots.
+Launcher/startup adoption and its current acceptance are recorded in that guide;
+the Spoons remain recoverable fallbacks.
 
 The product's core is capturing the active applications and window layout and
 restoring that workspace later. Recreating application contents, browser URLs,
