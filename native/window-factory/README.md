@@ -1268,3 +1268,17 @@ controls, leaving it enabled. Hammerspoon remains stopped. Physical badge/menu,
 desktop traversal, native command updates and regression acceptance are pending.
 After this pilot, launcher/startup ownership is the remaining Hammerspoon port;
 the Lua library and original controls remain retained fallbacks.
+
+
+### Build 22 physical menu-bar indicator pilot accepted, 2026-10-24
+
+The owner confirmed that the badge updates correctly, its menu works, and the
+existing controls still work. This accepts the native Space indicator and its
+Window Factory menu access for the tested workflow. Full-screen markers,
+multiple-display focus changes and rapid intermediate traversal retain their
+separate coverage limits beyond the automated state/image checks. Build 22
+remains installed with the indicator enabled. This checkpoint changes only
+documentation; application code, shortcuts, preferences, layouts and the
+Hammerspoon fallback are unchanged. Launcher/startup ownership is the remaining
+functional Hammerspoon port, with the Lua library and original controls retained
+as fallbacks.
