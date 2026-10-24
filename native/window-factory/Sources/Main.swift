@@ -55,6 +55,12 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 switcherControls.workspaceBusy = controls.workspaceBusy
                 switcherControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
                 settings?.switcher = switcherControls; switcherControls.restorePreference()
+                let pickerOrWorkspaceBusy: () -> Bool = { [weak self] in
+                    self?.library?.task != nil || self?.library?.frozen != nil || self?.switcher?.isOpen == true
+                }
+                controls.workspaceBusy = pickerOrWorkspaceBusy
+                focusControls.workspaceBusy = pickerOrWorkspaceBusy
+                stashControls.workspaceBusy = pickerOrWorkspaceBusy
                 shortcutReference?.switcher = switcherControls
                 shortcutReference?.geometry = controls; shortcutReference?.focus = focusControls; shortcutReference?.stash = stashControls
             }
@@ -90,6 +96,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             layoutItem.submenu = layoutMenu; menu.addItem(layoutItem)
             let windowItem = NSMenuItem(), windowMenu = NSMenu(title:"Window")
             windowMenu.addItem(withTitle:"Close Window",action:#selector(NSWindow.performClose(_:)),keyEquivalent:"w")
+            let switcherItem = windowMenu.addItem(withTitle:"Switch Windows",action:#selector(showSwitcher(_:)),keyEquivalent:"")
+            switcherItem.target = self
             let shortcutItem = windowMenu.addItem(withTitle:"Keyboard Shortcuts",action:#selector(showShortcuts(_:)),keyEquivalent:"?")
             shortcutItem.keyEquivalentModifierMask = [.command]; shortcutItem.target = self
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
@@ -100,6 +108,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             alert.runModal(); NSApp.terminate(nil)
         }
     }
+    @objc func showSwitcher(_ sender: Any?) { switcher?.toggle() }
     @objc func showShortcuts(_ sender: Any?) { shortcutReference?.show() }
     @objc func showSettings(_ sender: Any?) { settings?.show() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

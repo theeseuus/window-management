@@ -64,8 +64,11 @@ final class ShortcutReferenceWindow: NSObject {
           focus has moved elsewhere. Restore stashed windows before quitting.
 
         WINDOW SWITCHING  [\(state(switcher?.active == true))]
-          Hyper + W / ⇧W    Forward / backward through windows
-          Keep Tab held to choose; release it to switch. Esc cancels.
+          Hyper + W         Open / close the persistent window picker
+          ↑ / ↓             Previous / next window in desktop groups
+          ← / →             Previous / next desktop group
+          Return / Enter    Select and close     Esc cancels
+          Hyper + ⇧W        Open / step backward
           Windows on other Spaces are included; the selected Space is followed.
 
         REMAINING HAMMERSPOON CONTROLS  [\(hammerspoon)]

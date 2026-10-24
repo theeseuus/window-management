@@ -926,3 +926,47 @@ reported pushing both implementation commits; both local repositories matched
 their tracked remotes before this documentation checkpoint. Accordion remains
 unported. Command+? and recovery-button behaviour after a focus change retain
 their separately unverified status from earlier records.
+
+
+### Build 17 grouped, persistent window picker, 2026-10-24
+
+The native picker now groups windows by display and Desktop number, using the
+existing Space census order rather than private numeric Space IDs. Each group
+marks the current desktop and shows its window count; multiple displays receive
+display prefixes. Recency order is retained within each group. The selected
+header names the desktop, app and window separately, with group and total counts.
+Unavailable and full-screen locations receive explicit labels instead of false
+desktop numbers.
+
+At the owner's request, this supersedes the native hold-and-release interaction:
+
+- Tab+W opens the picker; releasing Tab leaves it open. Tab+W again dismisses
+  without switching.
+- Up/Down moves through windows; Left/Right moves between desktop groups.
+- Return or keypad Enter selects and closes; Escape dismisses without switching.
+- Tab+Shift+W remains a backward open/step command. Clicking a row still selects.
+
+The Window menu also exposes Switch Windows, and the shortcut reference and
+picker footer describe the new commands. A nonactivating key panel receives
+plain navigation keys locally, without new global arrow registrations or an
+Input Monitoring request. Desktop changes and loss of keyboard focus dismiss
+the picker. Geometry, directional focus and stash commands pause only while the
+picker is open, preventing changes underneath it.
+
+The accepted discovery and exact-window activation service, native bridge,
+geometry/focus/stash implementations and Hammerspoon fallback are unchanged.
+The fallback retains its original hold-and-release picker. The owner prefers
+the visible stash edge as a retrieval handle; no stash placement changes are
+included. Accordion remains unported.
+
+Validation: 999 switcher assertions cover grouping, ordering, identity-preserving
+selection, navigation, both Enter keys and cancellation; the full native tests
+and repository validation pass. An isolated render of the production panel
+confirmed clear grouping and keyboard focus without changing the active app.
+The production build is signed successfully as build 17. Physical toggle,
+arrow-key and cross-Space selection acceptance remains pending.
+
+Deployment is held with build 16 running: one window has a session-only saved
+stash frame that must be restored before quitting. No installed app, saved
+layouts, preferences or working Hammerspoon configuration has been changed by
+this checkpoint.

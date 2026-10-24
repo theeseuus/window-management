@@ -40,6 +40,13 @@ struct SwitcherWindowRecord {
     let space: UInt64, display: UInt32
     let title: String
     let icon: NSImage?
+    let location: SwitcherDesktopLocation?
+    init(window: SwitcherWindowIdentity,space: UInt64,display: UInt32,title: String,icon: NSImage?,location: SwitcherDesktopLocation? = nil) {
+        self.window = window; self.space = space; self.display = display; self.title = title; self.icon = icon; self.location = location
+    }
+    var desktopLocation: SwitcherDesktopLocation {
+        location ?? SwitcherDesktopLocation(display:display,space:space,displayNumber:Int.max,desktopNumber:nil,spaceOrder:Int.max,isCurrent:false,isFullscreen:false)
+    }
     func check() throws {
         try Task.checkCancellation(); let w = window
         guard NSRunningApplication(processIdentifier:w.pid)?.bundleIdentifier == w.bundleID,
@@ -100,9 +107,9 @@ final class SwitcherServices {
             metadata[id] = info; apps[pid] = app
         }
         var result: [SwitcherWindowRecord] = [], seen = Set<UInt32>(), axByPID: [pid_t:[UInt32:AXUIElement]] = [:]
-        for desktop in origin.desktops {
+        for (displayIndex,desktop) in origin.desktops.enumerated() {
             guard let spaces = WFSwitcherSpaces(desktop.display) as? [[String:Any]] else { throw FactoryError("All-Space inventory unavailable; no partial switcher list was substituted.") }
-            for descriptor in spaces {
+            for (spaceIndex,descriptor) in spaces.enumerated() {
                 try origin.check(); await Task.yield()
                 guard let sid = (descriptor["id"] as? NSNumber)?.uint64Value,
                       let kind = (descriptor["kind"] as? NSNumber)?.int32Value,[0,4].contains(kind),
@@ -132,7 +139,9 @@ final class SwitcherServices {
                         ?? (kind == 0 ? "Window on Desktop \(ordinal)" : "Full-screen window")
                     let frame = Frame(x:rect.minX,y:rect.minY,w:rect.width,h:rect.height)
                     let identity = SwitcherWindowIdentity(id:id,pid:pid,bundleID:bundle,appName:app.localizedName ?? bundle,element:element,frame:frame)
-                    result.append(SwitcherWindowRecord(window:identity,space:sid,display:desktop.display,title:title,icon:app.icon)); seen.insert(id)
+                    let location = SwitcherDesktopLocation(display:desktop.display,space:sid,displayNumber:displayIndex+1,
+                        desktopNumber:kind == 0 ? ordinal : nil,spaceOrder:spaceIndex,isCurrent:shown,isFullscreen:kind == 4)
+                    result.append(SwitcherWindowRecord(window:identity,space:sid,display:desktop.display,title:title,icon:app.icon,location:location)); seen.insert(id)
                 }
             }
         }
