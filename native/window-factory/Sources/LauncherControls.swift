@@ -8,15 +8,19 @@ final class LauncherControls {
     var lastResult = "Tab+R launcher is disabled."
     var loginResult: String?
     var toggleLibrary: (() -> Void)?
+    var toggleShortcuts: (() -> Void)?
     var changed: (() -> Void)?
     init(preferences: FactoryPreferences) { self.preferences = preferences; refreshLoginState() }
     func enable() throws {
-        let status = WFRegisterLauncherHotKey({ _,context in
-            MainActor.assumeIsolated { Unmanaged<LauncherControls>.fromOpaque(context).takeUnretainedValue().toggleLibrary?() }
+        let status = WFRegisterLauncherHotKey({ index,context in
+            MainActor.assumeIsolated {
+                let owner = Unmanaged<LauncherControls>.fromOpaque(context).takeUnretainedValue()
+                if index == 0 { owner.toggleLibrary?() } else if index == 1 { owner.toggleShortcuts?() }
+            }
         },Unmanaged.passUnretained(self).toOpaque())
         guard status == 0 else { active = false; lastResult = "Tab+R could not register (status \(status)); other controls are unchanged."; changed?(); throw FactoryError(lastResult) }
         active = true; preferences.launcherEnabled = true
-        lastResult = "Tab+R opens the library; press again while it is focused to close it."; changed?()
+        lastResult = "Library and Keyboard Shortcuts bindings are enabled."; changed?()
     }
     func disable() {
         WFUnregisterLauncherHotKey(); active = false; preferences.launcherEnabled = false

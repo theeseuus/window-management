@@ -91,10 +91,18 @@ import AppKit
         check(settings.window.frame.height<=(NSScreen.main?.visibleFrame.height ?? 2000),"Settings fits usable display height")
         try ShortcutValidation.validate([:])
         let definitions = ShortcutDefinition.all
-        check(definitions.count == 30 && Set(definitions.map(\.id)).count == 30,"all 30 commands have stable distinct IDs")
+        check(definitions.count == 31 && Set(definitions.map(\.id)).count == 31,"all 31 commands have stable distinct IDs")
         for (index,geometry) in GeometryShortcut.all.enumerated() {
             check(definitions[index].standard.key == geometry.keyCode && definitions[index].standard.modifiers == geometry.modifiers,"geometry defaults match working controls")
         }
+        let referenceShortcut = definitions.first{$0.id == "library.1"}!
+        check(referenceShortcut.standard.key == 44 && referenceShortcut.standard.modifiers == ShortcutChord.hyper,"Keyboard Shortcuts defaults to Hyper slash")
+        check(referenceShortcut.standard.actionHint == "Tab + /","reference button uses the same global chord")
+        let alternateHint = ShortcutChord(key:79,modifiers:ShortcutChord.hyper,name:"F18")
+        check(alternateHint.actionHint == "Tab + F18","a custom global reference binding produces a current hint")
+        let statusMenu = SpaceIndicator.menu(target:nil)
+        check(statusMenu.items.last?.title == "Quit Window Factory" && statusMenu.items.last?.keyEquivalent == "q","badge menu offers Quit")
+        check(statusMenu.items.last?.keyEquivalentModifierMask == .command,"badge Quit uses standard Command Q")
         let library = definitions.first{$0.group == .library}!
         let custom = ShortcutChord(key:79,modifiers:ShortcutChord.hyper,name:"F18")
         let shortcutStore = KeybindingStore(defaults:dockDefaults)

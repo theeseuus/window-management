@@ -42,6 +42,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     let restore = NSButton(title:"Restore",target:nil,action:nil)
     let establish = NSButton(title:"Establish here",target:nil,action:nil)
     let cancel = NSButton(title:"Cancel",target:nil,action:nil)
+    let shortcuts = NSButton(title:"Shortcuts…",target:nil,action:nil)
     var filtered: [Recipe] = [], frozen: Recipe?, task: Task<Void,Never>?, monitor: Any?
     var lastReceipt: Receipt?
     init(store: LayoutStore,registry: AdapterRegistry,preview: Bool,preferences: FactoryPreferences) {
@@ -72,7 +73,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         }
         let permission = NSButton(title:"Settings…  ⌘,",target:self,action:#selector(openSettings))
         permission.bezelStyle = .rounded
-        let shortcuts = NSButton(title:"Shortcuts…",target:self,action:#selector(openShortcuts)); shortcuts.bezelStyle = .rounded
+        shortcuts.target = self; shortcuts.action = #selector(openShortcuts); shortcuts.bezelStyle = .rounded
         name.placeholderString = "Name the captured layout"; name.target = self; name.action = #selector(saveCapture)
         let naming = NSStackView(views:[nameLabel,name,save,cancel]); naming.orientation = .horizontal
         name.widthAnchor.constraint(greaterThanOrEqualToConstant:240).isActive = true
@@ -107,6 +108,8 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     func applyPreferences() {
         window.level = preferences.keepLibraryOnTop ? .floating : .normal
         shortcutHints.isHidden = true
+        let reference = ShortcutDefinition.all.first{$0.id == "library.1"}!
+        shortcuts.title = preferences.showShortcutHints ? "Shortcuts…  " + preferences.shortcuts.chord(reference).actionHint : "Shortcuts…"
         capture.title = preferences.showShortcutHints ? "Capture…  ⌘N" : "Capture…"
         restore.title = preferences.showShortcutHints ? "Restore  ↩" : "Restore"
         establish.title = preferences.showShortcutHints ? "Establish here  ⌘↩" : "Establish here"

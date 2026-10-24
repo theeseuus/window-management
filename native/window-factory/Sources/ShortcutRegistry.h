@@ -63,7 +63,8 @@ static BOOL wfValidShortcutSlot(UInt32 signature,UInt32 index) {
         case 'WFGC': return index<19;
         case 'WFFC': return index<4;
         case 'WFSW': case 'WFSM': return index<2;
-        case 'WFST': case 'WFAC': case 'WFLA': return index==0;
+        case 'WFLA': return index<2;
+        case 'WFST': case 'WFAC': return index==0;
         default: return NO;
     }
 }

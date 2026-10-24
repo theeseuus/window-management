@@ -162,7 +162,7 @@ moves the whole group between Spaces or restores window contents.
 ## Window Factory
 
 The installed app provides a Settings pane (`Command + ,`) and a Layout
-menu with visible keyboard equivalents. Its buttons and optional hint row show
+menu with visible keyboard equivalents. Its action buttons show
 Restore, Establish, Capture, search and cancel commands. The complete current
 in-app map and preferences are documented in the
 [Window Factory guide](native/window-factory/README.md#settings-and-visible-keyboard-commands).
@@ -172,7 +172,11 @@ the launcher are independent global shortcuts while the app is running.
 ## Personal machine handoff
 
 On the owner's installed setup, hold Tab+R opens Window Factory through its own
-native launcher; repeat while the library is focused closes it. From another
+native launcher; repeat while the library is focused closes it. Tab+/ opens or
+closes Keyboard Shortcuts; both are configurable in Settings → Shortcuts → Library.
+The library button shows the configured reference binding. There is no separate
+Command+? binding.
+The Space badge menu includes Quit Window Factory. From another
 app it brings the library forward. Tab+Shift+R opens the Hammerspoon fallback when Hammerspoon is
 running. The managed loader no longer launches Window Factory or binds Tab+R.
 Optional start at login is in Window Factory Settings and is initially off.

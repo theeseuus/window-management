@@ -49,7 +49,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             settings?.onExport = { [weak self] in self?.library?.show(); self?.library?.exportLayouts() }
             settings?.onReport = { [weak self] in self?.library?.showReport() }
             settings?.layoutActionsAvailable = { [weak self] in self?.library?.task == nil && self?.library?.frozen == nil }
-            bindings?.changed = { [weak self] in self?.shortcutReference?.refresh(); self?.settings?.refresh() }
+            bindings?.changed = { [weak self] in self?.shortcutReference?.refresh(); self?.settings?.refresh(); self?.library?.applyPreferences() }
             bindings?.recoverRegistrations = { [weak self] in self?.restoreShortcutOwners() }
             library?.onShortcuts = { [weak self] in self?.showShortcuts(nil) }
             settings?.onShortcuts = { [weak self] in self?.showShortcuts(nil) }
@@ -58,6 +58,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             if !preview {
                 let launchControls = LauncherControls(preferences:preferences); launcher = launchControls
                 launchControls.toggleLibrary = { [weak self] in self?.toggleLibrary() }
+                launchControls.toggleShortcuts = { [weak self] in self?.toggleShortcuts() }
                 launchControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
                 settings?.launcher = launchControls; shortcutReference?.launcher = launchControls
                 launchControls.restorePreference()
@@ -144,8 +145,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             windowMenu.addItem(withTitle:"Close Window",action:#selector(NSWindow.performClose(_:)),keyEquivalent:"w")
             let switcherItem = windowMenu.addItem(withTitle:"Switch Windows",action:#selector(showSwitcher(_:)),keyEquivalent:"")
             switcherItem.target = self
-            let shortcutItem = windowMenu.addItem(withTitle:"Keyboard Shortcuts",action:#selector(showShortcuts(_:)),keyEquivalent:"?")
-            shortcutItem.keyEquivalentModifierMask = [.command]; shortcutItem.target = self
+            let shortcutItem = windowMenu.addItem(withTitle:"Keyboard Shortcuts",action:#selector(showShortcuts(_:)),keyEquivalent:"")
+            shortcutItem.target = self
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
             NSApp.mainMenu = menu
             loginLaunch = loginLaunch || LauncherControls.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent)
@@ -170,6 +171,15 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
         switch FactoryLaunchPolicy.libraryAction(visible:library.window.isVisible,key:library.window.isKeyWindow,active:NSApp.isActive,onActiveSpace:library.window.isOnActiveSpace,modal:NSApp.modalWindow != nil || library.window.attachedSheet != nil) {
         case .show: library.show()
         case .close: library.window.close()
+        case .ignore: break
+        }
+    }
+    func toggleShortcuts() {
+        guard let reference = shortcutReference else { return }
+        let window = reference.window
+        switch FactoryLaunchPolicy.libraryAction(visible:window.isVisible,key:window.isKeyWindow,active:NSApp.isActive,onActiveSpace:window.isOnActiveSpace,modal:NSApp.modalWindow != nil || window.attachedSheet != nil) {
+        case .show: reference.show()
+        case .close: window.close()
         case .ignore: break
         }
     }

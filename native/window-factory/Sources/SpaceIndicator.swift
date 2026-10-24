@@ -20,11 +20,7 @@ final class SpaceIndicator {
         let status = NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength)
         status.button?.imagePosition = .imageOnly
         item = status; preferences.spaceIndicatorEnabled = true
-        let menu = NSMenu(),description = NSMenuItem(title:"Reading active Space…",action:nil,keyEquivalent:"")
-        description.isEnabled = false; descriptionItem = description; menu.addItem(description); menu.addItem(.separator())
-        for (title,selector) in [("Open Window Factory",#selector(showLibrary)),("Settings…",#selector(showSettings)),("Keyboard Shortcuts…",#selector(showShortcuts))] {
-            let entry = menu.addItem(withTitle:title,action:selector,keyEquivalent:""); entry.target = self
-        }
+        let menu = Self.menu(target:self); descriptionItem = menu.items.first
         status.menu = menu
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.activeSpaceDidChangeNotification,NSWorkspace.didActivateApplicationNotification,NSWorkspace.didWakeNotification] {
@@ -34,6 +30,17 @@ final class SpaceIndicator {
             observe(NotificationCenter.default,name)
         }
         scheduleRefresh()
+    }
+    static func menu(target: SpaceIndicator?) -> NSMenu {
+        let menu = NSMenu(),description = NSMenuItem(title:"Reading active Space…",action:nil,keyEquivalent:"")
+        description.isEnabled = false; menu.addItem(description); menu.addItem(.separator())
+        for (title,selector) in [("Open Window Factory",#selector(showLibrary)),("Settings…",#selector(showSettings)),("Keyboard Shortcuts…",#selector(showShortcuts))] {
+            let entry = menu.addItem(withTitle:title,action:selector,keyEquivalent:""); entry.target = target
+        }
+        menu.addItem(.separator())
+        let quit = menu.addItem(withTitle:"Quit Window Factory",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
+        quit.keyEquivalentModifierMask = [.command]; quit.target = NSApp
+        return menu
     }
     private func observe(_ center: NotificationCenter,_ name: Notification.Name) {
         let token = center.addObserver(forName:name,object:nil,queue:.main) { [weak self] _ in

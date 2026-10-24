@@ -6,6 +6,15 @@ library or closes it when focused, while the app is running. Optional start at l
 Tab+Shift+R retains the Hammerspoon library fallback when Hammerspoon is running.
 The dated records below preserve implementation and physical acceptance evidence.
 
+## Future work
+
+- **Custom geometries:** consider a way to add new size/position geometries.
+  Keep the current geometry set and controller behavior unchanged in this version.
+- **App launching:** consider an Applications shortcut group with an app picker
+  and launch/bring-forward actions. Review existing-window/Space behavior and
+  hand bindings over individually from Raycast after testing. Raycast retains
+  launcher ownership in this version.
+
 ## Configurable shortcuts and compact Settings (build 25)
 
 Settings has four tabs: General, Shortcuts, Layouts and About. General uses
@@ -1568,3 +1577,70 @@ column positions, plus the existing 41 agent-interface assertions and controller
 regressions. Repository validation passes. Settings → Shortcuts was left open
 for the owner's appearance review; this does not claim a new physical-control
 acceptance test.
+
+### Build 30 menu and reference access, 2026-10-25
+
+The Space badge menu adds Quit Window Factory with standard Command+Q behavior.
+Settings → Shortcuts → Library adds a configurable Open / close Keyboard
+Shortcuts command, default Hyper+/ (hold Tab and press /). Existing Hyper+R and
+Hyper+Shift+R fallback bindings remain unchanged. The library Shortcuts button
+now shows ⌘? when shortcut hints are enabled; the existing local Window-menu
+binding remains available while the app is active. The new global command uses
+the existing launcher group and chord store; 31 global commands are now listed.
+Future custom geometries and app launching are recorded above without adding
+those features to this version. The CLI disposable-Rex pilot is recorded below.
+
+### Build 31 single reference binding correction, 2026-10-25
+
+The owner reported that the advertised Command+? action did not work. The label
+had been added without physical-key verification. It is removed from both the
+Window menu's key equivalent and the local reference list. Tab+/ is now the
+single default reference binding, consistent with the Tab-based direct controls.
+The library button reads that binding from the saved chord, including custom
+changes, and refreshes when editing changes it. The menu/button mouse actions
+remain available. This replaces the build 30 Command+? note above; it does not
+claim the broken local combination was accepted.
+
+The first armed CLI pilot completed Capture (a new Rex-only pilot layout), then
+stopped on an active-desktop change before Restore or Establish. No window
+creation or placement was dispatched by that run. Its report/capture are retained
+for an explicitly guarded continuation after the reference-binding correction.
+
+
+### Build 31 shortcut acceptance and live CLI pilot, 2026-10-25
+
+The owner confirmed Tab + / opens and closes Keyboard Shortcuts. The library
+button shows that configured binding. The previously advertised, non-working
+Command+? duplicate is removed. The signed build 31 installation preserved the
+layout catalog byte-for-byte and the existing signing identity. No session
+stashes were present at restart.
+
+The owner-authorized Rex CLI pilot completed against Rex Beta 0.1.0 (1408),
+using the successful earlier capture `CLI Rex pilot c9bc1062`. The first resumed
+attempt stopped before any operation when the owner returned to chat. The next
+attempt completed while the owner stayed on the disposable window's desktop:
+
+| CLI operation | Placed | Created | Reused | Missing | Extras |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Restore after manual movement/resize | 1 | 0 | 1 | 0 | 0 |
+| Establish after owner closed the disposable window | 1 | 1 | 0 | 0 | 0 |
+| Establish again with a fresh request ID | 1 | 0 | 1 | 0 | 0 |
+
+All three jobs succeeded without failures. Restore retained the exact disposable
+window identity and recovered its saved frame within two points. The repeat
+retained the recreated window identity and saved frame; all-Space Rex inventory
+contained exactly one test window beyond the original three. Original Rex window
+IDs and Space memberships and all pre-existing saved recipes were unchanged.
+The recreated test window and pilot layout remain available to the owner.
+Agent access remains enabled at the owner's explicit request.
+
+The explicitly armed `scripts/rex-cli-pilot.cjs` is excluded from normal test
+execution. Its resume mode requires a known successful Capture with no later
+operations, the exact captured disposable window on its original desktop, the
+unchanged Rex process/original windows and unchanged captured recipe. It stops
+on desktop changes and never retries uncertain mutations. Runtime reports remain
+in private temporary storage, outside the repository.
+
+This live pilot tests CLI Capture/Restore/Establish and duplicate prevention.
+It does not constitute a new manual test of every direct-control shortcut.
+Their implementations and the Hammerspoon fallback were unchanged in this work.

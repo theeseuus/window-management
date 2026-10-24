@@ -55,5 +55,11 @@ int main(void) {
     keys[0]=200;
     assert(WFUpdateShortcutConfiguration(sig,idx,keys,mods,2,&failed,&rollback)==paramErr);
     assert(a); blockedKey=-1;assert(WFUnregisterConfiguredHotKey(a)==noErr);
+    EventHotKeyRef reference=NULL;
+    UInt32 referenceSig='WFLA',referenceIndex=1,referenceKey=44,referenceModifiers=cmdKey|controlKey|optionKey;
+    assert(WFUpdateShortcutConfiguration(&referenceSig,&referenceIndex,&referenceKey,&referenceModifiers,1,&failed,&rollback)==noErr);
+    assert(WFRegisterConfiguredHotKey(44,referenceModifiers,(EventHotKeyID){'WFLA',1},NULL,0,&reference)==noErr);
+    WFSetShortcutCapture(capture,NULL);assert(WFHandleShortcutCapture((EventHotKeyID){'WFLA',1}) && captured==44);
+    WFSetShortcutCapture(NULL,NULL);assert(WFUnregisterConfiguredHotKey(reference)==noErr);
     puts("native shortcut registry: configured/live bindings, capture, shared Escape IDs, rejection and rollback passed; no OS hotkeys registered");
 }

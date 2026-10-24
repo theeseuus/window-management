@@ -420,7 +420,7 @@ int32_t WFRegisterSpaceMoveHotKeys(WFHotKeyCallback callback,void *context,uint3
 }
 
 // Native library launcher has its own registry; Shift+R stays with Hammerspoon.
-static EventHotKeyRef wfLauncherKey;
+static EventHotKeyRef wfLauncherKeys[2];
 static EventHandlerRef wfLauncherHandler;
 static WFHotKeyCallback wfLauncherCallback;
 static void *wfLauncherContext;
@@ -429,10 +429,10 @@ static OSStatus wfLauncherEvent(EventHandlerCallRef next,EventRef event,void *co
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
     if(status==noErr && WFHandleShortcutCapture(key)) return noErr;
     if(status!=noErr || key.signature!='WFLA' || !wfLauncherCallback) return eventNotHandledErr;
-    wfLauncherCallback(0,wfLauncherContext); return noErr;
+    wfLauncherCallback(key.id,wfLauncherContext); return noErr;
 }
 void WFUnregisterLauncherHotKey(void) {
-    if(wfLauncherKey) { WFUnregisterConfiguredHotKey(wfLauncherKey); wfLauncherKey=NULL; }
+    for(unsigned i=0;i<2;i++) if(wfLauncherKeys[i]) { WFUnregisterConfiguredHotKey(wfLauncherKeys[i]); wfLauncherKeys[i]=NULL; }
     if(wfLauncherHandler) { RemoveEventHandler(wfLauncherHandler); wfLauncherHandler=NULL; }
     wfLauncherCallback=NULL; wfLauncherContext=NULL;
 }
@@ -440,7 +440,12 @@ int32_t WFRegisterLauncherHotKey(WFHotKeyCallback callback,void *context) {
     WFUnregisterLauncherHotKey(); EventTypeSpec type={kEventClassKeyboard,kEventHotKeyPressed};
     OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfLauncherEvent,1,&type,NULL,&wfLauncherHandler);
     if(status!=noErr) return status;
-    wfLauncherCallback=callback; wfLauncherContext=context; EventHotKeyID key={'WFLA',0};
-    status=WFRegisterConfiguredHotKey(15,cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfLauncherKey);
-    if(status!=noErr) WFUnregisterLauncherHotKey(); return status;
+    wfLauncherCallback=callback; wfLauncherContext=context;
+    const UInt32 keys[]={15,44};
+    for(unsigned i=0;i<2;i++) {
+        EventHotKeyID key={'WFLA',i};
+        status=WFRegisterConfiguredHotKey(keys[i],cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfLauncherKeys[i]);
+        if(status!=noErr) { WFUnregisterLauncherHotKey(); return status; }
+    }
+    return noErr;
 }
