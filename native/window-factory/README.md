@@ -1096,3 +1096,33 @@ menu-bar Space indicator, and launcher/startup ownership remain to migrate.
 The Hammerspoon layout library and original direct controls remain deliberate
 fallbacks. Configurable bindings and the planned UI cleanup are later product
 work, separate from porting the remaining controller functions.
+
+
+### Build 20 accordion stacking correction, 2026-10-24
+
+The owner confirmed build 19 accordion placement works, but supplied a Chrome
+screenshot showing inconsistent overlap order. Placement followed the fan while
+the inherited front-to-back window order did not. The owner agreed to an explicit
+stacking pass: raise farthest to nearest, then restore the anchor frontmost and
+focused. This is a native refinement; the original Lua fallback is unchanged.
+
+Build 20 retains the existing frame plan, shortcut and scope. After verifying
+frames, it raises the fan in reverse placement order, then the anchor, without
+yielding between raises. It rechecks identities, desktop, front app and anchor
+frame during that pass. The final anchor-focus request uses the existing bridge
+function; no bridge implementation changes are needed. Bounded read-only checks
+then compare the compositor's actual front-to-back IDs with anchor/nearest/next
+order and confirm exact anchor focus. Unconfirmed order is reported as a stacking
+failure even when frame placement succeeded. There are no repeated stacking
+repair loops or Space transfers.
+
+Validation passes: 46 accordion assertions cover expected raise order (including
+clamped/tied placements and single-window no-op), retaining the 18 original Lua
+frame comparisons. All native suites and repository validation pass. The accepted
+geometry, directional focus, stash and switcher implementations, bindings and
+Hammerspoon fallback remain unchanged. Physical stacking acceptance is pending.
+
+Deployment is held with build 19 running: the shortcut reference reports one
+session-only stash. The owner has been asked to restore it before restart. The
+build 20 candidate is prepared; no installed app or saved layout changes are
+included in this checkpoint.

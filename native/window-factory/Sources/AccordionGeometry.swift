@@ -5,6 +5,11 @@ struct AccordionRecord {
     let frame: Frame
 }
 enum AccordionGeometry {
+    // Raising farthest first leaves each nearer window above it; anchor is last.
+    static func raiseOrder(anchor: UInt32,fan: [AccordionRecord]) -> [UInt32] {
+        fan.isEmpty ? [] : fan.reversed().map(\.id)+[anchor]
+    }
+
     static func plan(anchor: AccordionRecord,others: [AccordionRecord],screen: Frame) -> [AccordionRecord] {
         let ordered = others.filter{$0.id != anchor.id}.sorted {
             if $0.frame.y != $1.frame.y { return $0.frame.y < $1.frame.y }
