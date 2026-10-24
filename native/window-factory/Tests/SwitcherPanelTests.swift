@@ -127,6 +127,26 @@ import AppKit
         }
         check(abs(commandX("Next size")-commandX("Previous size"))<0.1,"Shift modifiers must not shift the action column")
         check(abs(commandX("Next size")-commandX("Focus left"))<0.1,"action column aligns across shortcut groups")
+        func glyphX(_ character: Int) -> CGFloat {
+            let glyph = layout.glyphIndexForCharacter(at:character)
+            return layout.lineFragmentRect(forGlyphAt:glyph,effectiveRange:nil).minX+layout.location(forGlyphAt:glyph).x
+        }
+        func mainKeyX(_ action: String) -> CGFloat {
+            let source = referenceText.string as NSString
+            let line = source.lineRange(for:source.range(of:action))
+            let row = source.substring(with:line)
+            let parts = row.components(separatedBy:"\t")
+            return glyphX(line.location+(parts[0]+"\t"+parts[1]+"\t").utf16.count)
+        }
+        check(abs(mainKeyX("Next size")-mainKeyX("Previous size"))<0.1,"Shift must not shift the main-key column")
+        check(abs(mainKeyX("Next size")-mainKeyX("Focus left"))<0.1,"main keys align across groups")
+        check(abs(mainKeyX("Next size")-mainKeyX("Select window"))<0.1,"unmodified navigation keys use the same key column")
+        check(abs(commandX("Next size")-commandX("Select window"))<0.1,"long navigation names must not push the action to another tab stop")
+        let nextSize = ShortcutDefinition.all.first{$0.title == "Next size"}!
+        try dockPreferences.shortcuts.save([nextSize.id:ShortcutChord(key:121,modifiers:ShortcutChord.hyper,name:"Page Down")])
+        reference.refresh(); layout.ensureLayout(for:container)
+        check(abs(mainKeyX("Next size")-mainKeyX("Previous size"))<0.1,"custom key names retain their column")
+        check(abs(commandX("Next size")-commandX("Previous size"))<0.1,"custom key names retain the action column")
         reference.stop()
         settings.stop()
         print("native switcher panel: \(assertions) assertions passed; no windows shown or controlled")

@@ -1530,3 +1530,22 @@ The controllers gained only read-only busy indicators for the agent job gate.
 Live Capture/Restore/Establish through the new entry point has not been exercised
 against disposable desktop windows yet. Existing UI adapter acceptance and
 fixture job tests do not substitute for that future end-to-end pilot.
+
+### Build 28 shortcut component columns, 2026-10-25
+
+The Keyboard Shortcuts reference separates each chord into modifier symbols,
+main key and action. Modifiers are right-aligned, main keys start at a fixed tab
+stop and action text uses a separate stop/hanging indent. Adding Shift (⇧,
+U+21E7) therefore does not shift the main key or action. Up Arrow remains ↑.
+The same columns cover unmodified navigation, local library commands and the
+Hammerspoon fallback; paired Import/Export and Close/Quit entries have separate
+rows so each chord has an unambiguous modifier/key pair.
+
+Modifiers and main-key names come directly from the saved chord components;
+labels are not split on spaces, so custom multiword key names remain intact.
+The Settings recorder's combined label, bindings, preference schema, CLI,
+controller algorithms and fallback are unchanged. Native regression suites pass,
+including 191 AppKit assertions with actual glyph-position checks for shifted,
+unshifted, unmodified and custom-key rows. Repository validation passes.
+Signed build 28 is installed and its reference was visually inspected; the
+layout catalog is byte-identical and the existing signing identity is retained.

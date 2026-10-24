@@ -45,23 +45,29 @@ final class ShortcutReferenceWindow: NSObject {
     }
     func refresh() {
         let states: [ShortcutGroup:Bool] = [.geometry:geometry?.active == true,.focus:focus?.active == true,.stash:stash?.active == true,.switcher:switcher?.active == true,.accordion:accordion?.active == true,.spaces:spaceMove?.active == true,.library:launcher?.active == true]
+        func row(_ modifiers: String,_ key: String,_ action: String) -> String {
+            "\t"+modifiers+"\t"+key+"\t"+action
+        }
         var sections = ["WINDOW FACTORY KEYBOARD SHORTCUTS"]
         for group in ShortcutGroup.allCases {
-            let rows = ShortcutDefinition.all.filter{$0.group == group}.map { "\(preferences.shortcuts.chord($0).label)\t\($0.title)" }
+            let rows = ShortcutDefinition.all.filter{$0.group == group}.map {
+                let chord = preferences.shortcuts.chord($0)
+                return row(chord.modifierLabel,chord.name,$0.title)
+            }
             sections.append("\(group.title.uppercased())  [\(states[group] == true ? "On" : "Off")]\n"+rows.joined(separator:"\n"))
         }
         sections.append("Stashed windows in this app session: \(stash?.count ?? 0)")
-        func section(_ title: String,_ rows: [(String,String)]) -> String {
-            title+"\n"+rows.map{$0.0+"\t"+$0.1}.joined(separator:"\n")
+        func section(_ title: String,_ rows: [(String,String,String)]) -> String {
+            title+"\n"+rows.map{row($0.0,$0.1,$0.2)}.joined(separator:"\n")
         }
-        sections.append(section("SWITCHER NAVIGATION",[("↑ / ↓","Previous / next window"),("← / →","Previous / next desktop"),("Return / Enter","Select window"),("Escape","Close")]))
-        sections.append(section("LAYOUT LIBRARY",[("↑ / ↓","Select layout"),("Return","Restore"),("⌘ Return","Establish"),("⌘ N","Capture"),("⌘ F","Search"),("⌘ I / ⇧⌘ E","Import / export"),("⌘ Delete","Delete layout"),("Escape","Cancel or close"),("⌘ ,","Settings"),("⌘ ?","Keyboard Shortcuts"),("⌘ W / ⌘ Q","Close / quit")]))
-        sections.append(section("HAMMERSPOON FALLBACK",[("⌃⌥⇧⌘ R","Open fallback library"),("⌃ ← / ⌃ →","Switch desktop (macOS)")]))
+        sections.append(section("SWITCHER NAVIGATION",[("","↑ / ↓","Previous / next window"),("","← / →","Previous / next desktop"),("","Return / Enter","Select window"),("","Escape","Close")]))
+        sections.append(section("LAYOUT LIBRARY",[("","↑ / ↓","Select layout"),("","Return","Restore"),("⌘","Return","Establish"),("⌘","N","Capture"),("⌘","F","Search"),("⌘","I","Import"),("⇧⌘","E","Export"),("⌘","Delete","Delete layout"),("","Escape","Cancel or close"),("⌘",",","Settings"),("⌘","?","Keyboard Shortcuts"),("⌘","W","Close window"),("⌘","Q","Quit Window Factory")]))
+        sections.append(section("HAMMERSPOON FALLBACK",[("⌃⌥⇧⌘","R","Open fallback library"),("⌃","← / →","Switch desktop (macOS)")]))
         text.string = sections.joined(separator:"\n\n")
         let body = NSMutableAttributedString(string:text.string,attributes:[.font:NSFont.monospacedSystemFont(ofSize:13,weight:.regular),.foregroundColor:NSColor.labelColor])
         let columns = NSMutableParagraphStyle()
-        columns.tabStops = [NSTextTab(textAlignment:.left,location:190)]
-        columns.defaultTabInterval = 190; columns.headIndent = 190
+        columns.tabStops = [NSTextTab(textAlignment:.right,location:55),NSTextTab(textAlignment:.left,location:72),NSTextTab(textAlignment:.left,location:210)]
+        columns.defaultTabInterval = 210; columns.headIndent = 210
         (body.string as NSString).enumerateSubstrings(in:NSRange(location:0,length:body.length),options:.byParagraphs) { line,range,_,_ in
             if line?.contains("\t") == true { body.addAttribute(.paragraphStyle,value:columns,range:range) }
         }
