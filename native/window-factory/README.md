@@ -1350,3 +1350,18 @@ designated signing requirement; existing access survived. The normal build 23
 launcher passed the owner's physical test; build 24 toggle/Dock physical
 acceptance is pending. Existing control and bridge primitives are unchanged;
 only a separate launcher registry and app integration were added.
+
+
+### Build 24 physical launcher-toggle and Dock pilot accepted, 2026-10-24
+
+The owner confirmed Tab+R opens/closes correctly, brings the library forward
+from another app, Dock visibility works while retaining badge/launcher access,
+and existing controls continue to work. This accepts the build 24 toggle and
+Dock options for the tested workflow, alongside the earlier build 23 native
+launcher acceptance. Login startup remains off as requested; real login-item
+registration and sign-in startup remain untested. Hammerspoon's original
+Tab+Shift+R binding is retained and its loader handoff is verified; Hammerspoon
+was not started for a new physical fallback test. No functional Hammerspoon port
+remains for the normal workflow. The Lua implementation remains a recovery
+fallback; configurable keybindings and further UI refinement are later work.
+This acceptance checkpoint changes documentation only.

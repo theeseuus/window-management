@@ -2,8 +2,9 @@
 
 Current status, 2026-10-24: Window Factory is installed with accepted layout,
 geometry, focus, stash, switcher, accordion, Space movement and indicator pilots.
-The launcher/startup handoff is implemented in builds 23–24; initial opening
-passed and toggle/Dock visibility acceptance is pending. See the
+The launcher/startup handoff is implemented in builds 23–24; primary opening,
+open/close toggling and Dock visibility are physically accepted. Optional login
+startup remains off and real sign-in startup is untested. See the
 [Window Factory guide](../native/window-factory/README.md) for current deployment,
 permissions and acceptance. The original transition plan below is retained as
 planning history; the branch name and this stable document path are historical
