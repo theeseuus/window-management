@@ -28,6 +28,17 @@ import Foundation
     check(recency.ordered([1,4,4],current:99) == [1,4],"Closed candidates and absent source excluded")
     for id in 1...600 { recency.note(UInt32(id)) }
     check(recency.ids.count == 512 && recency.ids.first == 600,"Bounded memory-only history")
+    check(SwitcherDiscovery.accepts(space:4,membership:[4],kind:0,shown:false,isUp:true,standardAX:false,rejectedAX:false),"Regression: live away window absent from AX is discoverable")
+    check(!SwitcherDiscovery.accepts(space:4,membership:[4],kind:0,shown:false,isUp:false,standardAX:false,rejectedAX:false),"Parked or closed compositor windows excluded")
+    check(!SwitcherDiscovery.accepts(space:4,membership:[4],kind:0,shown:true,isUp:true,standardAX:false,rejectedAX:false),"Shown desktop requires exact standard AX window")
+    check(SwitcherDiscovery.accepts(space:4,membership:[4],kind:0,shown:true,isUp:true,standardAX:true,rejectedAX:false),"Shown standard window retained")
+    check(!SwitcherDiscovery.accepts(space:4,membership:[4,5],kind:0,shown:false,isUp:true,standardAX:false,rejectedAX:false),"Ambiguous membership refused")
+    check(!SwitcherDiscovery.accepts(space:4,membership:[],kind:0,shown:false,isUp:true,standardAX:false,rejectedAX:false),"Ghost metadata absent from live membership refused")
+    check(!SwitcherDiscovery.accepts(space:4,membership:[5],kind:0,shown:false,isUp:true,standardAX:false,rejectedAX:false),"Wrong desktop membership refused")
+    check(!SwitcherDiscovery.accepts(space:4,membership:[4],kind:0,shown:false,isUp:true,standardAX:true,rejectedAX:true),"Known nonstandard or minimized AX window refused")
+    check(!SwitcherDiscovery.accepts(space:4,membership:[4],kind:2,shown:false,isUp:true,standardAX:false,rejectedAX:false),"Unsupported Space kind refused")
+    check(!SwitcherDiscovery.accepts(space:4,membership:[4],kind:4,shown:false,isUp:true,standardAX:false,rejectedAX:false),"No unproven metadata-only fullscreen visit")
+    check(SwitcherDiscovery.accepts(space:4,membership:[4],kind:4,shown:true,isUp:true,standardAX:true,rejectedAX:false),"Known fullscreen AX window retained")
     print("native window switching: \(assertions) assertions passed")
  }
 }

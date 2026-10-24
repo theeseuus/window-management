@@ -34,3 +34,8 @@ int32_t WFSpaceKind(uint64_t space);
 int32_t WFRegisterSwitcherHotKeys(WFHotKeyCallback _Nonnull callback,void * _Nonnull context,uint32_t * _Nonnull failedIndex);
 int32_t WFSetSwitcherEscape(BOOL enabled);
 void WFUnregisterSwitcherHotKeys(void);
+
+// Switcher-only census and intentional desktop selection. Never move a window.
+NSArray<NSDictionary *> * _Nullable WFSwitcherSpaces(CGDirectDisplayID display);
+NSArray<NSNumber *> * _Nullable WFSwitcherSpaceWindows(uint64_t space,BOOL onlyUp);
+BOOL WFSwitcherSelectSpace(CGDirectDisplayID display,uint64_t expectedSource,uint64_t destination);

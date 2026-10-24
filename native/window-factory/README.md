@@ -828,3 +828,67 @@ This checkpoint records the result only; no app binary, shortcut, preference,
 layout or Hammerspoon implementation changed. The owner reported pushing the
 implementation; both local repositories matched their tracked remotes before
 these documentation updates.
+
+## Cross-Space discovery correction, 2026-10-24
+
+The build 15 omission was an application of the wrong discovery source: on this
+Mac, AXWindows omits live windows on desktops that are not currently shown.
+Changing to the array-specific AX getter did not repair it. Hammerspoon's own
+[window-filter source](https://github.com/Hammerspoon/hammerspoon/blob/1.1.1/extensions/window/window_filter.lua)
+notes this limitation and retains windows as Spaces are visited. The native
+switcher was collecting a fresh AX list and had no equivalent away-window
+inventory. Relaxing minimized or dialog filters would not supply the missing
+ordinary windows and would admit the wrong objects.
+
+A read-only WindowServer census proved the difference: several live Finder,
+Safari, Codex and Chrome windows on other desktops were absent from the AX list.
+The per-Space `SLSCopyWindowsWithOptionsAndTags` read distinguishes windows that
+are up (`0x2`) from all hosted windows including parked ones (`0x7`). The
+existing native helper already uses this API and the desktop-selection protocol;
+[KiwiDesk's census source](https://github.com/KiwiCanopy/KiwiDesk/blob/main/Sources/KiwiDeskCore/OS/SkyLight%2BWindowCensus.swift)
+also documents this distinction. The correction independently uses those API
+signatures; no KiwiDesk implementation is copied.
+
+Build 16 makes the live compositor census authoritative for discovery, intersected
+with layer-0 owner metadata, exact singleton Space membership, valid bounds and
+an eligible regular app identity. Parked, hidden, closed/ghost and credential
+windows remain excluded. Current-desktop entries still require an exact standard
+AX window. An unseen ordinary-desktop entry can instead retain its existing
+WindowServer ID, PID, bundle and native display/Space identity until selected.
+Unavailable census reads produce an error rather than a silently incomplete
+current-desktop list. Discovery itself never visits desktops or changes focus.
+
+Only after selection does the switcher use the previously proven WMBridge
+`ManagedDisplaySetCurrentSpaceOperation` plus `HideSpacesOperation` protocol to
+visit that ordinary desktop. It then resolves the *same* window ID in the app's
+AX windows/main/focused references, requires standard/non-minimized identity,
+uses the accepted native focus request and verifies exact focus plus destination
+Space. No window-transfer operation, frame write, creation, unhide or unminimize
+is involved. It never substitutes a different app window when resolution fails.
+Other displays' captured desktops remain guarded. Desktop arrival and focus
+verification are bounded; no continuing focus enforcement is installed.
+
+This new metadata-only reveal path is limited to ordinary desktops, the scope
+of the existing helper proof. Full-screen windows already available through AX
+retain their original activation path; unseen full-screen metadata is not
+promised. Titles may initially be `Window on Desktop N` when neither AX nor
+permitted WindowServer metadata supplies one; real observed titles are cached
+in memory. No new Screen Recording or Accessibility grant is requested.
+
+A clean read-only probe using the corrected production collector found 16
+eligible windows: eight current-desktop AX windows and eight other-desktop
+metadata entries (four Finder, one Safari, one Codex/ChatGPT, one Chrome and
+one Mail). None of those desktops was visited for discovery. The added regression
+case explicitly accepts a live away window absent from AX while rejecting
+parked, wrong/ambiguous membership, ghost and known nonstandard windows. All 979
+switcher assertions, existing native tests, 170 Spoon lifecycle assertions and
+required repository validation pass.
+
+Installed signed build 16 retains Accessibility, enabled registrations and the
+exact six-layout catalog. There were zero session stashes before restart.
+The source implementations of geometry, directional focus and stash/restore,
+and their existing membership/frame/focus bridges, are unchanged. The managed
+Hammerspoon fallback is unchanged and Hammerspoon remains quit. The earlier
+same-Space physical acceptance remains recorded; the new end-to-end other-Space
+reveal/resolve/focus path awaits the owner's physical pilot. Discovery is now
+live-verified, but cross-Space activation is not yet marked accepted.

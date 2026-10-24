@@ -26,3 +26,14 @@ struct WindowRecency {
         return ([current].compactMap{$0}+ids+candidates).filter{allowed.contains($0) && seen.insert($0).inserted}
     }
 }
+
+// An unseen ordinary desktop can have real windows absent from AXWindows.
+// Use compositor presence for discovery; require exact AX identity at landing.
+enum SwitcherDiscovery {
+    static func accepts(space: UInt64,membership: [UInt64],kind: Int32,shown: Bool,
+                        isUp: Bool,standardAX: Bool,rejectedAX: Bool) -> Bool {
+        guard space != 0,membership == [space],isUp,!rejectedAX else { return false }
+        if standardAX { return kind == 0 || kind == 4 }
+        return !shown && kind == 0
+    }
+}

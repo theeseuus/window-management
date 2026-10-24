@@ -254,3 +254,74 @@ int32_t WFRegisterSwitcherHotKeys(WFHotKeyCallback callback,void *context,uint32
     }
     return noErr;
 }
+
+// These switcher-only reads do not alter the accepted groups' membership API.
+typedef CFArrayRef (*SwitcherWindowsFn)(int,uint32_t,CFArrayRef,uint32_t,uint64_t *,uint64_t *);
+NSArray *WFSwitcherSpaceWindows(uint64_t space,BOOL onlyUp) {
+    load(); if(!handle || !connection || !spaceType || !space) return nil;
+    SwitcherWindowsFn list=(SwitcherWindowsFn)dlsym(handle,"SLSCopyWindowsWithOptionsAndTags");
+    if(!list) return nil;
+    uint64_t set=0,clear=0;
+    NSArray *result=CFBridgingRelease(list(connection(),0,(__bridge CFArrayRef)@[@(space)],onlyUp ? 2 : 7,&set,&clear));
+    if(![result isKindOfClass:NSArray.class]) return nil;
+    for(id item in result) if(![item isKindOfClass:NSNumber.class]) return nil;
+    return result;
+}
+NSArray *WFSwitcherSpaces(CGDirectDisplayID display) {
+    load(); if(!handle || !connection || !displays || !spaceType) return nil;
+    CFUUIDRef uuid=CGDisplayCreateUUIDFromDisplayID(display); if(!uuid) return nil;
+    NSString *identifier=CFBridgingRelease(CFUUIDCreateString(NULL,uuid)); CFRelease(uuid);
+    NSArray *managed=CFBridgingRelease(displays(connection()));
+    if(![managed isKindOfClass:NSArray.class]) return nil;
+    for(id object in managed) {
+        if(![object isKindOfClass:NSDictionary.class]) return nil;
+        NSDictionary *d=object;
+        if(![d[@"Display Identifier"] isEqual:identifier] && ![d[@"Display Identifier"] isEqual:@"Main"]) continue;
+        NSArray *spaces=d[@"Spaces"]; id currentEntry=d[@"Current Space"];
+        if(![currentEntry isKindOfClass:NSDictionary.class]) return nil;
+        NSNumber *current=currentEntry[@"ManagedSpaceID"];
+        if(![spaces isKindOfClass:NSArray.class] || ![current isKindOfClass:NSNumber.class]) return nil;
+        NSMutableArray *result=[NSMutableArray array]; unsigned ordinal=0;
+        for(id entry in spaces) {
+            if(![entry isKindOfClass:NSDictionary.class]) return nil;
+            NSNumber *sid=entry[@"ManagedSpaceID"]; if(![sid isKindOfClass:NSNumber.class]) return nil;
+            int kind=spaceType(connection(),sid.unsignedLongLongValue);
+            if(kind==0) ordinal++;
+            [result addObject:@{@"id":sid,@"display":@(display),@"identifier":d[@"Display Identifier"],
+                @"ordinal":@(ordinal),@"kind":@(kind),@"shown":@([sid isEqual:current])}];
+        }
+        return result;
+    }
+    return nil;
+}
+
+#import <objc/message.h>
+@interface NSObject (WFSwitcherSpaceInitializers)
+- (instancetype)initWithDisplayIdentifier:(NSString *)display spaceID:(uint64_t)space;
+- (instancetype)initWithSpaces:(NSArray *)spaces;
+@end
+static BOOL wfPerformSwitcherSpaceOperation(id operation) {
+    SEL selector=NSSelectorFromString(@"performWithWMBridgeDelegate");
+    NSMethodSignature *signature=[operation methodSignatureForSelector:selector];
+    if(!signature || signature.numberOfArguments!=2 || strcmp(signature.methodReturnType,@encode(void))!=0) return NO;
+    ((void (*)(id,SEL))(void *)objc_msgSend)(operation,selector); return YES;
+}
+BOOL WFSwitcherSelectSpace(CGDirectDisplayID display,uint64_t expectedSource,uint64_t destination) {
+    uint64_t current=0;int kind=-1;
+    if(!WFContext(display,&current,&kind) || current!=expectedSource) return NO;
+    if(current==destination) return YES;
+    // The existing native helper proved this protocol for ordinary desktops.
+    // Full-screen targets with existing AX elements retain native activation.
+    if(kind!=0 || WFSpaceKind(destination)!=0) return NO;
+    NSDictionary *target=nil;
+    for(NSDictionary *space in WFSwitcherSpaces(display)) if([space[@"id"] unsignedLongLongValue]==destination) target=space;
+    if(!target) return NO;
+    Class setClass=NSClassFromString(@"SLSBridgedManagedDisplaySetCurrentSpaceOperation");
+    Class hideClass=NSClassFromString(@"SLSBridgedHideSpacesOperation");
+    if(![setClass instancesRespondToSelector:NSSelectorFromString(@"initWithDisplayIdentifier:spaceID:")]
+        || ![hideClass instancesRespondToSelector:NSSelectorFromString(@"initWithSpaces:")]) return NO;
+    id set=[[setClass alloc] initWithDisplayIdentifier:target[@"identifier"] spaceID:destination];
+    id hide=[[hideClass alloc] initWithSpaces:@[@(expectedSource)]];
+    if(!set || !hide) return NO;
+    return wfPerformSwitcherSpaceOperation(set) && wfPerformSwitcherSpaceOperation(hide);
+}
