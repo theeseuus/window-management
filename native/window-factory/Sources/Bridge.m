@@ -130,3 +130,34 @@ int32_t WFRegisterHotKeys(const uint32_t *keys,const uint32_t *modifiers,uint32_
     }
     return noErr;
 }
+
+// Directional focus has an independent registry and event signature.
+static EventHotKeyRef wfFocusKeys[4];
+static EventHandlerRef wfFocusHandler;
+static WFHotKeyCallback wfFocusCallback;
+static void *wfFocusContext;
+static OSStatus wfFocusEvent(EventHandlerCallRef next,EventRef event,void *context) {
+    (void)next; (void)context; EventHotKeyID key={0};
+    OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if (status!=noErr || key.signature!='WFFC' || !wfFocusCallback) return eventNotHandledErr;
+    wfFocusCallback(key.id,wfFocusContext); return noErr;
+}
+void WFUnregisterFocusHotKeys(void) {
+    for(unsigned i=0;i<4;i++) if(wfFocusKeys[i]) { UnregisterEventHotKey(wfFocusKeys[i]); wfFocusKeys[i]=NULL; }
+    if(wfFocusHandler) { RemoveEventHandler(wfFocusHandler); wfFocusHandler=NULL; }
+    wfFocusCallback=NULL; wfFocusContext=NULL;
+}
+int32_t WFRegisterFocusHotKeys(const uint32_t *keys,uint32_t count,WFHotKeyCallback callback,void *context,uint32_t *failedIndex) {
+    WFUnregisterFocusHotKeys(); *failedIndex=0;
+    if(count!=4) return paramErr;
+    EventTypeSpec type={kEventClassKeyboard,kEventHotKeyPressed};
+    OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfFocusEvent,1,&type,NULL,&wfFocusHandler);
+    if(status!=noErr) return status;
+    wfFocusCallback=callback; wfFocusContext=context;
+    for(unsigned i=0;i<count;i++) {
+        EventHotKeyID key={'WFFC',i};
+        status=RegisterEventHotKey(keys[i],cmdKey|optionKey|controlKey,key,GetApplicationEventTarget(),0,&wfFocusKeys[i]);
+        if(status!=noErr) { *failedIndex=i; WFUnregisterFocusHotKeys(); return status; }
+    }
+    return noErr;
+}

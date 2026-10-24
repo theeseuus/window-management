@@ -972,6 +972,7 @@ function obj:bindHotkeys()
     windowSwitcher:previous()
   end)
 
+  if self.focusHotkeys ~= false then
   -- Spatial window focus: current Space only; current-screen candidates win.
   -- Hyper + K is reserved here for upward window focus.
   hs.hotkey.bind(h, "h", function()
@@ -986,6 +987,7 @@ function obj:bindHotkeys()
   hs.hotkey.bind(h, "l", function()
     focusDirectionalWindow("right")
   end)
+  end
 
   if self.geometryHotkeys ~= false then
   -- Experiment: derive geometry directly from the current frame. Shift runs

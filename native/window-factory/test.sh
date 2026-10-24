@@ -25,3 +25,10 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     "$native_root/Sources/Core.swift" "$native_root/Sources/DirectFrameApplication.swift" \
     "$native_root/Tests/FrameApplicationTests.swift" -o "$native_root/.build/frame-application-tests"
 "$native_root/.build/frame-application-tests"
+
+mise exec -- lua "$native_root/Tests/focus-oracle.lua" "$repo_root" > "$native_root/.build/focus-oracle.json"
+xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
+    -module-cache-path "$native_root/.build/ModuleCache" \
+    "$native_root/Sources/Core.swift" "$native_root/Sources/DirectionalFocus.swift" \
+    "$native_root/Tests/FocusTests.swift" -o "$native_root/.build/focus-tests"
+"$native_root/.build/focus-tests" "$native_root/.build/focus-oracle.json"

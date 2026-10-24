@@ -17,3 +17,8 @@ int32_t WFRegisterHotKeys(const uint32_t * _Nonnull keys, const uint32_t * _Nonn
                          uint32_t count, WFHotKeyCallback _Nonnull callback, void * _Nonnull context,
                          uint32_t * _Nonnull failedIndex);
 void WFUnregisterHotKeys(void);
+
+// Independent directional-focus group; never releases geometry registrations.
+int32_t WFRegisterFocusHotKeys(const uint32_t * _Nonnull keys,uint32_t count,
+    WFHotKeyCallback _Nonnull callback,void * _Nonnull context,uint32_t * _Nonnull failedIndex);
+void WFUnregisterFocusHotKeys(void);

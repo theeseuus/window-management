@@ -547,3 +547,56 @@ pushing the build 10 fix; the local branch matched its tracked remote before
 this acceptance record. No binary, shortcuts, settings or Hammerspoon files
 changed for this documentation checkpoint. Directional focus is the next group
 in the approved controller-port sequence; it has not been handed over yet.
+
+## Directional focus pilot, 2026-10-24
+
+Build 11 adds native Hyper+H/J/K/L (hold Tab + H/J/K/L) for left/down/up/right
+focus. These are the existing TheseusWindow shortcuts. The working geometry
+controller, geometry calculations and responsive frame application are unchanged.
+Focus has a separate four-key Carbon registry, preference and Settings checkbox;
+its enable/disable/failure path never unregisters geometry's nineteen keys.
+A fresh profile leaves focus disabled until selected, and a successful selection
+is remembered across restart.
+
+Selection ports `spatial_focus_logic.lua`: candidates must overlap on the
+perpendicular axis and lie in the requested direction. Compare edge gap, centre
+misalignment, larger overlap, then directional centre distance; exact ties retain
+visible stacking order. Prefer a qualifying window on the source display, then
+another currently visible display. With no aligned candidate, do nothing.
+
+Candidate enumeration is on demand, limited to on-screen standard windows in
+visible regular apps, with singleton membership in each display's captured
+current ordinary Space. Hidden/minimized/full-screen windows, the controller,
+Hammerspoon and credential apps are excluded. Only eligible app PIDs from the
+on-screen window list are queried. Source focus, exact window identity and
+captured desktops are checked before activation; target identity/eligibility
+and exact resulting focus are verified. This group never writes window geometry,
+creates a window, switches a Space or transfers a window. No continuous polling
+or persistent window watcher is installed. Collection and verification remain
+bounded by AX messaging timeouts and a short target-focus confirmation window.
+Workspace capture/Restore/Establish and focus cannot run concurrently.
+
+The portable Spoon wraps only its four directional bindings with
+`focusHotkeys ~= false`, retaining the original focus implementation and default
+fallback behaviour. The managed loader selects native focus with
+`spoon.TheseusWindow.focusHotkeys = false`, independently of
+`geometryHotkeys = false`. Hammerspoon remained quit during deployment. To
+restore just focus to it, disable native directional focus in Settings, set
+`focusHotkeys = true` in the chezmoi-managed loader, apply and reload Hammerspoon;
+leave `geometryHotkeys = false` to retain native geometry. Do not enable both
+owners for H/J/K/L. Canonical machine ownership/rollback is in chezmoi
+`docs/reference/keyboard-shortcuts.md`.
+
+Validation: 293 native focus assertions include 288 comparisons with the actual
+Lua selector across shifted/scaled frames, candidate orders and invalid frames,
+plus same-display preference, cross-display fallback, edge-touching rejection,
+source exclusion and ties. The Spoon lifecycle suite has 113 assertions proving
+independent release/restoration of focus and retention of geometry/other keys.
+All existing native tests, 109 geometry assertions, 100 frame-application
+assertions and repository validation pass. Chezmoi verification passes; the
+expected uncommitted work was its only diagnostic warning before commit.
+Installed build 11 retains Accessibility, the exact six-layout catalog bytes
+and nineteen geometry registrations; the independent four focus registrations
+were enabled in Settings. These are algorithm/registration checks. Normal
+physical-key focus, its responsiveness and live cross-display selection require
+the owner's pilot; no automated live focus success is claimed at this point.

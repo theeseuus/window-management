@@ -82,5 +82,11 @@ for _,key in ipairs({"ctrl+alt+cmd:l","ctrl+alt+cmd:left","ctrl+alt+cmd:s","ctrl
 end
 bindings = {}; spoon.geometryHotkeys = true; spoon:bindHotkeys()
 for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","fallback restores " .. key) end
+bindings = {}; spoon.focusHotkeys = false; spoon:bindHotkeys()
+for _,key in ipairs({"h","j","k","l"}) do equal(bindings["ctrl+alt+cmd:" .. key],nil,"native focus releases " .. key) end
+for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","focus handoff retains geometry " .. key) end
+for _,key in ipairs({"left","s","w"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","focus handoff retains " .. key) end
+bindings = {}; spoon.focusHotkeys = true; spoon:bindHotkeys()
+for _,key in ipairs({"h","j","k","l"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","fallback restores focus " .. key) end
 hs = originalHS
 print(string.format("window_filter_lifecycle_spec: %d assertions passed", assertions))

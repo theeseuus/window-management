@@ -4,6 +4,7 @@ import AppKit
 final class FactoryApp: NSObject, NSApplicationDelegate {
     var library: LibraryWindow?
     var settings: SettingsWindow?
+    var focus: DirectFocusControls?
     var geometry: DirectWindowControls?
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
@@ -36,6 +37,10 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 controls.changed = { [weak self] in self?.settings?.refresh() }
                 settings?.geometry = controls
                 controls.restorePreference()
+                let focusControls = DirectFocusControls(preferences:preferences); focus = focusControls
+                focusControls.workspaceBusy = controls.workspaceBusy
+                focusControls.changed = { [weak self] in self?.settings?.refresh() }
+                settings?.focus = focusControls; focusControls.restorePreference()
             }
             let menu = NSMenu(), item = NSMenuItem(), appMenu = NSMenu()
             let settingsItem = appMenu.addItem(withTitle:"Settings…",action:#selector(showSettings(_:)),keyEquivalent:",")
@@ -81,7 +86,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main
