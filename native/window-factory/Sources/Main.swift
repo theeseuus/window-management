@@ -5,6 +5,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     var library: LibraryWindow?
     var settings: SettingsWindow?
     var shortcutReference: ShortcutReferenceWindow?
+    var agent: AgentService?
     var keybindings: KeybindingManager?
     var launcher: LauncherControls?
     private var loginLaunch = false
@@ -102,6 +103,13 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 shortcutReference?.switcher = switcherControls
                 shortcutReference?.geometry = controls; shortcutReference?.focus = focusControls; shortcutReference?.stash = stashControls
             }
+            if !preview,let library {
+                let service=AgentService(preferences:preferences,library:library);agent=service;settings?.agent=service
+                service.extraBusy = { [weak self] in self?.geometry?.isBusy == true || self?.focus?.isBusy == true || self?.stash?.isBusy == true || self?.accordion?.isBusy == true || self?.spaceMove?.isMoving == true || self?.switcher?.isOpen == true }
+                service.changed = { [weak self] in self?.settings?.refresh() }
+                do {try service.restorePreference()} catch {preferences.agentAccessEnabled=false;library.status.stringValue="Agent access: \(error.localizedDescription)"}
+                settings?.refresh()
+            }
             let menu = NSMenu(), item = NSMenuItem(), appMenu = NSMenu()
             let settingsItem = appMenu.addItem(withTitle:"Settings…",action:#selector(showSettings(_:)),keyEquivalent:",")
             settingsItem.target = self; appMenu.addItem(.separator())
@@ -171,12 +179,13 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); launcher?.refreshLoginState(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main
 enum FactoryMain {
     @MainActor static func main() {
+        if CommandLine.arguments.dropFirst().first == "--cli" { AgentCLI.run(Array(CommandLine.arguments.dropFirst(2))) }
         if let index = CommandLine.arguments.firstIndex(of:"--validate-catalog") {
             do {
                 guard CommandLine.arguments.indices.contains(index+1) else { throw FactoryError("Catalog path required.") }

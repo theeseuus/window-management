@@ -9,6 +9,7 @@ final class DirectStashControls {
     private var order: [String] = []
     private var task: Task<Void,Never>?
     private var serial = 0
+    var isBusy: Bool { task != nil }
     var active = false
     var lastResult = "Native stash/restore is disabled."
     var workspaceBusy: () -> Bool = { false }

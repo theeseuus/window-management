@@ -39,6 +39,7 @@ final class DirectWindowControls {
     private var pendingFrame: (pid: pid_t, id: CGWindowID, frame: Frame)?
     private var cycles: [String:Int] = [:]
     private var restores: [String:Frame] = [:]
+    var isBusy: Bool { task != nil }
     var active = false
     var lastResult = "Native geometry shortcuts are disabled."
     var workspaceBusy: () -> Bool = { false }

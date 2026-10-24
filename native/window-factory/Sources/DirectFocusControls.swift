@@ -5,6 +5,7 @@ final class DirectFocusControls {
     private let preferences: FactoryPreferences
     private let hud = GeometryHUD()
     private var task: Task<Void,Never>?
+    var isBusy: Bool { task != nil }
     var active = false
     var lastResult = "Native directional focus is disabled."
     var workspaceBusy: () -> Bool = { false }

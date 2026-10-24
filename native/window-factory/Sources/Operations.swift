@@ -1,7 +1,7 @@
 import AppKit
 
 
-struct Receipt {
+struct Receipt: Codable {
     var created = 0, placed = 0, reused = 0, missing = 0, extras = 0
     var failures: [String] = []
     var summary: String {

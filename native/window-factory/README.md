@@ -1474,16 +1474,59 @@ shortcut or Hammerspoon changes were made for this acceptance checkpoint.
 
 ## Agent command-line access
 
-There is no supported agent control CLI or IPC endpoint yet. The executable
-supports offline `--validate-catalog`, UI `--preview`, an alternate `--data-dir`,
-and quiet `--background` launch. The latter runs the GUI-session app without
-opening its library; it is not a command endpoint. Live capture, Restore,
-Establish, window controls and structured operation receipts are not exposed to
-agents. The earlier Space proof/helper programs are separate diagnostics, not
-Window Factory's public automation interface.
+Build 27 adds a default-off **Agent access** switch in General and a versioned,
+same-user JSON CLI for status, capabilities, layout/window inventory, Capture,
+Restore, Establish, job results and cancellation. It reuses this app's existing
+Coordinator, capture service and catalog store without opening or activating
+its UI or creating another shortcut owner. The supported interface, limits,
+examples and recovery semantics are in [CLI.md](CLI.md).
 
-The intended extension is one CLI client talking to the installed app's existing
-operation owners, returning structured results and avoiding a second app instance
-or duplicate shortcut registries. UI-free control still requires a logged-in
-WindowServer session and the app's existing Accessibility permission. This is
-future work, not part of build 26.
+
+### Build 26 boundary (historical)
+
+> There is no supported agent control CLI or IPC endpoint yet. The executable
+> supports offline `--validate-catalog`, UI `--preview`, an alternate `--data-dir`,
+> and quiet `--background` launch. The latter runs the GUI-session app without
+> opening its library; it is not a command endpoint. Live capture, Restore,
+> Establish, window controls and structured operation receipts are not exposed to
+> agents. The earlier Space proof/helper programs are separate diagnostics, not
+> Window Factory's public automation interface.
+>
+> The intended extension is one CLI client talking to the installed app's existing
+> operation owners, returning structured results and avoiding a second app instance
+> or duplicate shortcut registries. UI-free control still requires a logged-in
+> WindowServer session and the app's existing Accessibility permission. This is
+> future work, not part of build 26.
+
+### Build 27 verification, 2026-10-25
+
+The full native suites and repository validation pass, including 41 new agent
+assertions and the existing 185 AppKit, geometry/focus Lua comparisons, stash,
+switcher, accordion, Space-focus and indicator checks. Isolated agent tests use
+the real private socket and a fixture backend; they do not move real windows or
+register hotkeys. They cover routing/argument validation, disabled access,
+permission/context/instance rejection, busy protection, duplicate requests,
+structured receipts and partial results, replacement, cancellation, disabling
+mid-job, listener ownership, framing/packet limits and endpoint safety.
+Wait-interruption cases also prove that the client retains the last known job
+and original request ID without resubmitting a mutation.
+
+The signed build 27 update is installed at the existing app path with Accessibility
+retained. The managed launcher checks the bundle's CLI protocol marker before
+execution, so an older app cannot accidentally be launched as a CLI. With the
+app quit, the installed CLI returned structured `agent_disabled` and did not
+start a process. Normal launch restored the existing controls/settings.
+
+The owner enabled Agent access for an installed read-only pilot. `status`,
+`capabilities`, `layouts` and scoped `windows` succeeded: nine command names,
+seven saved layouts and ten eligible windows on the then-active desktop. Exactly
+one persistent Window Factory process remained. The owner then turned access
+off: the CLI returned `agent_disabled` with nonzero exit, the socket was absent,
+the app kept running and the seven-layout catalog remained byte-identical to the
+pre-update copy. Agent access is left off. No new grants, login settings, Dock
+preference, keybindings, Hammerspoon or controller algorithms were changed.
+The controllers gained only read-only busy indicators for the agent job gate.
+
+Live Capture/Restore/Establish through the new entry point has not been exercised
+against disposable desktop windows yet. Existing UI adapter acceptance and
+fixture job tests do not substitute for that future end-to-end pilot.

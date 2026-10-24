@@ -62,7 +62,16 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     "$@" "$native_root/Tests/SwitcherPanelTests.swift" "$native_root/.build/panel-test-bridge.o" \
     -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit \
     -o "$native_root/.build/switcher-panel-tests"
+
 "$native_root/.build/switcher-panel-tests"
+
+xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
+    -module-cache-path "$native_root/.build/ModuleCache" \
+    -import-objc-header "$native_root/Sources/Bridge.h" \
+    "$@" "$native_root/Tests/AgentTests.swift" "$native_root/.build/panel-test-bridge.o" \
+    -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit \
+    -o "$native_root/.build/agent-tests"
+"$native_root/.build/agent-tests" "$native_root/Resources/adapters.json"
 
 mise exec -- lua "$native_root/Tests/accordion-oracle.lua" "$repo_root" > "$native_root/.build/accordion-oracle.json"
 xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \

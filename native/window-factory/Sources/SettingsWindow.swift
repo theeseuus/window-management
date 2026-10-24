@@ -9,6 +9,10 @@ final class FactoryPreferences {
         shortcuts = KeybindingStore(defaults:defaults)
         defaults.register(defaults:["showShortcutHints":true,"keepLibraryOnTop":false,"launcherEnabled":true,"showDockIcon":true])
     }
+    var agentAccessEnabled: Bool {
+        get { defaults.bool(forKey:"agentAccessEnabled") }
+        set { defaults.set(newValue,forKey:"agentAccessEnabled") }
+    }
     var showShortcutHints: Bool {
         get { defaults.bool(forKey:"showShortcutHints") }
         set { defaults.set(newValue,forKey:"showShortcutHints") }
@@ -140,6 +144,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
     var onShortcuts: (() -> Void)?
     var onImport: (() -> Void)?,onExport: (() -> Void)?,onReport: (() -> Void)?
     var layoutActionsAvailable: (() -> Bool)?
+    weak var agent: AgentService?
     weak var launcher: LauncherControls?
     weak var spaceIndicator: SpaceIndicator?
     weak var spaceMove: DirectSpaceMoveControls?
@@ -148,6 +153,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
     weak var stash: DirectStashControls?
     weak var focus: DirectFocusControls?
     weak var geometry: DirectWindowControls?
+    private let agentAccess = NSSwitch()
     private let dockIcon = NSSwitch(),indicatorEnabled = NSSwitch(),loginEnabled = NSSwitch(),floating = NSSwitch(),hints = NSSwitch()
     private let loginSettings = NSButton(title:"Login Items…",target:nil,action:nil)
     private let access = NSTextField(labelWithString:"")
@@ -161,6 +167,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         window.minSize = NSSize(width:660,height:460); window.collectionBehavior = [.moveToActiveSpace]
         tabs.translatesAutoresizingMaskIntoConstraints = false; tabs.delegate = self; window.contentView!.addSubview(tabs)
         NSLayoutConstraint.activate([tabs.leadingAnchor.constraint(equalTo:window.contentView!.leadingAnchor,constant:12),tabs.trailingAnchor.constraint(equalTo:window.contentView!.trailingAnchor,constant:-12),tabs.topAnchor.constraint(equalTo:window.contentView!.topAnchor,constant:12),tabs.bottomAnchor.constraint(equalTo:window.contentView!.bottomAnchor,constant:-12)])
+        agentAccess.target = self; agentAccess.action = #selector(changeAgentAccess)
         dockIcon.target = self; dockIcon.action = #selector(changeDock)
         indicatorEnabled.target = self; indicatorEnabled.action = #selector(changeIndicator)
         loginEnabled.target = self; loginEnabled.action = #selector(changeLogin)
@@ -168,7 +175,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         hints.target = self; hints.action = #selector(changePreferences)
         loginSettings.target = self; loginSettings.action = #selector(openLoginSettings); loginSettings.bezelStyle = .rounded
         let permission = NSButton(title:"Accessibility Settings…",target:self,action:#selector(openAccess)); permission.bezelStyle = .rounded
-        let general = Self.page([Self.row("Dock icon",dockIcon),Self.row("Menu-bar indicator",indicatorEnabled),Self.row("Start at login",loginEnabled),loginSettings,Self.row("Keep library on top",floating),Self.row("Shortcuts on buttons",hints),Self.row("Accessibility",access),permission])
+        let general = Self.page([Self.row("Dock icon",dockIcon),Self.row("Menu-bar indicator",indicatorEnabled),Self.row("Start at login",loginEnabled),loginSettings,Self.row("Keep library on top",floating),Self.row("Shortcuts on buttons",hints),Self.row("Agent access",agentAccess),Self.row("Accessibility",access),permission])
         addTab("General",general); addTab("Shortcuts",shortcutEditor.view)
         shortcutEditor.isEnabled = { [weak self] in self?.groupEnabled($0) ?? false }
         shortcutEditor.changeEnabled = { [weak self] in self?.changeGroup($0,enabled:$1) }
@@ -220,6 +227,11 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         } catch { let alert = NSAlert(); alert.messageText = "\(group.title) could not be enabled"; alert.informativeText = error.localizedDescription; alert.beginSheetModal(for:window) }
         refresh()
     }
+    @objc private func changeAgentAccess() {
+        do { try agent?.setEnabled(agentAccess.state == .on) }
+        catch { let alert=NSAlert();alert.messageText="Agent access could not be enabled";alert.informativeText=error.localizedDescription;alert.beginSheetModal(for:window) }
+        refresh()
+    }
     @objc private func changeDock() {
         let show = dockIcon.state == .on
         if NSApp.setActivationPolicy(show ? .regular : .accessory) { preferences.showDockIcon = show }
@@ -242,6 +254,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         if alert.runModal() == .alertSecondButtonReturn { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(alert.informativeText,forType:.string) }
     }
     func refresh() {
+        agentAccess.state = agent?.enabled == true ? .on : .off; agentAccess.isEnabled = agent != nil
         dockIcon.state = preferences.showDockIcon ? .on : .off
         indicatorEnabled.state = spaceIndicator?.active == true ? .on : .off; indicatorEnabled.isEnabled = spaceIndicator != nil
         loginEnabled.isEnabled = launcher?.loginAvailable == true
