@@ -320,7 +320,8 @@ mise run native-install -- --migrate-data-from /Users/troymay/.local/share/windo
 Substitute that Mac's actual old directory. This explicit operation validates
 both catalogs, rejects an occupied destination or symlink catalog/source,
 renames the entire directory and restores its original location if app
-replacement fails. It never merges stores or prunes backups. Existing explicit
+replacement fails. The directory move never merges stores; after a successful
+install, the backup retention policy below applies. Existing explicit
 `--data-dir` launches keep their chosen location. For manual rollback to a
 pre-32 app, launch it with `--data-dir` pointing at the migrated directory;
 that old app's default still names the old folder. Do not let old and new apps
@@ -335,8 +336,29 @@ permission re-add, settings change, shortcut or fallback change was needed.
 General Settings showed Start at login enabled; it was preserved, not changed
 by migration, and a real sign-in startup check remains outstanding.
 
-For routine local rollback, two previous **distinct** builds are recommended;
-a known-good checkpoint can be pinned during risky work. The 35 old backups
-represented 28 distinct builds and approximately 55 MB. All were preserved as
-requested. Automatic retention/pruning is not implemented; it should follow a
-separate reviewed policy, with verified recovery copies before retirement.
+## Backup retention
+
+Successful installs retain one backup for each of the two most recently backed-up
+**distinct builds**. A build is identified by bundle ID, app version and build
+number. Duplicate backups of the same build retain only the newest copy. The
+installed app is separate from those two rollback copies.
+
+Retention runs after the new app and any catalog copy have been verified and
+the install transaction completed. It verifies both retained app signatures
+before pruning, rejects unexpected entries/symlink backup directories, and uses
+an exclusive maintenance lock. Finder's `.DS_Store` is preserved. A retention
+failure is reported without rolling back an already successful installation.
+Failed installs do not run retention. Layout catalogs, preferences, permissions,
+the installed app and Hammerspoon are outside the pruning targets.
+
+On 2026-10-25 the same retention operation reduced 36 backup bundles to builds
+31 and 30, removing 34 older/duplicate bundles. Build 32 remained installed and
+running. Catalog, settings and installed-binary hashes were unchanged; the live
+CLI still reported Accessibility and Agent access enabled. No app restart or
+new app build was needed for this installer-only change.
+
+For inspection, `scripts/backup-retention.cjs --plan PATH_TO_INSTALL_BACKUPS`
+reports its selection without changing it. `--apply` uses the identical guarded
+maintenance path used by the installer. An interrupted run may leave a lock;
+inspect the owning process before deliberately removing that lock. There is no
+automatic lock stealing or age-based deletion.

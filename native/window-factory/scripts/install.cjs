@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const {execFileSync} = require('node:child_process');
+const {pruneBackups}=require('./backup-retention.cjs');
 const {migrateData}=require('./data-migration.cjs');
 const {runningAppPattern,validateExecutable} = require('./bundle-identity.cjs');
 const args = process.argv.slice(2);
@@ -69,5 +70,10 @@ function run() {
     if(rollbackData)rollbackData();
     throw Error(`Install failed; previous app restored where available. Evidence: ${stage}. ${error.message}`);
   }
+  // Post-success housekeeping: a retention error must never roll back a verified install.
+  try {
+    const result=pruneBackups(path.join(dataDir,'install-backups'),{verify});
+    console.log(`Backup retention: kept ${result.keep.length} distinct builds; removed ${result.remove.length} older/duplicate bundles.`);
+  } catch(error) { console.warn(`Installed successfully; backup retention stopped: ${error.message}`); }
 }
 try { run(); } catch (e) { console.error(e.message); process.exitCode = 1; }
