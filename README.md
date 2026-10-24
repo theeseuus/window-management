@@ -46,7 +46,8 @@ configuration keeps broader responsibilities separate:
   (`Control + Option + Command`).
 - Raycast owns the general application-launch shortcuts. Factory Workspace can
   launch supported apps only when filling missing saved-layout slots.
-- Hammerspoon and these Spoons manipulate windows.
+- Window Factory owns the adopted native window controls; the Spoons remain
+  available as explicitly enabled fallbacks.
 - Native macOS `Control + Left/Right` moves only the user between Spaces.
 
 The complete reference map is in [SHORTCUTS.md](SHORTCUTS.md). Its application

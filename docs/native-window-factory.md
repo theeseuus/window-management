@@ -1,14 +1,14 @@
 # Window Factory: build and transition
 
-Current status, 2026-10-24: Window Factory is installed with accepted layout,
-geometry, focus, stash, switcher, accordion, Space movement and indicator pilots.
-The launcher/startup handoff is implemented in builds 23–24; primary opening,
-open/close toggling and Dock visibility are physically accepted. Optional login
-startup remains off and real sign-in startup is untested. See the
-[Window Factory guide](../native/window-factory/README.md) for current deployment,
-permissions and acceptance. The original transition plan below is retained as
-planning history; the branch name and this stable document path are historical
-identifiers rather than the app's product name.
+Current status, 2026-10-25: the complete controller and core workspace workflow
+are ported and accepted. Configurable shortcuts, the reference window and the
+agent CLI are also implemented; the live Rex CLI pilot passed.
+[Migration status and next work](../native/window-factory/README.md#migration-status-and-next-work)
+is the current checklist. Dated implementation/acceptance evidence is retained
+in [development history](../native/window-factory/DEVELOPMENT.md).
+
+The original plan below is historical. Its pending-port and proposed binding-
+ownership statements have been superseded; it is not the current backlog.
 
 ## Original transition plan, 2026-10-23
 
