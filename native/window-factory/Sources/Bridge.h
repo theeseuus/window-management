@@ -39,3 +39,6 @@ void WFUnregisterSwitcherHotKeys(void);
 NSArray<NSDictionary *> * _Nullable WFSwitcherSpaces(CGDirectDisplayID display);
 NSArray<NSNumber *> * _Nullable WFSwitcherSpaceWindows(uint64_t space,BOOL onlyUp);
 BOOL WFSwitcherSelectSpace(CGDirectDisplayID display,uint64_t expectedSource,uint64_t destination);
+
+int32_t WFRegisterAccordionHotKey(WFHotKeyCallback _Nonnull callback,void * _Nonnull context);
+void WFUnregisterAccordionHotKey(void);

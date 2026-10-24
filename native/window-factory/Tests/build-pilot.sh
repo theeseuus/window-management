@@ -15,6 +15,9 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundlePackageType</key><string>APPL</string>
 </dict></plist>
 PLIST
+if [ "${1:-}" = --accordion ]; then
+    /usr/libexec/PlistBuddy -c "Add :WFAccordionPilot bool true" "$app/Contents/Info.plist"
+fi
 codesign --force --sign - "$app"
 codesign --verify --strict "$app"
 printf '%s\n' "$app"

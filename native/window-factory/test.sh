@@ -59,3 +59,10 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit \
     -o "$native_root/.build/switcher-panel-tests"
 "$native_root/.build/switcher-panel-tests"
+
+mise exec -- lua "$native_root/Tests/accordion-oracle.lua" "$repo_root" > "$native_root/.build/accordion-oracle.json"
+xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
+    -module-cache-path "$native_root/.build/ModuleCache" \
+    "$native_root/Sources/Core.swift" "$native_root/Sources/AccordionGeometry.swift" \
+    "$native_root/Tests/AccordionTests.swift" -o "$native_root/.build/accordion-tests"
+"$native_root/.build/accordion-tests" "$native_root/.build/accordion-oracle.json"

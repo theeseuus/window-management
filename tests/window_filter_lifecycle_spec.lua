@@ -104,5 +104,11 @@ equal(type(bindings["ctrl+alt+cmd+shift:s"]),"function","accordion remains in Ha
 bindings = {}; spoon.switcherHotkeys = true; spoon:bindHotkeys()
 equal(type(bindings["ctrl+alt+cmd:w"]),"function","fallback restores forward W")
 equal(type(bindings["ctrl+alt+cmd+shift:w"]),"function","fallback restores reverse W")
+bindings = {}; spoon.accordionHotkeys = false; spoon:bindHotkeys()
+equal(bindings["ctrl+alt+cmd+shift:s"],nil,"native accordion releases only Shift+S")
+for _,key in ipairs(geometryKeys) do equal(type(bindings[key]),"function","accordion handoff retains geometry " .. key) end
+for _,key in ipairs({"h","j","k","l","s","w","left","right"}) do equal(type(bindings["ctrl+alt+cmd:" .. key]),"function","accordion handoff retains " .. key) end
+bindings = {}; spoon.accordionHotkeys = true; spoon:bindHotkeys()
+equal(type(bindings["ctrl+alt+cmd+shift:s"]),"function","fallback restores accordion")
 hs = originalHS
 print(string.format("window_filter_lifecycle_spec: %d assertions passed", assertions))

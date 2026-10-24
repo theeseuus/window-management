@@ -208,6 +208,31 @@ int32_t WFRegisterStashHotKey(WFHotKeyCallback callback,void *context) {
     if(status!=noErr) WFUnregisterStashHotKey(); return status;
 }
 
+// Independent accordion group; leaves all accepted registrations untouched.
+static EventHotKeyRef wfAccordionKey;
+static EventHandlerRef wfAccordionHandler;
+static WFHotKeyCallback wfAccordionCallback;
+static void *wfAccordionContext;
+static OSStatus wfAccordionEvent(EventHandlerCallRef next,EventRef event,void *context) {
+    (void)next; (void)context; EventHotKeyID key={0};
+    OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key);
+    if(status!=noErr || key.signature!='WFAC' || !wfAccordionCallback) return eventNotHandledErr;
+    wfAccordionCallback(0,wfAccordionContext); return noErr;
+}
+void WFUnregisterAccordionHotKey(void) {
+    if(wfAccordionKey) { UnregisterEventHotKey(wfAccordionKey); wfAccordionKey=NULL; }
+    if(wfAccordionHandler) { RemoveEventHandler(wfAccordionHandler); wfAccordionHandler=NULL; }
+    wfAccordionCallback=NULL; wfAccordionContext=NULL;
+}
+int32_t WFRegisterAccordionHotKey(WFHotKeyCallback callback,void *context) {
+    WFUnregisterAccordionHotKey(); EventTypeSpec type={kEventClassKeyboard,kEventHotKeyPressed};
+    OSStatus status=InstallEventHandler(GetApplicationEventTarget(),wfAccordionEvent,1,&type,NULL,&wfAccordionHandler);
+    if(status!=noErr) return status;
+    wfAccordionCallback=callback; wfAccordionContext=context; EventHotKeyID key={'WFAC',0};
+    status=RegisterEventHotKey(1,cmdKey|optionKey|controlKey|shiftKey,key,GetApplicationEventTarget(),0,&wfAccordionKey);
+    if(status!=noErr) WFUnregisterAccordionHotKey(); return status;
+}
+
 int32_t WFSpaceKind(uint64_t space) {
     load(); return connection && spaceType ? spaceType(connection(),space) : -1;
 }

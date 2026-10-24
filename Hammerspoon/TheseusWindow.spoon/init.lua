@@ -1051,6 +1051,7 @@ function obj:bindHotkeys()
   end)
   end
 
+  if self.accordionHotkeys ~= false then
   -- Accordion: Hyper + Shift + S
   -- Uses focused window as the anchor; does NOT resize/move it.
   -- All other standard visible windows in the same app match its size and fan out.
@@ -1061,6 +1062,8 @@ function obj:bindHotkeys()
       clampToScreen = true
     })
   end)
+
+  end -- independent accordion ownership
 
   -- Spatial arrows:
   -- Control+Left/Right moves only the user (native macOS, not bound here).

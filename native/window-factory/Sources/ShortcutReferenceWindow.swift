@@ -6,6 +6,7 @@ final class ShortcutReferenceWindow: NSObject {
     private let preferences: FactoryPreferences
     private let text = NSTextView()
     private let restore = NSButton(title:"Restore last stashed window",target:nil,action:nil)
+    weak var accordion: DirectAccordionControls?
     weak var geometry: DirectWindowControls?
     weak var focus: DirectFocusControls?
     weak var switcher: DirectSwitcherControls?
@@ -71,8 +72,12 @@ final class ShortcutReferenceWindow: NSObject {
           Hyper + ⇧W        Open / step backward
           Windows on other Spaces are included; the selected Space is followed.
 
+        ACCORDION  [\(state(accordion?.active == true))]
+          Hyper + ⇧S        Fan the active app’s windows from the focused anchor
+          Anchor stays unchanged; other windows match its size, offset 28 × 22.
+          Current ordinary desktop/display only.
+
         REMAINING HAMMERSPOON CONTROLS  [\(hammerspoon)]
-          Hyper + ⇧S        Accordion the active app's windows
           Hyper + ← / →     Move window to adjacent Space and follow
           Hyper + R         Open native Window Factory
           Hyper + ⇧R        Open Hammerspoon layout fallback

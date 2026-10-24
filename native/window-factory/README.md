@@ -1048,3 +1048,51 @@ reported roulette-wheel scrolling defect is closed for these tested cases.
 Build 18 remains installed and running. This checkpoint changes documentation
 only; Hammerspoon, bindings, application code, preferences and saved layouts
 are unchanged.
+
+
+### Build 19 independent accordion pilot, 2026-10-24
+
+Tab+Shift+S now has a separate native accordion controller, Settings switch and
+shortcut-reference section. The focused standard window remains the anchor and
+is never resized, moved or refocused. Other visible standard windows from the
+same running app on the anchor's current ordinary desktop/display are sorted
+top-to-bottom then left-to-right, given its size, and offset right/down by
+28/22 points per step. Placement uses the original Lua screen clamp; exact
+position ties use window identity for repeatability. Other apps, minimized,
+hidden, full-screen, off-desktop and credential windows are excluded. This
+pilot deliberately does not gather windows across displays or Spaces.
+
+All fan frames are submitted before the 400ms verification wait. The controller
+checks exact app/window identity, desktop membership, continued anchor focus and
+unchanged anchor frame before writes and after settling. User focus/desktop or
+anchor changes cancel further work. A rejected/constrained frame is reported
+as incomplete; the implementation does not repeatedly fight app constraints.
+No restore history or document/session state is created.
+
+The Carbon registration uses an independent signature and registry. The accepted
+geometry, directional-focus, stash and switcher implementations are unchanged;
+accordion is blocked while the picker or a layout operation is active. The
+portable Spoon defaults to its original behaviour; `accordionHotkeys = false`
+releases only Shift+S in the managed loader. To fall back, disable native
+accordion in Settings, set the managed flag true, apply and reload Hammerspoon.
+Do not enable both owners for the same key. Hammerspoon was not started or
+reloaded for this pilot.
+
+Validation: 38 native accordion assertions include 18 exact comparisons against
+the original Lua callback run with fake windows, including sorting, clamping,
+negative display origins, oversized anchors and one-window behaviour. Existing
+native suites (including 999 switching and 127 viewport assertions) pass. Spoon
+lifecycle coverage passes 199 assertions, proving independent accordion key
+release and restoration while retaining every accepted group and Space keys.
+The repository validation and signed build pass. Build 19 is installed at the
+stable Applications location, Accessibility and all four earlier native groups
+are retained, accordion is enabled, and the six-layout catalog is byte-for-byte
+unchanged. Zero session stashes were confirmed before restart. A three-window
+disposable pilot is open for physical testing; acceptance remains pending.
+
+The current machine migration checklist is maintained in the chezmoi
+`docs/reference/keyboard-shortcuts.md` reference: Space move-and-follow, the
+menu-bar Space indicator, and launcher/startup ownership remain to migrate.
+The Hammerspoon layout library and original direct controls remain deliberate
+fallbacks. Configurable bindings and the planned UI cleanup are later product
+work, separate from porting the remaining controller functions.

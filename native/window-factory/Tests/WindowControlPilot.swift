@@ -2,6 +2,7 @@ import AppKit
 
 @MainActor final class WindowControlPilot: NSObject,NSApplicationDelegate,NSWindowDelegate {
     var window: NSWindow?
+    private var accordionWindows: [NSWindow] = []
     let frameLabel = NSTextField(labelWithString:"")
     func applicationDidFinishLaunching(_ notification: Notification) {
         let window = NSWindow(contentRect:NSRect(x:0,y:0,width:640,height:420),
@@ -24,7 +25,21 @@ import AppKit
         let menu = NSMenu(), item = NSMenuItem(), appMenu = NSMenu()
         appMenu.addItem(withTitle:"Quit Window Control Test",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
         item.submenu = appMenu; menu.addItem(item); NSApp.mainMenu = menu
-        self.window = window; window.center(); reportFrame(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
+        self.window = window; window.center()
+        if (CommandLine.arguments.contains("--accordion") || Bundle.main.object(forInfoDictionaryKey:"WFAccordionPilot") as? Bool == true),let screen = NSScreen.main {
+            window.title = "Accordion Test — Anchor (leave focused)"
+            text.stringValue = "Accordion pilot: three disposable windows in this app.\n\nClick this anchor, then hold Tab + Shift and press S.\nThe anchor must stay still. The other two windows should match its size and fan right/down by 28 × 22 points per step.\n\nRepeat to check stability; try geometry, focus, stash/restore and switching afterwards.\nQuit this test app when finished. No documents or terminal sessions are involved."
+            for index in 1...2 {
+                let extra = NSWindow(contentRect:NSRect(x:screen.visibleFrame.minX+Double(index)*150,y:screen.visibleFrame.minY+Double(index)*100,width:360,height:260),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
+                extra.title = "Accordion Test — Other \(index)"
+                extra.isReleasedWhenClosed = false; extra.minSize = NSSize(width:80,height:80)
+                extra.collectionBehavior = [.moveToActiveSpace]
+                let label = NSTextField(labelWithString:"Disposable accordion window \(index)")
+                label.frame = NSRect(x:15,y:100,width:320,height:25); extra.contentView!.addSubview(label)
+                accordionWindows.append(extra); extra.orderFront(nil)
+            }
+        }
+        reportFrame(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
     }
     func reportFrame() {
         guard let window else { return }

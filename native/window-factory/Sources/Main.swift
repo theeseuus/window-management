@@ -5,6 +5,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     var library: LibraryWindow?
     var settings: SettingsWindow?
     var shortcutReference: ShortcutReferenceWindow?
+    var accordion: DirectAccordionControls?
     var switcher: DirectSwitcherControls?
     var stash: DirectStashControls?
     var focus: DirectFocusControls?
@@ -61,6 +62,11 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 controls.workspaceBusy = pickerOrWorkspaceBusy
                 focusControls.workspaceBusy = pickerOrWorkspaceBusy
                 stashControls.workspaceBusy = pickerOrWorkspaceBusy
+                let accordionControls = DirectAccordionControls(preferences:preferences); accordion = accordionControls
+                accordionControls.workspaceBusy = pickerOrWorkspaceBusy
+                accordionControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
+                settings?.accordion = accordionControls; shortcutReference?.accordion = accordionControls
+                accordionControls.restorePreference()
                 shortcutReference?.switcher = switcherControls
                 shortcutReference?.geometry = controls; shortcutReference?.focus = focusControls; shortcutReference?.stash = stashControls
             }
@@ -114,7 +120,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main

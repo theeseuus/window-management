@@ -178,3 +178,11 @@ owns this installed-app dispatch and the machine's canonical shortcut map.
 The portable `Hammerspoon/init.lua` example above retains the standalone Spoon
 binding for users who have not installed the native app. The Spoon code and
 its recipes are unchanged by the personal launcher handoff.
+
+
+The personal native accordion pilot retains `Hyper + Shift + S`. Its independent
+Settings switch owns that shortcut; the managed loader sets
+`TheseusWindow.accordionHotkeys = false` to release only that original Spoon
+binding. The portable fallback algorithm and default binding remain available.
+See the [native pilot record](native/window-factory/README.md) for scope and
+acceptance, and the chezmoi keyboard reference for machine ownership.
