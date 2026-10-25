@@ -1512,3 +1512,26 @@ and native regression results remain applicable. This pilot does not establish
 other-app compatibility or live acceptance of every tiling/control interaction;
 stash/rejoin, empty-desktop activation and display changes remain separately
 listed verification work.
+
+
+### Build 42 mixed-app tiling pilot accepted, 2026-10-25
+
+The owner completed the disposable mixed Rex, Safari and Codex desktop pilot
+and explicitly confirmed:
+
+- All three applications tiled and resized correctly together.
+- Stash/restore returned each application's window to the tiling tree.
+- Safari floated through a manual geometry command and successfully rejoined.
+
+This extends the earlier Rex-only acceptance to the tested three-app workflow,
+including the live stash/restore handoff for each application. The post-pilot
+read-only hash comparison found both layout catalogs unchanged against the
+mixed-app pre-pilot baseline. Restoration of previous positions was accepted
+in the earlier Rex pilot; this report does not claim a separate mixed-app result
+for that step or window identity/focus measurements that were not collected.
+
+This acceptance update changes documentation only. Executable code, shortcuts,
+settings, working controls and the Hammerspoon fallback remain unchanged. The
+prior native regression and 522-assertion tiling fixture results remain applicable;
+repository validation was rerun for this documentation commit. Empty-desktop
+activation, display changes and further application coverage remain open checks.
