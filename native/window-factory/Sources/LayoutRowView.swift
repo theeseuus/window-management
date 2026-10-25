@@ -15,11 +15,12 @@ struct LayoutRowApp: Equatable {
 @MainActor
 final class LayoutThumbnailView: NSView {
     let recipe: Recipe
+    var aspectRatio: Double = 1.6
     init(recipe: Recipe) { self.recipe = recipe; super.init(frame:.zero); setAccessibilityElement(false) }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unsupported") }
     override var isFlipped: Bool { true }
     func rectangles(in bounds: NSRect) -> [NSRect] {
-        let canvas = bounds.insetBy(dx:4,dy:4)
+        let canvas = LibraryPresentation.canvas(in:bounds,inset:4,aspect:aspectRatio)
         guard canvas.width>0,canvas.height>0 else { return [] }
         return recipe.windows.compactMap { slot in
             guard slot.frame.valid else { return nil }
@@ -29,7 +30,7 @@ final class LayoutThumbnailView: NSView {
         }
     }
     override func draw(_ dirtyRect: NSRect) {
-        let border = NSBezierPath(roundedRect:bounds.insetBy(dx:0.5,dy:0.5),xRadius:5,yRadius:5)
+        let border = NSBezierPath(roundedRect:LibraryPresentation.canvas(in:bounds,inset:0.5,aspect:aspectRatio),xRadius:5,yRadius:5)
         NSColor.controlBackgroundColor.setFill(); border.fill()
         NSColor.separatorColor.setStroke(); border.stroke()
         for rect in rectangles(in:bounds) {
@@ -47,8 +48,9 @@ final class LayoutRowView: NSTableCellView {
     let icons = NSStackView()
     let nameLabel: NSTextField
     static let visibleAppLimit = 4
-    init(recipe: Recipe,iconForBundle: (String)->NSImage?) {
+    init(recipe: Recipe,aspectRatio: Double = 1.6,iconForBundle: (String)->NSImage?) {
         apps = LayoutRowApp.apps(in:recipe); thumbnail = LayoutThumbnailView(recipe:recipe)
+        thumbnail.aspectRatio = aspectRatio
         nameLabel = NSTextField(labelWithString:recipe.name)
         super.init(frame:.zero)
         nameLabel.font = .systemFont(ofSize:13,weight:.semibold)

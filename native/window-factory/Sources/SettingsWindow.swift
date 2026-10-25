@@ -9,6 +9,14 @@ final class FactoryPreferences {
         shortcuts = KeybindingStore(defaults:defaults)
         defaults.register(defaults:["showShortcutHints":true,"keepLibraryOnTop":false,"launcherEnabled":true,"showDockIcon":true])
     }
+    var libraryPreviewShown: Bool {
+        get { defaults.bool(forKey:"libraryPreviewShown") }
+        set { defaults.set(newValue,forKey:"libraryPreviewShown") }
+    }
+    var layoutOrder: [String] {
+        get { defaults.stringArray(forKey:"layoutOrder.v1") ?? [] }
+        set { defaults.set(newValue,forKey:"layoutOrder.v1") }
+    }
     var agentAccessEnabled: Bool {
         get { defaults.bool(forKey:"agentAccessEnabled") }
         set { defaults.set(newValue,forKey:"agentAccessEnabled") }

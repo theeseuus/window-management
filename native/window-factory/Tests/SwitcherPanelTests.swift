@@ -112,13 +112,37 @@ import AppKit
         check(richRow.icons.arrangedSubviews.count == 1,"repeated app windows do not duplicate icons")
         check(richRow.nameLabel.stringValue == rowRecipe.name && richRow.textField === richRow.nameLabel,"row retains a native accessible title")
         let rects = richRow.thumbnail.rectangles(in:NSRect(x:0,y:0,width:84,height:52))
-        check(rects.count == 2 && rects[0].minX == 4 && rects[1].minX == 42,"thumbnail reflects normalized left/right layout geometry")
+        check(rects.count == 2 && abs(rects[0].width-rects[1].width)<0.001 && abs(rects[0].maxX-rects[1].minX)<0.001 && abs(rects[1].minX-42)<0.001,"thumbnail reflects normalized left/right layout geometry")
         check(rects.allSatisfy{NSRect(x:0,y:0,width:84,height:52).contains($0)},"thumbnail stays within its canvas")
         check((richRow.icons.arrangedSubviews[0] as! NSStackView).arrangedSubviews.compactMap{$0 as? NSImageView}.first?.image != nil,"missing apps retain a visible fallback icon")
         let manyRecipe = Recipe(name:"Many apps",capturedAt:"fixture",windows:(0..<8).map { index in
             Slot(bundleID:"test.\(index)",appName:"App \(index)",ordinal:1,frame:Frame(x:0,y:0,w:1,h:1)) })
         let manyRow = LayoutRowView(recipe:manyRecipe) { _ in nil }
         check(manyRow.icons.arrangedSubviews.count == 5 && (manyRow.icons.arrangedSubviews.last as? NSTextField)?.stringValue == "+4","many-app rows cap icons and expose the remainder")
+        let rexName = Recipe(name:"Rex",capturedAt:"fixture",windows:rowRecipe.windows)
+        let rexNamePart = Recipe(name:"Rex work",capturedAt:"fixture",windows:rowRecipe.windows)
+        let containsRex = Recipe(name:"Alpha",capturedAt:"fixture",windows:[Slot(bundleID:"rex",appName:"Rex",ordinal:1,frame:Frame(x:0,y:0,w:1,h:1))])
+        check(LibraryPresentation.ordered([containsRex,rexNamePart,rexName],savedOrder:["Alpha","Rex work","Rex"],query:"rex").map(\.name) == ["Rex","Rex work","Alpha"],"exact layout name, partial layout name, then app-only matches")
+        check(LibraryPresentation.ordered([containsRex,rexName],savedOrder:["Rex","Rex","gone"],query:"").map(\.name) == ["Rex","Alpha"],"saved order tolerates stale/duplicate names and appends new layouts")
+        check(LibraryPresentation.moving(["A","B","C"],name:"A",to:3) == ["B","C","A"],"drop below final row moves down correctly")
+        check(LibraryPresentation.moving(["A","B","C"],name:"C",to:0) == ["C","A","B"],"drop above first row moves up correctly")
+        check(LibraryPresentation.moving(["A"],name:"gone",to:0) == nil && LibraryPresentation.moving(["A"],name:"A",to:2) == nil,"invalid drops cannot change order")
+        let wideCanvas = LibraryPresentation.canvas(in:NSRect(x:0,y:0,width:280,height:400),inset:12,aspect:16.0/9)
+        check(abs(wideCanvas.width/wideCanvas.height-16.0/9)<0.001 && wideCanvas.midY == 200,"expanded preview letterboxes to display ratio")
+        check(layoutUI.shortcuts.title.isEmpty && layoutUI.shortcuts.imagePosition == .imageOnly,"compact shortcut control has no overlapping title")
+        check(!dockPreferences.libraryPreviewShown && layoutUI.drawing.isHidden,"compact library defaults to no large preview")
+        layoutUI.togglePreview()
+        check(dockPreferences.libraryPreviewShown && !layoutUI.drawing.isHidden && FactoryPreferences(defaults:dockDefaults).libraryPreviewShown,"preview toggle persists and shows the pane")
+        layoutUI.togglePreview()
+        layoutUI.filtered = [rowA,rowB];layoutUI.table.reloadData()
+        check(layoutUI.moveLayout("B",to:0) && dockPreferences.layoutOrder == ["B","A"],"drop order is stored without changing recipes")
+        check(FactoryPreferences(defaults:dockDefaults).layoutOrder == ["B","A"],"manual order survives preferences reload")
+        layoutUI.search.stringValue = "A"
+        check(!layoutUI.moveLayout("B",to:0),"reordering is disabled while search hides rows")
+        layoutUI.search.stringValue = "";layoutUI.frozen = rowA
+        check(!layoutUI.moveLayout("B",to:0),"reordering is disabled during capture naming")
+        layoutUI.frozen = nil
+        check(settingsStore.catalog.recipes.isEmpty,"presentation settings never alter layout catalog")
         let settings = SettingsWindow(store:settingsStore,preferences:FactoryPreferences())
         settings.refresh(); settings.window.contentView!.layoutSubtreeIfNeeded()
         let settingsTabs = settings.window.contentView!.subviews.compactMap{$0 as? NSTabView}.first!

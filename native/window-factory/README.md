@@ -50,8 +50,8 @@ Remaining verification and polish, before adding a new feature:
 - Review deliberate, consistent visible stash edges. The current native command
   requests a right-edge stash and accepts macOS constraints; it does not promise
   a chosen visible strip width or provide a left/right stash selector.
-- Observe the new row thumbnails/app icons in ordinary use. Build 34 implements
-  these visual affordances; build 33 supplies the row context menu.
+- Observe the compact library, proportional optional preview, ranked search
+  and manual layout ordering in ordinary use (builds 35–36).
 
 Deferred feature choices, with none selected by this review:
 
@@ -421,3 +421,52 @@ and the Dual Finder ×2 count. App-name search found Dual Finder, clearing searc
 restored the full list, and right-clicking its icon selected that row and showed
 the existing context actions; the menu was cancelled without executing them.
 Current/previous catalog and app-owned settings hashes remained unchanged.
+
+
+## Compact library, search ranking and manual order (builds 35–36)
+
+The library defaults to a compact 620-point-wide list. Search, Capture and a
+Preview toggle share the top bar. Settings, Keyboard Shortcuts and Delete use
+accessible icon controls at the bottom, with Restore/Establish grouped on the
+right. Tooltips retain the commands and configured shortcut hints. Empty status
+and inactive capture-naming rows collapse rather than reserving footer space.
+The Preview toggle persists and expands the library to show a read-only pane.
+Both large and small previews fit the current display's usable-screen ratio;
+they never stretch to fill arbitrary view bounds. Schema-v1 layouts do not
+record capture-monitor aspect, so this is the current display ratio, not a claim
+that old monitor metadata was recovered.
+
+Search still includes layout names and saved app names. Results rank exact
+layout-name matches first, then partial layout-name matches, then app-only
+matches; manual order breaks ties before alphabetical fallback. Clearing search
+restores the full manually ordered list. Unordered/new layouts append in name
+order. The initial list remains alphabetical until a reorder is saved.
+
+Drag a row above/below another row in the unfiltered list to save a manual order.
+Only local, single-row moves within this table are accepted; external drags,
+filtered results, preview mode, capture naming and in-flight operations cannot
+reorder. An intervening list change invalidates a pending drag. Selection follows
+the moved layout. Ordering persists under `layoutOrder.v1` in app preferences;
+preview visibility uses `libraryPreviewShown`. Neither changes catalog bytes,
+window geometry, adapter operations, the schema or CLI protocol. Exported
+catalogs therefore contain recipes, not this Mac's presentation order.
+
+
+Signed build 36 is installed. Full native tests passed with 231 AppKit assertions,
+including search ranking, move indices, stale ordering, filtering/capture guards,
+preference persistence and proportional preview geometry. A first socket-fixture
+run failed its initial context assertion, passed in isolation, and both subsequent
+full native runs (including the final build) passed all 41 agent assertions.
+Repository validation and strict installed signature verification passed.
+
+Live checks showed Rex first above its three app-only matches, the compact and
+expanded views, correct aspect fitting, a row move through native dragging,
+row-specific right-click actions, and preview/order persistence across restart.
+The automation's drag coordinates targeted a different row than intended; the
+owner's exact pre-test order was restored from its recorded preference while
+the app was stopped, then verified on restart. Preview was returned to compact.
+The final build fixes a title overlapping the shortcuts icon found in visual
+inspection. Both catalog hashes and all prior app settings were unchanged;
+only the new presentation preferences were written. No Restore, Establish,
+Capture or Delete operation ran during these UI checks. Existing controller
+source files, adapter operations and Hammerspoon fallback were unchanged.
