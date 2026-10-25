@@ -1595,3 +1595,38 @@ left in place; no alternate UI-automation path was used to control Codex.
 
 Existing geometry/focus/stash/switcher/accordion/Space algorithms, shortcut
 defaults and the Hammerspoon fallback were unchanged.
+
+
+### Build 44 New Codex Window naming and optional shortcut, 2026-10-25
+
+At the owner's request, renamed the current menu titles to New Codex Window and
+added an optional row to Settings → Shortcuts → Library. The row starts unassigned,
+uses the existing recorder, and persists a versioned chord separately from the
+31 established fixed control definitions. Resetting the row clears the chord;
+the Library group switch releases/re-enables it. Keyboard Shortcuts and the
+Window/menu-bar/Dock menu hints read the same saved value.
+
+Validation rejects collisions in both directions with fixed controls and app
+launch/search bindings, as well as reserved local commands and the fallback.
+The independent application-key bridge now keeps callbacks per slot: search is
+slot 0, the existing 64 app slots remain 1–64, and the optional command uses 65.
+Changing it does not release or re-register the working fixed-control owners or
+redirect Rex/search callbacks. The single-window creation engine is unchanged.
+
+The native suite passed, including 34 creation/optional-shortcut assertions and
+522 tiling assertions. Tests cover unset defaults, persistence, rejected edits,
+bidirectional conflicts, Library editor/reference/menu display, group disable,
+clear and corrupt-data preservation. Carbon fixtures cover isolated callbacks
+and rejection rollback. The signed build and repository validation passed.
+
+Before restart, tiling was off and the reference showed zero stashed windows.
+Signed build 44 was installed; Accessibility and Agent access remained enabled,
+all pre-existing product settings and both layout catalogs were unchanged, and
+two distinct backup builds remained. The installed Library editor was inspected:
+New Codex Window showed Record… with no assigned shortcut. Normal keyboard
+recording and live Codex creation/automatic insertion await the owner's test;
+no Codex window was created through desktop automation for this update.
+
+Hammerspoon, the existing shortcut defaults and all working window-control
+algorithms remain unchanged. Historical build 43 entries retain their original
+New Codex Window Here wording as implementation history.

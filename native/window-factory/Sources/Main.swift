@@ -2,6 +2,7 @@ import AppKit
 
 @MainActor
 final class FactoryApp: NSObject, NSApplicationDelegate {
+    var newWindowShortcut: NewWindowShortcut?
     var newWindow: NewWindowAction?
     private let newWindowHUD = GeometryHUD()
     var tiling: TilingFeature?
@@ -53,10 +54,14 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             let bindings = preview ? nil : KeybindingManager(store:preferences.shortcuts)
             keybindings = bindings
             let appLauncher = ApplicationLauncher(shortcuts:preferences.shortcuts,live:!preview);applications=appLauncher
-            bindings?.additionalShortcuts = { [weak appLauncher] in appLauncher?.reservedShortcuts ?? [] }
+            let creationKey = preview ? nil : NewWindowShortcut(store:preferences.shortcuts,others:{[weak appLauncher] in appLauncher?.reservedShortcuts ?? []});newWindowShortcut=creationKey
+            creationKey?.action = { [weak self] in self?.newCodexWindow(nil) }
+            appLauncher.additionalShortcuts = { [weak creationKey] in creationKey?.reserved ?? [] }
+            bindings?.additionalShortcuts = { [weak appLauncher,weak creationKey] in (appLauncher?.reservedShortcuts ?? [])+(creationKey?.reserved ?? []) }
             try bindings?.restore()
             shortcutReference = ShortcutReferenceWindow(preferences:preferences)
             settings = SettingsWindow(store:store,preferences:preferences,keybindings:bindings)
+            settings?.shortcutEditor.newWindow=creationKey;shortcutReference?.newWindow=creationKey
             library = LibraryWindow(store:store,registry:registry,preview:preview,preferences:preferences)
             settings?.onImport = { [weak self] in self?.library?.show(); self?.library?.importLayouts() }
             settings?.onExport = { [weak self] in self?.library?.show(); self?.library?.exportLayouts() }
@@ -74,13 +79,17 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 appLauncher.launchFailed = { [weak search] in search?.showError($0) }
                 appLauncher.blocked = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil || NSApp.modalWindow != nil }
                 appLauncher.changed = { [weak self] in self?.settings?.refresh();self?.shortcutReference?.refresh() }
+                creationKey?.changed = { [weak self] in self?.shortcutReference?.refresh();self?.spaceIndicator?.refreshMenuShortcuts();if let menu=NSApp.mainMenu?.items.first(where:{$0.submenu?.title == "Window"})?.submenu,let item=menu.items.first(where:{$0.identifier?.rawValue == "codex.new-window"}){WindowCreationMenus.applyShortcut(to:item,chord:self?.newWindowShortcut?.chord)} }
                 settings?.applicationsEditor.connect(appLauncher);shortcutReference?.applications=appLauncher
                 library?.onApplications = { [weak self] in self?.showApplications(nil) };library?.applyPreferences()
                 appLauncher.restore()
                 let launchControls = LauncherControls(preferences:preferences); launcher = launchControls
                 launchControls.toggleLibrary = { [weak self] in self?.toggleLibrary() }
                 launchControls.toggleShortcuts = { [weak self] in self?.toggleShortcuts() }
-                launchControls.changed = { [weak self] in self?.settings?.refresh(); self?.shortcutReference?.refresh() }
+                launchControls.changed = { [weak self,weak creationKey,weak launchControls] in
+                    do {try creationKey?.setOwnerEnabled(launchControls?.active == true)}catch{self?.library?.status.stringValue=error.localizedDescription}
+                    self?.settings?.refresh(); self?.shortcutReference?.refresh()
+                }
                 settings?.launcher = launchControls; shortcutReference?.launcher = launchControls
                 launchControls.restorePreference()
                 let indicator = SpaceIndicator(preferences:preferences); spaceIndicator = indicator
@@ -133,6 +142,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 creator.blocked = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil || self?.tiling?.controller.isBusy == true || self?.geometry?.isBusy == true || self?.stash?.isBusy == true || self?.accordion?.isBusy == true || self?.spaceMove?.isMoving == true || self?.switcher?.isOpen == true || ShortcutRecorder.current?.isRecording == true }
                 creator.changed = { [weak self,weak creator] in guard let creator,!creator.isBusy else{return};self?.newWindowHUD.show(creator.lastResult) }
                 spaceIndicator?.newCodexWindow = { [weak self] in self?.newCodexWindow(nil) }
+                spaceIndicator?.newCodexChord = { [weak creationKey] in creationKey?.chord }
                 spaceIndicator?.newCodexAvailable = { [weak creator] in creator?.available("com.openai.codex") == true }
                 let service=AgentService(preferences:preferences,library:library);agent=service;settings?.agent=service
                 service.extraBusy = { [weak self] in self?.geometry?.isBusy == true || self?.focus?.isBusy == true || self?.stash?.isBusy == true || self?.accordion?.isBusy == true || self?.spaceMove?.isMoving == true || self?.switcher?.isOpen == true || self?.tiling?.controller.isBusy == true || self?.newWindow?.isBusy == true }
@@ -181,7 +191,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             let appsItem = windowMenu.addItem(withTitle:"Applications",action:#selector(showApplications(_:)),keyEquivalent:"a")
             appsItem.keyEquivalentModifierMask = [.command,.shift]; appsItem.target = self
             let tilingItem=windowMenu.addItem(withTitle:"Tiling…",action:#selector(showTiling(_:)),keyEquivalent:"");tilingItem.target=self
-            let newCodex=windowMenu.addItem(withTitle:"New Codex Window Here",action:#selector(newCodexWindow(_:)),keyEquivalent:"");newCodex.target=self
+            let newCodex=windowMenu.addItem(withTitle:"New Codex Window",action:#selector(newCodexWindow(_:)),keyEquivalent:"");newCodex.target=self;newCodex.identifier=NSUserInterfaceItemIdentifier("codex.new-window");WindowCreationMenus.applyShortcut(to:newCodex,chord:creationKey?.chord)
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
             NSApp.mainMenu = menu
             loginLaunch = loginLaunch || LauncherControls.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent)
@@ -227,7 +237,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
         }
     }
     func applicationDockMenu(_ sender: NSApplication)->NSMenu? {
-        WindowCreationMenus.dock(target:self,open:#selector(openFromDock(_:)),create:#selector(newCodexWindow(_:)),available:newWindow?.available("com.openai.codex") == true)
+        WindowCreationMenus.dock(target:self,open:#selector(openFromDock(_:)),create:#selector(newCodexWindow(_:)),available:newWindow?.available("com.openai.codex") == true,chord:newWindowShortcut?.chord)
     }
     @objc func openFromDock(_ sender: Any?) { library?.show() }
     @objc func newCodexWindow(_ sender: Any?) { newWindow?.run("com.openai.codex") }
@@ -239,7 +249,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); launcher?.refreshLoginState(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { newWindow?.stop();newWindowHUD.stop();tiling?.stop();applications?.stop();applicationSearch?.stop();agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { newWindowShortcut?.stop();newWindow?.stop();newWindowHUD.stop();tiling?.stop();applications?.stop();applicationSearch?.stop();agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main

@@ -172,7 +172,7 @@ endpoints; existing Agent access remains separately controlled.
 
 ## New Codex window on the current desktop
 
-**New Codex Window Here** is available in Window Factory's numbered menu-bar
+**New Codex Window** is available in Window Factory's numbered menu-bar
 badge, Window menu and its own Dock menu. It does not modify Codex's Dock menu.
 Codex must already be running. The action targets the installed adapter identity
 `com.openai.codex`, reuses `MacServices.create` and the canonical File/New Window
@@ -181,8 +181,13 @@ adapter, and checks for one newly eligible window on the captured desktop.
 This action does not use the layout Coordinator, apply frames, explicitly
 activate Codex, or pause/rejoin the tiler. It is suitable for testing whether
 a window arrives through normal automatic tiling insertion. Establish retains
-its existing pause-and-place semantics. No new global shortcut or CLI command
-is added.
+its existing pause-and-place semantics. No default global chord or CLI command is added. Configure an optional binding
+in **Settings → Shortcuts → Library → New Codex Window**. It starts unassigned;
+record a chord to use it, or use the row reset to clear it. The Library group
+switch also releases this binding. Keyboard Shortcuts and menu hints read the
+same saved chord. Known clashes with window controls, application shortcuts,
+local library commands and the fallback are rejected before registration.
+Failed operating-system registration keeps the prior settings.
 
 The action issues at most one creation request, then performs bounded discovery.
 A desktop/display change, an ambiguous arrival or a timeout is reported without
@@ -196,7 +201,8 @@ the dated acceptance records in DEVELOPMENT.md.
 Settings has General, Shortcuts, Applications, Layouts, About and Tiling tabs.
 The Tiling page is present in the normal installed app. General uses
 concise labelled switches. Shortcuts offers all 31 global commands in the seven
-existing groups, with a group switch and a recorder beside each action. Click a
+existing groups, with a group switch and a recorder beside each action. Library
+also includes the optional New Codex Window command, unassigned by default. Click a
 binding, press a new combination, or Escape to cancel. Individual reset buttons
 and a confirmed Reset All restore defaults. The Keyboard Shortcuts window reads
 the same saved bindings, including changes after restart. Local library and

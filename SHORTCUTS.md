@@ -233,3 +233,13 @@ apply only while the Tiling panel is focused and register no global bindings.
 The existing geometry commands float their target before resizing it. Restore,
 Establish and accordion pause the current tiling session. Details and limits are
 in [Window Factory](native/window-factory/README.md#binary-tree-tiling).
+
+
+## New Codex Window
+
+Window Factory's menu-bar, Window and own Dock menus provide **New Codex Window**.
+Its optional global shortcut is configured under Settings → Shortcuts → Library
+and starts unassigned. Keyboard Shortcuts and the menus follow the saved chord;
+resetting that row clears it. The Library group switch releases the binding.
+The command keeps its current-desktop creation behavior independently of its name
+and shortcut. See [Window Factory](native/window-factory/README.md#new-codex-window-on-the-current-desktop).

@@ -55,6 +55,10 @@ struct ShortcutDefinition {
 }
 struct ShortcutEnvelope: Codable { let version: Int; let overrides: [String:ShortcutChord] }
 enum ShortcutValidation {
+    static func validateLocalCommand(_ chord: ShortcutChord) throws {
+        let local: [(UInt32,UInt32,String)] = [(45,ShortcutChord.command,"Capture"),(3,ShortcutChord.command,"Search"),(34,ShortcutChord.command,"Import"),(14,ShortcutChord.command|ShortcutChord.shift,"Export"),(51,ShortcutChord.command,"Delete layout"),(36,ShortcutChord.command,"Establish"),(0,ShortcutChord.command|ShortcutChord.shift,"Applications search"),(125,ShortcutChord.option,"Move layout down"),(126,ShortcutChord.option,"Move layout up")]
+        if let command=local.first(where:{$0.0==chord.key && $0.1==chord.modifiers}) {throw FactoryError("\(chord.label) is used by \(command.2) inside Window Factory.")}
+    }
     static func validate(_ overrides: [String:ShortcutChord],additional: [(String,ShortcutChord)] = []) throws {
         let definitions = ShortcutDefinition.all
         guard Set(overrides.keys).isSubset(of:Set(definitions.map(\.id))) else { throw FactoryError("Unknown shortcut command.") }

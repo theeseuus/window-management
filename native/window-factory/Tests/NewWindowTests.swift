@@ -116,7 +116,7 @@ struct NewWindowTests {
       target: nil, open: NSSelectorFromString("open:"), create: NSSelectorFromString("create:"),
       available: false)
     check(
-      dock.items.map(\.title) == ["Open Window Factory", "New Codex Window Here"],
+      dock.items.map(\.title) == ["Open Window Factory", "New Codex Window"],
       "only Window Factory's own Dock menu is provided")
     check(
       !dock.autoenablesItems && !dock.items[1].isEnabled,
@@ -124,8 +124,100 @@ struct NewWindowTests {
     let menu = SpaceIndicator.menu(target: nil)
     check(
       menu.items.contains {
-        $0.identifier?.rawValue == "codex.new-window" && $0.title == "New Codex Window Here"
+        $0.identifier?.rawValue == "codex.new-window" && $0.title == "New Codex Window"
       }, "menu-bar action is discoverable")
+    let suite = "local.windowfactory.new-window-shortcut.\(UUID())"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let keys = KeybindingStore(defaults: defaults)
+    let appChord = ShortcutChord(key: 17, modifiers: ShortcutChord.hyper, name: "T")
+    let key = NewWindowShortcut(
+      defaults: defaults, store: keys, live: false, others: { [("Rex", appChord)] })
+    check(
+      key.chord == nil && !key.active
+        && defaults.object(forKey: "codexNewWindowShortcut.v1") == nil,
+      "command starts unassigned without writing preferences")
+    try key.setOwnerEnabled(true)
+    let chosen = ShortcutChord(key: 16, modifiers: ShortcutChord.hyper, name: "Y")
+    try key.set(chosen)
+    let saved = defaults.data(forKey: "codexNewWindowShortcut.v1")!
+    check(
+      key.chord == chosen && key.active,
+      "recording enables optional key only within enabled Library group")
+    let reloaded = NewWindowShortcut(
+      defaults: defaults, store: keys, live: false, others: { [("Rex", appChord)] })
+    try reloaded.setOwnerEnabled(true)
+    check(reloaded.chord == chosen && reloaded.active, "optional binding survives restart")
+    for rejected in [
+      appChord, ShortcutChord(key: 1, modifiers: ShortcutChord.hyper, name: "S"),
+      ShortcutChord(key: 45, modifiers: ShortcutChord.command, name: "N"),
+      ShortcutChord(key: 15, modifiers: ShortcutChord.hyper | ShortcutChord.shift, name: "R"),
+    ] {
+      do {
+        try key.set(rejected)
+        check(false, "clash must fail")
+      } catch {
+        check(
+          key.chord == chosen && defaults.data(forKey: "codexNewWindowShortcut.v1") == saved,
+          "failed edit preserves saved binding")
+      }
+    }
+    let manager = KeybindingManager(store: keys)
+    manager.additionalShortcuts = { key.reserved }
+    do {
+      try manager.set(chosen, for: ShortcutDefinition.all.first { $0.id == "library.0" }!)
+      check(false, "reverse control clash must fail")
+    } catch { check(keys.overrides.isEmpty, "fixed binding cannot steal optional command key") }
+    let apps = ApplicationLauncher(defaults: defaults, shortcuts: keys, live: false)
+    apps.additionalShortcuts = { key.reserved }
+    do {
+      try apps.configureSearchShortcut(chosen, enabled: false)
+      check(false, "app binding clash must fail")
+    } catch {
+      check(
+        apps.entries.first { $0.isSearch }?.shortcut == nil,
+        "app binding cannot steal optional command key")
+    }
+    let editor = ShortcutEditor(manager: manager)
+    editor.newWindow = key
+    editor.groups.selectItem(withTitle: "Library")
+    editor.groups.sendAction(editor.groups.action, to: editor.groups.target)
+    func descendants(_ view: NSView) -> [NSView] {
+      [view] + view.subviews.flatMap { descendants($0) }
+    }
+    let table = descendants(editor.view).compactMap { $0 as? NSTableView }.first!
+    check(table.numberOfRows == 3, "Library editor contains optional New Codex Window row")
+    let ref = ShortcutReferenceWindow(preferences: FactoryPreferences(defaults: defaults))
+    ref.newWindow = key
+    ref.refresh()
+    let text = descendants(ref.window.contentView!).compactMap { $0 as? NSTextView }.first!
+    check(
+      text.string.contains("New Codex Window") && text.string.contains("\tY\tNew Codex Window"),
+      "reference reads configured optional chord")
+    let hinted = WindowCreationMenus.dock(
+      target: nil, open: NSSelectorFromString("open:"), create: NSSelectorFromString("create:"),
+      available: true, chord: chosen)
+    check(
+      hinted.items[1].keyEquivalent == "y" && hinted.items[1].toolTip == "Tab + Y",
+      "menu hint reads chosen chord")
+    try key.setOwnerEnabled(false)
+    check(!key.active && key.chord == chosen, "Library off releases only the optional registration")
+    try key.set(nil)
+    check(
+      key.chord == nil && !key.active
+        && defaults.object(forKey: "codexNewWindowShortcut.v1") == nil,
+      "clear restores the unassigned default")
+    defaults.set(Data("bad".utf8), forKey: "codexNewWindowShortcut.v1")
+    let corrupt = NewWindowShortcut(defaults: defaults, store: keys, live: false, others: { [] })
+    try corrupt.setOwnerEnabled(true)
+    check(
+      corrupt.error != nil && corrupt.chord == nil
+        && defaults.data(forKey: "codexNewWindowShortcut.v1") == Data("bad".utf8),
+      "corrupt optional data does not activate or overwrite existing controls")
+    key.stop()
+    reloaded.stop()
+    corrupt.stop()
+    ref.stop()
     print(
       "native new-window action: \(count) assertions passed; injected desktop only, no live app creation or UI activation"
     )

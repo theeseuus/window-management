@@ -121,15 +121,24 @@ final class NewWindowAction {
 
 @MainActor
 enum WindowCreationMenus {
-  static func dock(target: AnyObject?, open: Selector, create: Selector, available: Bool) -> NSMenu
-  {
+  static func applyShortcut(to item: NSMenuItem, chord: ShortcutChord?) {
+    item.keyEquivalent = chord?.menuKeyEquivalent ?? ""
+    item.keyEquivalentModifierMask = chord?.menuModifiers ?? []
+    item.toolTip = chord?.actionHint
+  }
+
+  static func dock(
+    target: AnyObject?, open: Selector, create: Selector, available: Bool,
+    chord: ShortcutChord? = nil
+  ) -> NSMenu {
     let menu = NSMenu()
     menu.autoenablesItems = false
     let library = menu.addItem(withTitle: "Open Window Factory", action: open, keyEquivalent: "")
     library.target = target
-    let window = menu.addItem(withTitle: "New Codex Window Here", action: create, keyEquivalent: "")
+    let window = menu.addItem(withTitle: "New Codex Window", action: create, keyEquivalent: "")
     window.target = target
     window.isEnabled = available
+    applyShortcut(to: window, chord: chord)
     return menu
   }
 }

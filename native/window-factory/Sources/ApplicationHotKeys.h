@@ -1,15 +1,13 @@
-// Independent app-launch keys: existing window-control slots are never released.
-#define WF_APP_KEY_LIMIT 65
-static struct { EventHotKeyRef ref; UInt32 key,mods; } wfAppKeys[WF_APP_KEY_LIMIT];
+// Independent app/optional-command keys: window-control slots are never released.
+#define WF_APP_KEY_LIMIT 66 // 0 search, 1...64 apps, 65 optional New Codex Window
+static struct { EventHotKeyRef ref; UInt32 key,mods; WFHotKeyCallback callback; void *context; } wfAppKeys[WF_APP_KEY_LIMIT];
 static EventHandlerRef wfAppHandler;
-static WFHotKeyCallback wfAppCallback;
-static void *wfAppContext;
 static OSStatus wfAppEvent(EventHandlerCallRef next,EventRef event,void *context) {
     (void)next;(void)context;EventHotKeyID id;
     OSStatus status=GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(id),NULL,&id);
     if(status!=noErr || id.signature!='WFAP' || id.id>=WF_APP_KEY_LIMIT || !wfAppKeys[id.id].ref) return eventNotHandledErr;
     if(wfCapture) {wfCapture(wfAppKeys[id.id].key,wfAppKeys[id.id].mods,wfCaptureContext);return noErr;}
-    if(wfAppCallback)wfAppCallback(id.id,wfAppContext);return noErr;
+    if(wfAppKeys[id.id].callback)wfAppKeys[id.id].callback(id.id,wfAppKeys[id.id].context);return noErr;
 }
 int32_t WFConfigureApplicationHotKey(uint32_t index,uint32_t key,uint32_t modifiers,BOOL enabled,WFHotKeyCallback callback,void *context,int32_t *rollback) {
     *rollback=noErr;
@@ -20,9 +18,9 @@ int32_t WFConfigureApplicationHotKey(uint32_t index,uint32_t key,uint32_t modifi
     OSStatus status=noErr;EventHotKeyID id={'WFAP',index};
     if(enabled)status=WF_REGISTER_OS_HOTKEY(key,modifiers,id,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfAppKeys[index].ref);
     if(status!=noErr){if(old)*rollback=WF_REGISTER_OS_HOTKEY(oldKey,oldMods,id,GetApplicationEventTarget(),kEventHotKeyExclusive,&wfAppKeys[index].ref);return status;}
-    wfAppKeys[index].key=key;wfAppKeys[index].mods=modifiers;wfAppCallback=callback;wfAppContext=context;return noErr;
+    wfAppKeys[index].key=key;wfAppKeys[index].mods=modifiers;wfAppKeys[index].callback=callback;wfAppKeys[index].context=context;return noErr;
 }
 void WFStopApplicationHotKeys(void) {
     for(unsigned i=0;i<WF_APP_KEY_LIMIT;i++)if(wfAppKeys[i].ref){WF_UNREGISTER_OS_HOTKEY(wfAppKeys[i].ref);wfAppKeys[i].ref=NULL;}
-    if(wfAppHandler){RemoveEventHandler(wfAppHandler);wfAppHandler=NULL;}wfAppCallback=NULL;wfAppContext=NULL;
+    if(wfAppHandler){RemoveEventHandler(wfAppHandler);wfAppHandler=NULL;}
 }

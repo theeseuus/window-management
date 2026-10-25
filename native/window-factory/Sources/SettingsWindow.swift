@@ -71,6 +71,7 @@ final class ShortcutEditor: NSObject,NSTableViewDataSource,NSTableViewDelegate {
     private let table = NSTableView()
     private var recorders: [ShortcutRecorder] = []
     private let manager: KeybindingManager?
+    var newWindow: NewWindowShortcut? { didSet { changeGroup() } }
     var isEnabled: ((ShortcutGroup)->Bool)?
     var changeEnabled: ((ShortcutGroup,Bool)->Void)?
     private var definitions: [ShortcutDefinition] = []
@@ -96,7 +97,7 @@ final class ShortcutEditor: NSObject,NSTableViewDataSource,NSTableViewDelegate {
         reset.isEnabled = manager != nil; changeGroup()
     }
     var group: ShortcutGroup { ShortcutGroup.allCases[max(0,groups.indexOfSelectedItem)] }
-    @objc private func changeGroup() { cancelRecording(); definitions = ShortcutDefinition.all.filter{$0.group == group}; table.reloadData(); refresh() }
+    @objc private func changeGroup() { cancelRecording(); definitions = ShortcutDefinition.all.filter{$0.group == group}; if group == .library,newWindow != nil { definitions.append(NewWindowShortcut.definition) }; table.reloadData(); refresh() }
     func refresh() { enabled.state = isEnabled?(group) == true ? .on : .off; enabled.isEnabled = manager != nil && changeEnabled != nil; enabled.setAccessibilityLabel("\(group.title) shortcuts") }
     @objc private func toggleGroup() { changeEnabled?(group,enabled.state == .on); refresh() }
     var isRecording: Bool { ShortcutRecorder.current?.isRecording == true }
@@ -110,25 +111,30 @@ final class ShortcutEditor: NSObject,NSTableViewDataSource,NSTableViewDelegate {
             NSLayoutConstraint.activate([label.leadingAnchor.constraint(equalTo:cell.leadingAnchor,constant:4),label.trailingAnchor.constraint(equalTo:cell.trailingAnchor,constant:-4),label.centerYAnchor.constraint(equalTo:cell.centerYAnchor)])
             return cell
         }
-        let recorder = ShortcutRecorder(definition,manager:manager)
+        let custom = definition.id == NewWindowShortcut.definition.id ? newWindow : nil
+        let recorder: ShortcutRecorder
+        if let custom {
+            recorder=ShortcutRecorder(definition,manager:nil,read:{[weak custom] in custom?.chord},save:{[weak custom] chord in try custom?.set(chord)})
+        }else{recorder=ShortcutRecorder(definition,manager:manager)}
+        if let issue=custom?.error {recorder.toolTip=issue}
         recorder.isEnabled = manager != nil
         let reset = NSButton(image:NSImage(systemSymbolName:"arrow.uturn.backward",accessibilityDescription:"Reset \(definition.title) shortcut")!,target:self,action:#selector(resetRow(_:)))
-        reset.tag = row; reset.bezelStyle = .inline; reset.isEnabled = manager?.store.overrides[definition.id] != nil
+        reset.tag = row; reset.bezelStyle = .inline; reset.isEnabled = custom != nil ? custom?.chord != nil : manager?.store.overrides[definition.id] != nil
         let stack = NSStackView(views:[recorder,reset]); stack.spacing = 8
         recorder.widthAnchor.constraint(equalToConstant:140).isActive = true
         recorders.append(recorder)
-        recorder.finished = { [weak self,weak reset] in reset?.isEnabled = self?.manager?.store.overrides[definition.id] != nil }
+        recorder.finished = { [weak self,weak reset,weak custom] in reset?.isEnabled = definition.id == NewWindowShortcut.definition.id ? custom?.chord != nil : self?.manager?.store.overrides[definition.id] != nil }
         return stack
     }
     @objc private func resetRow(_ sender: NSButton) {
         cancelRecording()
-        do { try manager?.set(nil,for:definitions[sender.tag]); table.reloadData() } catch { showError(error) }
+        do { if definitions[sender.tag].id == NewWindowShortcut.definition.id {try newWindow?.set(nil)}else{try manager?.set(nil,for:definitions[sender.tag])}; table.reloadData() } catch { showError(error) }
     }
     @objc private func resetAll() {
         cancelRecording()
         let alert = NSAlert(); alert.messageText = "Reset all shortcuts?"; alert.addButton(withTitle:"Cancel"); alert.addButton(withTitle:"Reset All")
         if alert.runModal() == .alertSecondButtonReturn {
-            do { try manager?.reset(); table.reloadData() } catch { showError(error) }
+            do { try manager?.reset(); try newWindow?.set(nil); table.reloadData() } catch { showError(error) }
         }
     }
     private func showError(_ error: Error) {

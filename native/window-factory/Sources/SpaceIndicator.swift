@@ -13,6 +13,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate, NSMenuItemValidation {
     var changed: (() -> Void)?
     var openLibrary: (() -> Void)?
     var openSettings: (() -> Void)?
+    var newCodexChord: (()->ShortcutChord?)?
     var newCodexWindow: (()->Void)?
     var newCodexAvailable: (()->Bool)?
     var openTiling: (()->Void)?
@@ -38,7 +39,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate, NSMenuItemValidation {
         let menu = NSMenu(),description = NSMenuItem(title:"Reading active Space…",action:nil,keyEquivalent:"")
         menu.delegate = target
         description.isEnabled = false; menu.addItem(description); menu.addItem(.separator())
-        for (title,selector,id) in [("Open Window Factory",#selector(showLibrary),"library.0"),("Settings…",#selector(showSettings),"settings"),("Keyboard Shortcuts…",#selector(showShortcuts),"library.1"),("Tiling…",#selector(showTiling),"tiling"),("New Codex Window Here",#selector(createCodexWindow),"codex.new-window")] {
+        for (title,selector,id) in [("Open Window Factory",#selector(showLibrary),"library.0"),("Settings…",#selector(showSettings),"settings"),("Keyboard Shortcuts…",#selector(showShortcuts),"library.1"),("Tiling…",#selector(showTiling),"tiling"),("New Codex Window",#selector(createCodexWindow),"codex.new-window")] {
             let entry = menu.addItem(withTitle:title,action:selector,keyEquivalent:""); entry.target = target; entry.identifier = NSUserInterfaceItemIdentifier(id)
         }
         let settings = menu.items.first{$0.identifier?.rawValue == "settings"}!
@@ -56,9 +57,9 @@ final class SpaceIndicator: NSObject, NSMenuDelegate, NSMenuItemValidation {
             entry.toolTip = chord.actionHint
         }
     }
-    func refreshMenuShortcuts() { if let menu = item?.menu { Self.updateShortcuts(in:menu,preferences:preferences) } }
+    func refreshMenuShortcuts() { if let menu = item?.menu { Self.updateShortcuts(in:menu,preferences:preferences);if let entry=menu.items.first(where:{$0.identifier?.rawValue == "codex.new-window"}){WindowCreationMenus.applyShortcut(to:entry,chord:newCodexChord?())} } }
     func validateMenuItem(_ menuItem: NSMenuItem)->Bool { menuItem.identifier?.rawValue == "codex.new-window" ? newCodexAvailable?() == true : true }
-    func menuNeedsUpdate(_ menu: NSMenu) { Self.updateShortcuts(in:menu,preferences:preferences);menu.items.first{$0.identifier?.rawValue == "codex.new-window"}?.isEnabled = newCodexAvailable?() == true }
+    func menuNeedsUpdate(_ menu: NSMenu) { refreshMenuShortcuts();menu.items.first{$0.identifier?.rawValue == "codex.new-window"}?.isEnabled = newCodexAvailable?() == true }
     private func observe(_ center: NotificationCenter,_ name: Notification.Name) {
         let token = center.addObserver(forName:name,object:nil,queue:.main) { [weak self] _ in
             MainActor.assumeIsolated { self?.scheduleRefresh() }

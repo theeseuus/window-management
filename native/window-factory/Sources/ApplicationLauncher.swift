@@ -19,6 +19,7 @@ final class ApplicationLauncher {
     private(set) var active: Set<UUID> = []
     private(set) var failures: [UUID:String] = [:]
     private(set) var loadError: String?
+    var additionalShortcuts: ()->[(String,ShortcutChord)] = { [] }
     var changed: (() -> Void)?
     var searchRequested: (() -> Void)?
     var launchFailed: ((String)->Void)?
@@ -47,8 +48,7 @@ final class ApplicationLauncher {
         guard entries.count<=65,Set(entries.map(\.id)).count==entries.count,Set(entries.map(\.slot)).count==entries.count,
               Set(entries.filter({!$0.isSearch}).map(\.bundleID)).count==entries.filter({!$0.isSearch}).count,
               entries.allSatisfy({($0.isSearch ? $0.slot==0 : ($0.slot>0 && $0.slot<=64)) && !$0.bundleID.isEmpty && !$0.name.isEmpty && $0.name.count<=256 && $0.path.hasPrefix("/") && (!$0.enabled || $0.shortcut != nil)}) else {throw FactoryError("Invalid or duplicate application shortcuts.")}
-        let local: [(UInt32,UInt32,String)] = [(45,ShortcutChord.command,"Capture"),(3,ShortcutChord.command,"Search"),(34,ShortcutChord.command,"Import"),(14,ShortcutChord.command|ShortcutChord.shift,"Export"),(51,ShortcutChord.command,"Delete layout"),(36,ShortcutChord.command,"Establish"),(0,ShortcutChord.command|ShortcutChord.shift,"Applications search"),(125,ShortcutChord.option,"Move layout down"),(126,ShortcutChord.option,"Move layout up")]
-        for entry in entries { if let chord=entry.shortcut,let command=local.first(where:{$0.0==chord.key && $0.1==chord.modifiers}) {throw FactoryError("\(chord.label) is used by \(command.2) inside Window Factory.")} }
+        for entry in entries { if let chord=entry.shortcut {try ShortcutValidation.validateLocalCommand(chord)} }
         try ShortcutValidation.validate(overrides,additional:entries.compactMap { entry in entry.shortcut.map{(entry.isSearch ? "Applications search" : "Launch "+entry.name,$0)} })
     }
     var reservedShortcuts: [(String,ShortcutChord)] { entries.compactMap{ entry in entry.shortcut.map{(entry.isSearch ? "Applications search" : "Launch "+entry.name,$0)} } }
@@ -75,6 +75,7 @@ final class ApplicationLauncher {
     private func commit(_ draft: [ApplicationEntry],changed entry: ApplicationEntry) throws {
         guard loadError==nil else {throw FactoryError(loadError!)}
         try Self.validateEntries(draft,overrides:shortcuts.overrides)
+        try ShortcutValidation.validate(shortcuts.overrides,additional:draft.compactMap { e in e.shortcut.map{(e.name,$0)} }+additionalShortcuts())
         let data=try JSONEncoder().encode(ApplicationEnvelope(version:1,entries:draft))
         try register(entry)
         entries=draft;defaults.set(data,forKey:"applicationLaunchers.v1");failures.removeValue(forKey:entry.id);changed?()

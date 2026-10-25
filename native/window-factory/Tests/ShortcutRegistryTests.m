@@ -23,6 +23,7 @@ static OSStatus unreg(EventHotKeyRef ref) {
 #import "../Sources/ApplicationHotKeys.h"
 static UInt32 captured;
 static void appInvoke(uint32_t index,void *context) { (void)index;(void)context; }
+static void commandInvoke(uint32_t index,void *context) { *(UInt32 *)context=index; }
 static void capture(uint32_t key,uint32_t mods,void *context) { (void)mods;(void)context;captured=key; }
 int main(void) {
     EventHotKeyRef a=NULL,b=NULL,escape[4]={NULL};
@@ -73,7 +74,18 @@ int main(void) {
     assert(WFConfigureApplicationHotKey(1,82,mods[0],YES,appInvoke,&captured,&appRollback)!=noErr && appRollback==0);
     assert(fake[(uintptr_t)wfAppKeys[1].ref].key==17);
     blockedKey=-1;
-    assert(WFConfigureApplicationHotKey(65,0,mods[0],YES,appInvoke,&captured,&appRollback)==paramErr);
+    UInt32 commandResult=0;
+    assert(WFConfigureApplicationHotKey(65,16,mods[0],YES,commandInvoke,&commandResult,&appRollback)==noErr);
+    assert(wfAppKeys[1].callback==appInvoke && wfAppKeys[1].context==&captured);
+    assert(wfAppKeys[65].callback==commandInvoke && wfAppKeys[65].context==&commandResult);
+    wfAppKeys[65].callback(65,wfAppKeys[65].context);assert(commandResult==65);
+    blockedKey=82;
+    assert(WFConfigureApplicationHotKey(65,82,mods[0],YES,commandInvoke,&commandResult,&appRollback)!=noErr && appRollback==0);
+    assert(fake[(uintptr_t)wfAppKeys[65].ref].key==16 && wfAppKeys[1].ref);
+    blockedKey=-1;
+    assert(WFConfigureApplicationHotKey(66,0,mods[0],YES,appInvoke,&captured,&appRollback)==paramErr);
+    assert(WFConfigureApplicationHotKey(65,16,mods[0],NO,commandInvoke,&commandResult,&appRollback)==noErr);
+    assert(wfAppKeys[1].ref && reference);
     assert(WFConfigureApplicationHotKey(1,17,mods[0],NO,appInvoke,&captured,&appRollback)==noErr);
     WFStopApplicationHotKeys();
     assert(reference && fake[(uintptr_t)reference].key==44);assert(WFUnregisterConfiguredHotKey(reference)==noErr);

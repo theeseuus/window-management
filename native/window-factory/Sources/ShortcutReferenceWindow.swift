@@ -6,6 +6,7 @@ final class ShortcutReferenceWindow: NSObject {
     private let preferences: FactoryPreferences
     private let text = NSTextView()
     private let restore = NSButton(title:"Restore last stashed window",target:nil,action:nil)
+    weak var newWindow: NewWindowShortcut?
     weak var launcher: LauncherControls?
     weak var spaceIndicator: SpaceIndicator?
     weak var spaceMove: DirectSpaceMoveControls?
@@ -55,7 +56,12 @@ final class ShortcutReferenceWindow: NSObject {
                 let chord = preferences.shortcuts.chord($0)
                 return row(chord.modifierLabel,chord.name,$0.title)
             }
-            sections.append("\(group.title.uppercased())  [\(states[group] == true ? "On" : "Off")]\n"+rows.joined(separator:"\n"))
+            var shownRows=rows
+            if group == .library,let newWindow {
+                let value=newWindow.chord
+                shownRows.append(row(value?.modifierLabel ?? "",value?.name ?? "—","New Codex Window"+(newWindow.active ? "" : " [Off]")))
+            }
+            sections.append("\(group.title.uppercased())  [\(states[group] == true ? "On" : "Off")]\n"+shownRows.joined(separator:"\n"))
         }
         if let applications {
             let rows = applications.entries.compactMap { entry -> String? in
