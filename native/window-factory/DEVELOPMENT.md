@@ -1801,3 +1801,39 @@ fresh baseline; Accessibility/Agent access remain enabled. Modern/fallback icon
 resource hashes match the signed candidate. Two backup builds retained. No
 control algorithms, bindings, permission grants or Hammerspoon configuration
 changed. Build 47's historical receipt remains above as incident evidence.
+
+
+### Generated development-output cleanup, 2026-10-25
+
+Owner requested removal of unneeded development builds/caches after accepting
+the sculpted blue icon. Only the installed /Applications/Window Factory.app
+process was running; no cleanup root was in use by a process. Removed the
+component .build directories, current cached build candidate/ModuleCache/icon
+outputs, retired-development bundles/caches, remaining legacy geometry/Space
+pilot module caches and project-named temporary probes/build/test outputs.
+These rebuild through the existing native-build/native-test/native-spaces-build
+commands. Source, icon assets and test source remain in Git. Machine-wide caches
+and other project outputs were outside the cleanup scope.
+
+The earlier retired-development stash described in README is now superseded by
+this cleanup. Its small manifest/data and historical pilot catalogs, reports,
+rollback patches, notes and screenshots were preserved in a private compressed
+archive before retiring the loose copies:
+`/Users/troymay/.local/share/window-factory/development-archives/dev-evidence-20261025T100644Z.tar.gz`.
+The archive contains 370 evidence files plus a manifest with original
+paths and SHA-256 values. Every archived file was read back and hash-verified.
+Reproducible binaries, generated app bundles and module caches were discarded.
+Credential/certificate-named temporary items were excluded from the sweep.
+
+Removed 365 scoped roots/files, accounting for 1,342,713,856 allocated
+bytes; the archive is 2,034,669 bytes. Net reclaimed allocation:
+1,340,678,144 bytes (about 1.25 GiB).
+The active CLI socket/cache directory was preserved. Window Factory stayed
+running with the same instance ID; no app restart or setting change was needed.
+Before/after hashes match for the complete installed app, current/previous live
+catalogs and every file of both retained backup builds; serialized preferences
+match exactly. Accessibility/Agent access are unchanged and installed signature
+verification passes. Hammerspoon and working control source/configuration were
+not edited. No native rebuild/test was run after cleanup, since that would
+immediately recreate the disposable output. Repository validation and clean-state
+checks remain the appropriate checks for this record-only commit.
