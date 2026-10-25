@@ -6,11 +6,16 @@ Hyper = `Control + Option + Command`
 
 ## App Launching (Hyper + key)
 
-These commands are owned by Raycast, not Hammerspoon.
+Window Factory owns Applications search on `Hyper + A` and Rex Beta on
+`Hyper + T`. Other app-launch bindings below remain owned by Raycast. Karabiner
+turns held Tab into Hyper. In Window Factory Settings → Applications, bindings
+can be recorded or disabled; Keyboard Shortcuts reads the saved bindings.
+Applications search also opens apps without an assigned shortcut.
 
 | Category | Shortcut | Action |
 | --- | --- | --- |
-| Terminals | `Hyper + T` | Rex Beta |
+| Search | `Hyper + A` | Applications search (Window Factory) |
+| Terminals | `Hyper + T` | Rex Beta (Window Factory) |
 | Terminals | `Hyper + Shift + T` | iTerm |
 | Browsers | `Hyper + B` | Safari |
 | Browsers | `Hyper + Shift + B` | Chrome |

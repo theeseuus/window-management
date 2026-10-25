@@ -25,6 +25,7 @@ and accepted in Window Factory. No core controller group remains to port.
 | Capture, Restore, Establish, repeat without duplicates | Accepted Rex/Safari/Codex desktop pilots; all 16 adapters shipped, broader live coverage remains |
 | Configurable keybindings and reference | Accepted; 31 global commands, Tab+/ toggles reference |
 | Library presentation | Thumbnails/icons, Delete/context menu, name-ranked search, optional proportional preview and drag ordering accepted |
+| Applications and launch shortcuts | Tab+A search, Tab+T Rex activation and Tab+S clash rejection accepted; build 41 installed with bindings retained |
 | Agent CLI | Read-only/off-switch checks and live Rex Capture/Restore/Establish/repeat passed; see [CLI.md](CLI.md) |
 
 Hammerspoon retains recoverable original implementations and Tab+Shift+R for
@@ -78,7 +79,8 @@ Return to launch or bring that app forward. Escape closes it. It includes
 installed apps without shortcuts and keeps Return in the layout library mapped
 to Restore. Open it from the library's Applications button or Window menu
 (Command+Shift+A); its global toggle is configurable in Settings → Applications.
-The requested initial handoff is Tab+A for search and Tab+T for Rex Beta.
+The accepted initial handoff is Tab+A for search and Tab+T for Rex Beta.
+Rex’s old Raycast binding was released; other Raycast bindings remain with Raycast.
 
 In Settings → Applications, choose Add Application, record a shortcut and enable
 its switch. Recording a binding does not enable it automatically. Clear Shortcut

@@ -1427,3 +1427,27 @@ in private temporary storage, outside the repository.
 This live pilot tests CLI Capture/Restore/Establish and duplicate prevention.
 It does not constitute a new manual test of every direct-control shortcut.
 Their implementations and the Hammerspoon fallback were unchanged in this work.
+
+
+### Application launcher acceptance and build 41 update, 2026-10-25
+
+The owner confirmed Applications search opens with Tab+A, Tab+T brings Rex Beta
+forward, and recording Tab+S for Rex rejects the clash with Stash. The saved Rex
+binding remained Tab+T. Rex's prior Raycast hotkey was cleared deliberately;
+other Raycast bindings and the Hammerspoon fallback were unchanged.
+
+Build 41 was installed at /Applications/Window Factory.app and restarted with the
+same verified Developer ID requirement. The CLI reported a new running instance,
+Accessibility and Agent access enabled, and no active operation. Current and
+previous layout catalogs retained identical hashes. All existing product settings,
+including both enabled application bindings and layout order, retained identical
+values. The restarted reference showed both application shortcuts active and all
+seven existing control groups On. No session stashes were present before restart.
+Backup retention left exactly two distinct app builds.
+
+The build 41 candidate had passed native-build, native-test (including 266 AppKit
+and 43 agent assertions), and repository validation before installation. Its
+additional moved-app re-selection behavior is covered by fixtures; the physical
+shortcut acceptance above was on build 40, followed by registration/preservation
+checks on build 41. This update did not repeat every geometry or Space-movement
+operation, and did not change their implementations.
