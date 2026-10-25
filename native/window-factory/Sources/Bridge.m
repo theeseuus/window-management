@@ -449,3 +449,5 @@ int32_t WFRegisterLauncherHotKey(WFHotKeyCallback callback,void *context) {
     }
     return noErr;
 }
+
+#import "ApplicationHotKeys.h"

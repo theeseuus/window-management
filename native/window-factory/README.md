@@ -31,7 +31,8 @@ Hammerspoon retains recoverable original implementations and Tab+Shift+R for
 its library when running. The managed loader releases all seven direct-control
 and indicator owners to Window Factory. Restoring a direct-control group still
 requires releasing its native binding before enabling its Spoon fallback.
-Karabiner owns hold-Tab → Hyper; Raycast owns app launching; macOS owns
+Karabiner owns hold-Tab → Hyper. Window Factory can own individual app-launch
+shortcuts; Raycast retains bindings not explicitly handed over. macOS owns
 Control+Left/Right. Those are separate integrations, not unfinished Spoon ports.
 The canonical app-adapter definitions still live in Lua and generate bundled
 JSON; the installed app does not require Hammerspoon to run.
@@ -54,11 +55,9 @@ Remaining verification and polish, before adding a new feature:
 - Observe the new app-local keyboard ordering and Space-preview interaction
   in ordinary use; no core migration work remains.
 
-Deferred feature choices, with none selected by this review:
+Deferred feature choices:
 
 - **Custom geometries:** add user-defined size/position geometries later.
-- **App launching:** an Applications shortcut group, app picker and launch/bring-
-  forward actions; hand bindings over individually from Raycast after testing.
 - **Binary-tree tiling:** KiwiDesk-style splits, sizing and reflow would be new
   layout behavior, not a missing accordion port.
 - **Layout editor:** drag/resize the saved window rectangles with save/cancel
@@ -72,9 +71,40 @@ Implementation and dated pilot receipts are preserved in
 [development history](DEVELOPMENT.md); the [original transition plan](../../docs/native-window-factory.md)
 is historical planning, not the current backlog.
 
+## Applications and launch shortcuts
+
+Applications is a separate search window: type a name, use the arrows and press
+Return to launch or bring that app forward. Escape closes it. It includes
+installed apps without shortcuts and keeps Return in the layout library mapped
+to Restore. Open it from the library's Applications button or Window menu
+(Command+Shift+A); its global toggle is configurable in Settings → Applications.
+The requested initial handoff is Tab+A for search and Tab+T for Rex Beta.
+
+In Settings → Applications, choose Add Application, record a shortcut and enable
+its switch. Recording a binding does not enable it automatically. Clear Shortcut
+also disables it; Remove forgets that app's launch entry. The search command can
+be disabled or cleared. Up to 64 application entries are supported. App identity,
+selected location, chords and enablement persist in app preferences independently
+of layout recipes. Re-selecting a moved app updates its location while preserving
+its binding. Keyboard Shortcuts reads the same records and shows inactive entries
+as Off.
+
+Clash checks run in both directions between application bindings and existing
+Window Factory commands, including disabled entries, reserved local commands and
+the Hammerspoon fallback. Failed OS registration keeps the previous binding where
+possible and reports the failure. External conflicts are detectable only when
+macOS refuses registration; this is not a complete inventory of shortcuts owned
+by every app. Release each Raycast binding deliberately before enabling its new
+owner. Changing an app binding does not re-register working controller groups.
+
+A running app is activated without requesting a new window. Otherwise macOS opens
+the selected app normally. App launching does not establish a layout, move windows
+or restore app content. Applications search and launch shortcuts are not CLI
+endpoints; existing Agent access remains separately controlled.
+
 ## Configurable shortcuts and Settings
 
-Settings has four tabs: General, Shortcuts, Layouts and About. General uses
+Settings has five tabs: General, Shortcuts, Applications, Layouts and About. General uses
 concise labelled switches. Shortcuts offers all 31 global commands in the seven
 existing groups, with a group switch and a recorder beside each action. Click a
 binding, press a new combination, or Escape to cancel. Individual reset buttons

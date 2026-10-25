@@ -55,3 +55,7 @@ void WFUnregisterLauncherHotKey(void);
 typedef void (*WFShortcutCaptureCallback)(uint32_t key,uint32_t modifiers,void * _Nullable context);
 void WFSetShortcutCapture(WFShortcutCaptureCallback _Nullable callback,void * _Nullable context);
 int32_t WFUpdateShortcutConfiguration(const uint32_t * _Nonnull signatures,const uint32_t * _Nonnull indices,const uint32_t * _Nonnull keys,const uint32_t * _Nonnull modifiers,uint32_t count,uint32_t * _Nonnull failedIndex,int32_t * _Nonnull rollbackStatus);
+
+// Separate app-launch owner; per-entry update preserves the old key on rejection.
+int32_t WFConfigureApplicationHotKey(uint32_t index,uint32_t key,uint32_t modifiers,BOOL enabled,WFHotKeyCallback _Nonnull callback,void * _Nonnull context,int32_t * _Nonnull rollback);
+void WFStopApplicationHotKeys(void);

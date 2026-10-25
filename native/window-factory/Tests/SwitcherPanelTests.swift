@@ -171,7 +171,7 @@ import AppKit
         let settings = SettingsWindow(store:settingsStore,preferences:FactoryPreferences())
         settings.refresh(); settings.window.contentView!.layoutSubtreeIfNeeded()
         let settingsTabs = settings.window.contentView!.subviews.compactMap{$0 as? NSTabView}.first!
-        check(settingsTabs.tabViewItems.map(\.label) == ["General","Shortcuts","Layouts","About"],"Settings separates preferences, shortcuts, data and app information")
+        check(settingsTabs.tabViewItems.map(\.label) == ["General","Shortcuts","Applications","Layouts","About"],"Settings separates preferences, shortcuts, data and app information")
         check(settings.window.frame.height<=(NSScreen.main?.visibleFrame.height ?? 2000),"Settings fits usable display height")
         try ShortcutValidation.validate([:])
         let definitions = ShortcutDefinition.all
@@ -262,6 +262,46 @@ import AppKit
         check((attributes.attribute(.kern,at:0,effectiveRange:nil) as? NSNumber)?.doubleValue == ShortcutChord.modifierTracking,"Settings modifier symbols receive subtle tracking")
         check(attributes.attribute(.kern,at:nextSize.standard.modifierLabel.utf16.count-1,effectiveRange:nil) == nil,"no tracking trails the last modifier")
         check(recorder.title == nextSize.standard.label,"visual formatting preserves shortcut text")
+        let appSuite = "WindowFactory.AppLaunchTest.\(UUID().uuidString)"
+        let appDefaults = UserDefaults(suiteName:appSuite)!
+        defer { appDefaults.removePersistentDomain(forName:appSuite) }
+        let appRoot = URL(fileURLWithPath:NSTemporaryDirectory()).appendingPathComponent("wf-app-fixture-\(UUID().uuidString)")
+        let appURL = appRoot.appendingPathComponent("Fixture.app")
+        try FileManager.default.createDirectory(at:appURL.appendingPathComponent("Contents"),withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:appRoot) }
+        let appInfo = ["CFBundleIdentifier":"local.fixture.launch","CFBundleName":"Fixture App","CFBundleVersion":"1","CFBundlePackageType":"APPL"]
+        try PropertyListSerialization.data(fromPropertyList:appInfo,format:.xml,options:0).write(to:appURL.appendingPathComponent("Contents/Info.plist"))
+        let appKeys = KeybindingStore(defaults:appDefaults)
+        let apps = ApplicationLauncher(defaults:appDefaults,shortcuts:appKeys,live:false)
+        check(apps.entries.count == 1 && apps.entries[0].isSearch && !apps.entries[0].enabled,"new Applications search command starts unassigned and disabled")
+        let fixtureID = try apps.add(appURL)
+        check(try apps.add(appURL) == fixtureID && apps.entries.count == 2,"app picker identity deduplicates by bundle ID")
+        let rexChord = ShortcutChord(key:17,modifiers:ShortcutChord.hyper,name:"T")
+        try apps.setShortcut(rexChord,id:fixtureID)
+        check(!apps.entries.first{$0.id==fixtureID}!.enabled,"recording does not silently claim a shortcut")
+        try apps.setEnabled(true,id:fixtureID)
+        let savedApps = appDefaults.data(forKey:"applicationLaunchers.v1")!
+        check(ApplicationLauncher(defaults:appDefaults,shortcuts:appKeys,live:false).entries == apps.entries,"selected app and chord/enabled state persist together")
+        do {try apps.setShortcut(ShortcutChord(key:1,modifiers:ShortcutChord.hyper,name:"S"),id:fixtureID);check(false,"stash clash must fail")} catch {check(true,"app shortcuts reject existing window-command clashes")}
+        check(appDefaults.data(forKey:"applicationLaunchers.v1") == savedApps && apps.entries.first{$0.id==fixtureID}!.shortcut == rexChord,"rejected app binding preserves old configuration")
+        let fixedManager = KeybindingManager(store:appKeys);fixedManager.additionalShortcuts = {apps.reservedShortcuts}
+        do {try fixedManager.set(rexChord,for:nextSize);check(false,"fixed command must reject app clash")}catch{check(true,"window-command editor rejects app-binding collisions before OS changes")}
+        try apps.configureSearchShortcut(ShortcutChord(key:0,modifiers:ShortcutChord.hyper,name:"A"),enabled:false)
+        do {try apps.setShortcut(ShortcutChord(key:0,modifiers:ShortcutChord.hyper,name:"A"),id:fixtureID);check(false,"search shortcut clash must fail")}catch{check(true,"search and app chords share collision validation")}
+        reference.applications = apps;reference.refresh()
+        check(referenceText.string.contains("APPLICATIONS") && referenceText.string.contains("Open Fixture App"),"shortcut reference reads current application records")
+        try apps.setEnabled(false,id:fixtureID);try apps.setShortcut(nil,id:fixtureID)
+        check(apps.entries.first{$0.id==fixtureID}!.shortcut == nil,"clearing a shortcut retains the app entry")
+        let alternateURL = appRoot.appendingPathComponent("Moved Fixture.app")
+        try FileManager.default.copyItem(at:appURL,to:alternateURL)
+        check(try apps.add(alternateURL) == fixtureID && apps.entries.first{$0.id==fixtureID}!.path == alternateURL.path,"reselecting a relocated app refreshes its path without losing identity")
+        try apps.remove(fixtureID)
+        check(apps.entries.count == 1 && apps.entries[0].isSearch,"removing an app does not remove Applications search")
+        check(try settingsStore.catalog.encoded() == catalogBeforeOrdering,"application configuration never changes saved layout recipes")
+        appDefaults.set(Data("invalid".utf8),forKey:"applicationLaunchers.v1")
+        let invalidApps = ApplicationLauncher(defaults:appDefaults,shortcuts:appKeys,live:false)
+        check(invalidApps.loadError != nil,"invalid app configuration is explicit")
+        do {_ = try invalidApps.add(appURL);check(false,"invalid saved state must not be overwritten")}catch{check(appDefaults.data(forKey:"applicationLaunchers.v1") == Data("invalid".utf8),"corrupt app settings are preserved for recovery")}
         reference.stop()
         settings.stop()
         print("native switcher panel: \(assertions) assertions passed; no windows shown or controlled")

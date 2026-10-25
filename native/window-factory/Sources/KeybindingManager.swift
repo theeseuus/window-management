@@ -3,11 +3,12 @@ import AppKit
 @MainActor
 final class KeybindingManager {
     let store: KeybindingStore
+    var additionalShortcuts: ()->[(String,ShortcutChord)] = { [] }
     var changed: (() -> Void)?
     var recoverRegistrations: (() -> Void)?
     init(store: KeybindingStore) { self.store = store }
     func configure(_ draft: [String:ShortcutChord]) throws {
-        try ShortcutValidation.validate(draft)
+        try ShortcutValidation.validate(draft,additional:additionalShortcuts())
         let definitions = ShortcutDefinition.all
         let signatures = definitions.map{$0.group.signature},indices = definitions.map(\.index)
         let chords = definitions.map{draft[$0.id] ?? $0.standard}
@@ -29,7 +30,7 @@ final class KeybindingManager {
     private func commit(_ draft: [String:ShortcutChord]) throws {
         // Encode before changing live registrations; persistence has no throwing
         // work left after the operating system accepts the complete draft.
-        try ShortcutValidation.validate(draft)
+        try ShortcutValidation.validate(draft,additional:additionalShortcuts())
         let data = try JSONEncoder().encode(ShortcutEnvelope(version:1,overrides:draft))
         try configure(draft); store.commit(draft,data:data); changed?()
     }
@@ -40,12 +41,14 @@ final class ShortcutRecorder: NSButton {
     static weak var current: ShortcutRecorder?
     let definition: ShortcutDefinition
     private weak var manager: KeybindingManager?
+    private let readChord: (() -> ShortcutChord?)?
+    private let saveChord: ((ShortcutChord) throws -> Void)?
     private var monitor: Any?,observer: NSObjectProtocol?
     private var recording = false,accepted = false
     var isRecording: Bool { recording }
     var finished: (() -> Void)?
-    init(_ definition: ShortcutDefinition,manager: KeybindingManager?) {
-        self.definition = definition; self.manager = manager
+    init(_ definition: ShortcutDefinition,manager: KeybindingManager?,read: (() -> ShortcutChord?)? = nil,save: ((ShortcutChord) throws -> Void)? = nil) {
+        self.definition = definition; self.manager = manager; self.readChord = read; self.saveChord = save
         super.init(frame:.zero)
         bezelStyle = .rounded; target = self; action = #selector(start)
         setAccessibilityLabel("\(definition.title) shortcut"); displayChord()
@@ -58,13 +61,14 @@ final class ShortcutRecorder: NSButton {
         alignment = .right; attributedTitle = text
     }
     private func displayChord() {
-        let chord = manager?.store.chord(definition) ?? definition.standard
+        let value = readChord.map{$0()} ?? (manager?.store.chord(definition) ?? definition.standard)
+        guard let chord = value else { caption("Record…");setAccessibilityValue("No shortcut");return }
         caption(chord.label,modifierCount:chord.modifierLabel.utf16.count); setAccessibilityValue(chord.label)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override var acceptsFirstResponder: Bool { true }
     @objc private func start() {
-        guard manager != nil,let window else { return }
+        guard manager != nil || saveChord != nil,let window else { return }
         window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
         Self.current?.cancel(); Self.current = self
         window.makeFirstResponder(self); recording = true; accepted = false; caption("Press shortcut"); setAccessibilityValue("Recording")
@@ -99,7 +103,8 @@ final class ShortcutRecorder: NSButton {
         guard recording,!accepted,window?.isKeyWindow == true,NSApp.isActive else { return }
         if key == 53 { cancel(); return }
         do {
-            try manager?.set(ShortcutChord(key:key,modifiers:modifiers,name:ShortcutChord.keyName(key)),for:definition)
+            let chord = ShortcutChord(key:key,modifiers:modifiers,name:ShortcutChord.keyName(key))
+            if let saveChord { try saveChord(chord) } else { try manager?.set(chord,for:definition) }
             accepted = true; displayChord()
         } catch {
             let owner = window; cancel()

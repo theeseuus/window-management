@@ -2,6 +2,8 @@ import AppKit
 
 @MainActor
 final class FactoryApp: NSObject, NSApplicationDelegate {
+    var applications: ApplicationLauncher?
+    var applicationSearch: ApplicationsWindow?
     var library: LibraryWindow?
     var settings: SettingsWindow?
     var shortcutReference: ShortcutReferenceWindow?
@@ -47,6 +49,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             let preferences = FactoryPreferences()
             let bindings = preview ? nil : KeybindingManager(store:preferences.shortcuts)
             keybindings = bindings
+            let appLauncher = ApplicationLauncher(shortcuts:preferences.shortcuts,live:!preview);applications=appLauncher
+            bindings?.additionalShortcuts = { [weak appLauncher] in appLauncher?.reservedShortcuts ?? [] }
             try bindings?.restore()
             shortcutReference = ShortcutReferenceWindow(preferences:preferences)
             settings = SettingsWindow(store:store,preferences:preferences,keybindings:bindings)
@@ -62,6 +66,14 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             library?.onSettings = { [weak self] in self?.showSettings(nil) }
             settings?.changed = { [weak self] in self?.library?.applyPreferences() }
             if !preview {
+                let search = ApplicationsWindow(launcher:appLauncher);applicationSearch=search
+                appLauncher.searchRequested = { [weak self] in self?.toggleApplications() }
+                appLauncher.launchFailed = { [weak search] in search?.showError($0) }
+                appLauncher.blocked = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil || NSApp.modalWindow != nil }
+                appLauncher.changed = { [weak self] in self?.settings?.refresh();self?.shortcutReference?.refresh() }
+                settings?.applicationsEditor.connect(appLauncher);shortcutReference?.applications=appLauncher
+                library?.onApplications = { [weak self] in self?.showApplications(nil) };library?.applyPreferences()
+                appLauncher.restore()
                 let launchControls = LauncherControls(preferences:preferences); launcher = launchControls
                 launchControls.toggleLibrary = { [weak self] in self?.toggleLibrary() }
                 launchControls.toggleShortcuts = { [weak self] in self?.toggleShortcuts() }
@@ -155,6 +167,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             switcherItem.target = self
             let shortcutItem = windowMenu.addItem(withTitle:"Keyboard Shortcuts",action:#selector(showShortcuts(_:)),keyEquivalent:"")
             shortcutItem.target = self
+            let appsItem = windowMenu.addItem(withTitle:"Applications",action:#selector(showApplications(_:)),keyEquivalent:"a")
+            appsItem.keyEquivalentModifierMask = [.command,.shift]; appsItem.target = self
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
             NSApp.mainMenu = menu
             loginLaunch = loginLaunch || LauncherControls.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent)
@@ -191,13 +205,22 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
         case .ignore: break
         }
     }
+    func toggleApplications() {
+        guard let search=applicationSearch else{return};let window=search.window
+        switch FactoryLaunchPolicy.libraryAction(visible:window.isVisible,key:window.isKeyWindow,active:NSApp.isActive,onActiveSpace:window.isOnActiveSpace,modal:NSApp.modalWindow != nil || window.attachedSheet != nil) {
+        case .show:search.show()
+        case .close:window.close()
+        case .ignore:break
+        }
+    }
+    @objc func showApplications(_ sender: Any?) { applicationSearch?.show() }
     @objc func showSwitcher(_ sender: Any?) { switcher?.toggle() }
     @objc func showShortcuts(_ sender: Any?) { shortcutReference?.show() }
     @objc func showSettings(_ sender: Any?) { settings?.show() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); launcher?.refreshLoginState(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { applications?.stop();applicationSearch?.stop();agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main

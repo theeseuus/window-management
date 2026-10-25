@@ -43,6 +43,7 @@ final class ShortcutReferenceWindow: NSObject {
             return handled ? nil : event
         }
     }
+    var applications: ApplicationLauncher?
     func refresh() {
         let states: [ShortcutGroup:Bool] = [.geometry:geometry?.active == true,.focus:focus?.active == true,.stash:stash?.active == true,.switcher:switcher?.active == true,.accordion:accordion?.active == true,.spaces:spaceMove?.active == true,.library:launcher?.active == true]
         func row(_ modifiers: String,_ key: String,_ action: String) -> String {
@@ -55,6 +56,14 @@ final class ShortcutReferenceWindow: NSObject {
                 return row(chord.modifierLabel,chord.name,$0.title)
             }
             sections.append("\(group.title.uppercased())  [\(states[group] == true ? "On" : "Off")]\n"+rows.joined(separator:"\n"))
+        }
+        if let applications {
+            let rows = applications.entries.compactMap { entry -> String? in
+                guard let chord=entry.shortcut else{return nil}
+                let state=applications.active.contains(entry.id) ? "" : " [Off]"
+                return row(chord.modifierLabel,chord.name,(entry.isSearch ? "Applications search" : "Open "+entry.name)+state)
+            }
+            sections.append("APPLICATIONS\n"+(rows.isEmpty ? "No application shortcuts" : rows.joined(separator:"\n")))
         }
         sections.append("Stashed windows in this app session: \(stash?.count ?? 0)")
         func section(_ title: String,_ rows: [(String,String,String)]) -> String {

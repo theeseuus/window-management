@@ -55,12 +55,11 @@ struct ShortcutDefinition {
 }
 struct ShortcutEnvelope: Codable { let version: Int; let overrides: [String:ShortcutChord] }
 enum ShortcutValidation {
-    static func validate(_ overrides: [String:ShortcutChord]) throws {
+    static func validate(_ overrides: [String:ShortcutChord],additional: [(String,ShortcutChord)] = []) throws {
         let definitions = ShortcutDefinition.all
         guard Set(overrides.keys).isSubset(of:Set(definitions.map(\.id))) else { throw FactoryError("Unknown shortcut command.") }
         var used: [String:String] = [:]
-        for definition in definitions {
-            let chord = overrides[definition.id] ?? definition.standard
+        for (title,chord) in definitions.map({ ($0.title,overrides[$0.id] ?? $0.standard) }) + additional {
             guard chord.key<=127,chord.modifiers & ~(ShortcutChord.hyper|ShortcutChord.shift) == 0,
                   chord.modifiers&ShortcutChord.hyper != 0,chord.key != 53,
                   !chord.name.isEmpty,chord.name.count<=16,!chord.name.unicodeScalars.contains(where:{$0.value<32}) else { throw FactoryError("Use a key with Control, Option or Command.") }
@@ -69,7 +68,7 @@ enum ShortcutValidation {
             if (chord.key == 48 || chord.key == 49) && (chord.modifiers == ShortcutChord.command || chord.modifiers == ShortcutChord.command|ShortcutChord.shift) { throw FactoryError("\(chord.label) is reserved by macOS.") }
             if [UInt32(12),13,43].contains(chord.key) && chord.modifiers == ShortcutChord.command { throw FactoryError("\(chord.label) is reserved for standard app commands.") }
             if let title = used[chord.identity] { throw FactoryError("\(chord.label) is already used by \(title).") }
-            used[chord.identity] = definition.title
+            used[chord.identity] = title
         }
     }
 }

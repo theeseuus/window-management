@@ -20,7 +20,9 @@ static OSStatus unreg(EventHotKeyRef ref) {
 #define WF_REGISTER_OS_HOTKEY reg
 #define WF_UNREGISTER_OS_HOTKEY unreg
 #import "../Sources/ShortcutRegistry.h"
+#import "../Sources/ApplicationHotKeys.h"
 static UInt32 captured;
+static void appInvoke(uint32_t index,void *context) { (void)index;(void)context; }
 static void capture(uint32_t key,uint32_t mods,void *context) { (void)mods;(void)context;captured=key; }
 int main(void) {
     EventHotKeyRef a=NULL,b=NULL,escape[4]={NULL};
@@ -61,5 +63,19 @@ int main(void) {
     assert(WFRegisterConfiguredHotKey(44,referenceModifiers,(EventHotKeyID){'WFLA',1},NULL,0,&reference)==noErr);
     WFSetShortcutCapture(capture,NULL);assert(WFHandleShortcutCapture((EventHotKeyID){'WFLA',1}) && captured==44);
     WFSetShortcutCapture(NULL,NULL);assert(WFUnregisterConfiguredHotKey(reference)==noErr);
+    // The independent app owner must not release or rewrite any fixed control.
+    assert(WFRegisterConfiguredHotKey(44,referenceModifiers,(EventHotKeyID){'WFLA',1},NULL,0,&reference)==noErr);
+    int32_t appRollback=0;
+    assert(WFConfigureApplicationHotKey(1,17,mods[0],YES,appInvoke,&captured,&appRollback)==noErr);
+    EventHotKeyRef appKey=wfAppKeys[1].ref;
+    assert(fake[(uintptr_t)appKey].key==17);
+    blockedKey=82;
+    assert(WFConfigureApplicationHotKey(1,82,mods[0],YES,appInvoke,&captured,&appRollback)!=noErr && appRollback==0);
+    assert(fake[(uintptr_t)wfAppKeys[1].ref].key==17);
+    blockedKey=-1;
+    assert(WFConfigureApplicationHotKey(65,0,mods[0],YES,appInvoke,&captured,&appRollback)==paramErr);
+    assert(WFConfigureApplicationHotKey(1,17,mods[0],NO,appInvoke,&captured,&appRollback)==noErr);
+    WFStopApplicationHotKeys();
+    assert(reference && fake[(uintptr_t)reference].key==44);assert(WFUnregisterConfiguredHotKey(reference)==noErr);
     puts("native shortcut registry: configured/live bindings, capture, shared Escape IDs, rejection and rollback passed; no OS hotkeys registered");
 }

@@ -143,6 +143,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
     let preferences: FactoryPreferences
     let store: LayoutStore
     let tabs = NSTabView()
+    let applicationsEditor = ApplicationsEditor()
     let shortcutEditor: ShortcutEditor
     var changed: (() -> Void)?
     var onShortcuts: (() -> Void)?
@@ -180,7 +181,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         loginSettings.target = self; loginSettings.action = #selector(openLoginSettings); loginSettings.bezelStyle = .rounded
         let permission = NSButton(title:"Accessibility Settings…",target:self,action:#selector(openAccess)); permission.bezelStyle = .rounded
         let general = Self.page([Self.row("Dock icon",dockIcon),Self.row("Menu-bar indicator",indicatorEnabled),Self.row("Start at login",loginEnabled),loginSettings,Self.row("Keep library on top",floating),Self.row("Shortcuts on buttons",hints),Self.row("Agent access",agentAccess),Self.row("Accessibility",access),permission])
-        addTab("General",general); addTab("Shortcuts",shortcutEditor.view)
+        addTab("General",general); addTab("Shortcuts",shortcutEditor.view); addTab("Applications",applicationsEditor.view)
         shortcutEditor.isEnabled = { [weak self] in self?.groupEnabled($0) ?? false }
         shortcutEditor.changeEnabled = { [weak self] in self?.changeGroup($0,enabled:$1) }
         for (button,action) in [(importButton,#selector(importLayouts)),(exportButton,#selector(exportLayouts)),(reportButton,#selector(lastReport))] { button.target = self; button.action = action; button.bezelStyle = .rounded }
@@ -268,7 +269,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         access.stringValue = AXIsProcessTrusted() ? "Allowed" : "Not allowed"
         let available = layoutActionsAvailable?() == true
         importButton.isEnabled = available; exportButton.isEnabled = available; reportButton.isEnabled = onReport != nil
-        shortcutEditor.refresh()
+        shortcutEditor.refresh(); applicationsEditor.refresh()
     }
     func show() { launcher?.refreshLoginState(); window.level = preferences.keepLibraryOnTop ? .floating : .normal; refresh(); window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true) }
     func windowWillClose(_ notification: Notification) { shortcutEditor.cancelRecording() }

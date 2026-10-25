@@ -42,6 +42,8 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     let preferences: FactoryPreferences
     var onShortcuts: (() -> Void)?
     var onSettings: (() -> Void)?
+    var onApplications: (() -> Void)?
+    let applicationsButton = NSButton(title:"Applications",target:nil,action:nil)
     let shortcutHints = NSTextField(labelWithString:"↑↓ Select   ↩ Restore   ⌘↩ Establish   ⌘N Capture   ⌘F Search   ⎋ Cancel/Close")
     let search = NSSearchField(), table = LayoutTableView(), drawing = PreviewView()
     let status = NSTextField(wrappingLabelWithString:"")
@@ -98,7 +100,8 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         name.placeholderString = "Name the captured layout"; name.target = self; name.action = #selector(saveCapture)
         for view in [nameLabel,name,save,cancel] { naming.addArrangedSubview(view) }; naming.orientation = .horizontal
         name.widthAnchor.constraint(greaterThanOrEqualToConstant:180).isActive = true
-        let header = NSStackView(views:[search,capture]); header.spacing = 10
+        applicationsButton.target = self; applicationsButton.action = #selector(openApplications); applicationsButton.bezelStyle = .rounded
+        let header = NSStackView(views:[search,applicationsButton,capture]); header.spacing = 10
         search.setContentHuggingPriority(.defaultLow,for:.horizontal)
         search.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
         for icon in [permission,shortcuts,delete] {
@@ -137,6 +140,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     func applyPreferences() {
         window.level = preferences.keepLibraryOnTop ? .floating : .normal
         shortcutHints.isHidden = true
+        applicationsButton.isEnabled = onApplications != nil
         let reference = ShortcutDefinition.all.first{$0.id == "library.1"}!
         shortcuts.title = ""; shortcuts.imagePosition = .imageOnly
         shortcuts.toolTip = "Keyboard Shortcuts — " + preferences.shortcuts.chord(reference).actionHint
@@ -164,6 +168,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     }
     func windowDidChangeScreen(_ notification: Notification) { updatePreviewAspect(); table.reloadData() }
     @objc func openShortcuts() { onShortcuts?() }
+    @objc func openApplications() { onApplications?() }
     @objc func openSettings() { onSettings?() }
     @objc func focusSearch() { if task == nil && frozen == nil { window.makeFirstResponder(search) } }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
