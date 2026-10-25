@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-final class SpaceIndicator: NSObject, NSMenuDelegate {
+final class SpaceIndicator: NSObject, NSMenuDelegate, NSMenuItemValidation {
     private let preferences: FactoryPreferences
     private var item: NSStatusItem?
     private var observers: [(NotificationCenter,NSObjectProtocol)] = []
@@ -13,6 +13,8 @@ final class SpaceIndicator: NSObject, NSMenuDelegate {
     var changed: (() -> Void)?
     var openLibrary: (() -> Void)?
     var openSettings: (() -> Void)?
+    var newCodexWindow: (()->Void)?
+    var newCodexAvailable: (()->Bool)?
     var openTiling: (()->Void)?
     var openShortcuts: (() -> Void)?
     init(preferences: FactoryPreferences) { self.preferences = preferences; super.init() }
@@ -36,7 +38,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate {
         let menu = NSMenu(),description = NSMenuItem(title:"Reading active Space…",action:nil,keyEquivalent:"")
         menu.delegate = target
         description.isEnabled = false; menu.addItem(description); menu.addItem(.separator())
-        for (title,selector,id) in [("Open Window Factory",#selector(showLibrary),"library.0"),("Settings…",#selector(showSettings),"settings"),("Keyboard Shortcuts…",#selector(showShortcuts),"library.1"),("Tiling…",#selector(showTiling),"tiling")] {
+        for (title,selector,id) in [("Open Window Factory",#selector(showLibrary),"library.0"),("Settings…",#selector(showSettings),"settings"),("Keyboard Shortcuts…",#selector(showShortcuts),"library.1"),("Tiling…",#selector(showTiling),"tiling"),("New Codex Window Here",#selector(createCodexWindow),"codex.new-window")] {
             let entry = menu.addItem(withTitle:title,action:selector,keyEquivalent:""); entry.target = target; entry.identifier = NSUserInterfaceItemIdentifier(id)
         }
         let settings = menu.items.first{$0.identifier?.rawValue == "settings"}!
@@ -55,7 +57,8 @@ final class SpaceIndicator: NSObject, NSMenuDelegate {
         }
     }
     func refreshMenuShortcuts() { if let menu = item?.menu { Self.updateShortcuts(in:menu,preferences:preferences) } }
-    func menuNeedsUpdate(_ menu: NSMenu) { Self.updateShortcuts(in:menu,preferences:preferences) }
+    func validateMenuItem(_ menuItem: NSMenuItem)->Bool { menuItem.identifier?.rawValue == "codex.new-window" ? newCodexAvailable?() == true : true }
+    func menuNeedsUpdate(_ menu: NSMenu) { Self.updateShortcuts(in:menu,preferences:preferences);menu.items.first{$0.identifier?.rawValue == "codex.new-window"}?.isEnabled = newCodexAvailable?() == true }
     private func observe(_ center: NotificationCenter,_ name: Notification.Name) {
         let token = center.addObserver(forName:name,object:nil,queue:.main) { [weak self] _ in
             MainActor.assumeIsolated { self?.scheduleRefresh() }
@@ -129,6 +132,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate {
         }
         image.isTemplate = true; return image
     }
+    @objc private func createCodexWindow() { newCodexWindow?() }
     @objc private func showTiling() { openTiling?() }
     @objc private func showLibrary() { openLibrary?() }
     @objc private func showSettings() { openSettings?() }

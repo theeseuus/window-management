@@ -1560,3 +1560,38 @@ shortcuts, working controls and the Hammerspoon fallback remain unchanged.
 Repository validation was rerun; the prior native regression and 522-assertion
 tiling fixture results remain applicable. Display changes and broader app
 coverage remain open checks.
+
+
+### Build 43 standalone Codex window creation candidate, 2026-10-25
+
+Added New Codex Window Here to Window Factory's menu-bar, Window and own Dock
+menus. Codex's application bundle and Dock menu were not modified. The owner
+reported its missing Dock command; Apple's applicationDockMenu API places custom
+Dock menu ownership with the supplying application.
+
+NewWindowAction is separate from the layout Coordinator and tiling controller.
+Its live backend calls the exact existing canonical Codex adapter through
+MacServices.create, with the current desktop captured before dispatch. Codex
+must already be running. The action dispatches once and waits for a single new
+eligible ID on that desktop; timeout, uncertain command results or context
+changes never trigger a second request or automatic window cleanup. It applies
+no frames and does not explicitly activate an app, pause tiling or manually
+join a window. That leaves insertion to the existing window-event path.
+
+The native suite passed, including 19 injected creation-action assertions and
+522 existing tiling assertions. Fixtures cover duplicate triggers while busy,
+preflight failure, uncertain dispatch, bounded timeout, desktop change and
+multiple arrivals. The final signed build and repository validation passed.
+No fixture created a live app window or activated Codex.
+
+After the owner ended the previous tiling session and confirmed no stashes,
+build 43 was installed and restarted. Accessibility and Agent access survived;
+all current layout catalog hashes and product setting values were unchanged.
+Retention left two distinct backup builds. The installed Window-menu command
+was inspected without invoking it. Live Codex creation and automatic insertion,
+and real Dock-menu interaction, remain pending owner operation. Direct desktop
+automation inspection of Codex was refused by the tool, so that restriction was
+left in place; no alternate UI-automation path was used to control Codex.
+
+Existing geometry/focus/stash/switcher/accordion/Space algorithms, shortcut
+defaults and the Hammerspoon fallback were unchanged.

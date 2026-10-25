@@ -170,6 +170,27 @@ the selected app normally. App launching does not establish a layout, move windo
 or restore app content. Applications search and launch shortcuts are not CLI
 endpoints; existing Agent access remains separately controlled.
 
+## New Codex window on the current desktop
+
+**New Codex Window Here** is available in Window Factory's numbered menu-bar
+badge, Window menu and its own Dock menu. It does not modify Codex's Dock menu.
+Codex must already be running. The action targets the installed adapter identity
+`com.openai.codex`, reuses `MacServices.create` and the canonical File/New Window
+adapter, and checks for one newly eligible window on the captured desktop.
+
+This action does not use the layout Coordinator, apply frames, explicitly
+activate Codex, or pause/rejoin the tiler. It is suitable for testing whether
+a window arrives through normal automatic tiling insertion. Establish retains
+its existing pause-and-place semantics. No new global shortcut or CLI command
+is added.
+
+The action issues at most one creation request, then performs bounded discovery.
+A desktop/display change, an ambiguous arrival or a timeout is reported without
+resending the request or closing any window. Existing windows are not selected
+as the result. While a conflicting operation is busy, the menu-bar/Dock action
+is unavailable. App-side behavior still needs a live current-desktop test; see
+the dated acceptance records in DEVELOPMENT.md.
+
 ## Configurable shortcuts and Settings
 
 Settings has General, Shortcuts, Applications, Layouts, About and Tiling tabs.

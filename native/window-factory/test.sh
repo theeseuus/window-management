@@ -108,3 +108,12 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit \
     -o "$native_root/.build/tiling-tests"
 "$native_root/.build/tiling-tests"
+
+# Single-window creation fixture never dispatches native application commands.
+xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
+    -module-cache-path "$native_root/.build/ModuleCache" \
+    -import-objc-header "$native_root/Sources/Bridge.h" \
+    "$@" "$native_root/Tests/NewWindowTests.swift" "$native_root/.build/panel-test-bridge.o" \
+    -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit \
+    -o "$native_root/.build/new-window-tests"
+"$native_root/.build/new-window-tests" "$native_root/Resources/adapters.json"
