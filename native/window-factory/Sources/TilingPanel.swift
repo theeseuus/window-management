@@ -285,6 +285,9 @@ final class TilingPanel: NSObject {
 @MainActor
 final class TilingSettings: NSObject {
   let view = NSView()
+  let session = NSSwitch()
+  private weak var controller: TilingController?
+  private let sessionStatus = NSTextField(wrappingLabelWithString: "")
   private let options: TilingOptions, gap = NSStepper(), margin = NSStepper(),
     axis = NSPopUpButton(), excluded = NSPopUpButton()
   private let gapLabel = NSTextField(labelWithString: ""),
@@ -292,6 +295,11 @@ final class TilingSettings: NSObject {
   init(options: TilingOptions) {
     self.options = options
     super.init()
+    session.target = self
+    session.action = #selector(changeSession)
+    session.isEnabled = false
+    sessionStatus.textColor = .secondaryLabelColor
+    sessionStatus.isHidden = true
     gap.minValue = 0
     gap.maxValue = 48
     gap.increment = 2
@@ -311,6 +319,7 @@ final class TilingSettings: NSObject {
     let add = NSButton(title: "Add…", target: self, action: #selector(addApp))
     let remove = NSButton(title: "Remove", target: self, action: #selector(removeApp))
     let stack = NSStackView(views: [
+      row("Tiling session", session), sessionStatus,
       row("Window gaps", NSStackView(views: [gapLabel, gap])),
       row("Outer margins", NSStackView(views: [marginLabel, margin])), row("New split", axis),
       NSTextField(labelWithString: "Excluded applications"),
@@ -327,6 +336,24 @@ final class TilingSettings: NSObject {
       stack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
     ])
     refresh()
+  }
+  func connect(_ controller: TilingController) {
+    self.controller = controller
+    refreshSession()
+  }
+  func refreshSession() {
+    session.state = controller?.enabled == true ? .on : .off
+    session.isEnabled = controller != nil && controller?.isBusy != true
+    let detail =
+      controller.map { $0.paused || $0.message == "Tiling on another desktop" ? $0.message : "" }
+      ?? ""
+    sessionStatus.stringValue = detail
+    sessionStatus.isHidden = detail.isEmpty
+  }
+  @objc private func changeSession() {
+    guard let controller else { return }
+    if controller.enabled { controller.disable() } else { controller.enable() }
+    refreshSession()
   }
   private func row(_ title: String, _ control: NSView) -> NSView {
     control.setAccessibilityLabel(title)

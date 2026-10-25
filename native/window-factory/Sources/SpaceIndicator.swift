@@ -13,6 +13,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate, NSMenuItemValidation {
     var changed: (() -> Void)?
     var openLibrary: (() -> Void)?
     var openSettings: (() -> Void)?
+    var tilingChord: (()->ShortcutChord?)?
     var newCodexChord: (()->ShortcutChord?)?
     var newCodexWindow: (()->Void)?
     var newCodexAvailable: (()->Bool)?
@@ -57,7 +58,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate, NSMenuItemValidation {
             entry.toolTip = chord.actionHint
         }
     }
-    func refreshMenuShortcuts() { if let menu = item?.menu { Self.updateShortcuts(in:menu,preferences:preferences);if let entry=menu.items.first(where:{$0.identifier?.rawValue == "codex.new-window"}){WindowCreationMenus.applyShortcut(to:entry,chord:newCodexChord?())} } }
+    func refreshMenuShortcuts() { if let menu = item?.menu { Self.updateShortcuts(in:menu,preferences:preferences);if let entry=menu.items.first(where:{$0.identifier?.rawValue == "tiling"}){MenuShortcut.apply(tilingChord?(),to:entry)};if let entry=menu.items.first(where:{$0.identifier?.rawValue == "codex.new-window"}){MenuShortcut.apply(newCodexChord?(),to:entry)} } }
     func validateMenuItem(_ menuItem: NSMenuItem)->Bool { menuItem.identifier?.rawValue == "codex.new-window" ? newCodexAvailable?() == true : true }
     func menuNeedsUpdate(_ menu: NSMenu) { refreshMenuShortcuts();menu.items.first{$0.identifier?.rawValue == "codex.new-window"}?.isEnabled = newCodexAvailable?() == true }
     private func observe(_ center: NotificationCenter,_ name: Notification.Name) {

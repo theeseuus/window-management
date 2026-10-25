@@ -220,6 +220,27 @@ struct TilingTests {
         buttons.contains { $0.keyEquivalent == key && $0.keyEquivalentModifierMask.isEmpty },
         "local panel key \(key) is explicit and does not register a global shortcut")
     }
+    c.disable()
+    windows = []
+    alive = []
+    let tilingSettings = TilingSettings(options: options)
+    tilingSettings.connect(c)
+    c.changed = { [weak tilingSettings] in tilingSettings?.refreshSession() }
+    check(tilingSettings.session.state == .off, "Settings switch mirrors off state")
+    tilingSettings.session.state = .on
+    tilingSettings.session.sendAction(
+      tilingSettings.session.action, to: tilingSettings.session.target)
+    try await settled()
+    check(
+      c.enabled && tilingSettings.session.state == .on,
+      "Settings switch uses same empty-desktop enable path")
+    c.pause()
+    check(tilingSettings.session.state == .on, "pause preserves session enablement")
+    tilingSettings.session.state = .off
+    tilingSettings.session.sendAction(
+      tilingSettings.session.action, to: tilingSettings.session.target)
+    check(
+      !c.enabled && tilingSettings.session.state == .off, "Settings off releases existing session")
     panel.stop()
     c.stop()
     print(

@@ -1650,3 +1650,45 @@ This documentation-only commit changes no executable code, shortcuts, settings,
 working controls or Hammerspoon fallback. Repository validation was rerun; the
 prior native regression results, including 34 creation/shortcut assertions and
 522 tiling assertions, remain applicable.
+
+
+### Build 45 Settings, tiling access and coverage review, 2026-10-25
+
+Added a Tiling session switch in Settings → Tiling, connected to the same
+TilingController enable/disable paths as the panel. It does not create a second
+session owner or persist automatic activation. Switching off releases the session
+and keeps current frames, matching the panel. Added an optional Open / close
+Tiling controls shortcut under Settings → Shortcuts → Library; it starts unassigned,
+toggles only the panel and updates the menu-bar/Window menu hints and reference.
+
+Refactored the New Codex Window optional-key owner into OptionalCommandShortcut,
+reusing the recorder and validation. Its existing preference key and encoded
+chord format remain unchanged; the new tiling-access key has separate storage
+and bridge slot 66. Codex retains slot 65 and apps retain slots 0–64. Library's
+switch controls those optional bindings alongside its two original commands;
+other shortcut groups have independent switches. No master all-groups switch
+was introduced. Menu hint formatting now uses the shared MenuShortcut helper.
+
+Moved Shortcut Reference to General. Tiling inserts before About so About is
+always the rightmost tab and contains app information/diagnostics only.
+The current README now distinguishes accepted tiling pilots, remaining live
+checks and deferred features. CLI.md records the live nine-command protocol and
+a prioritized gap review. No CLI endpoint or permission expansion was added.
+Application icon design is recorded as a later step after Settings acceptance
+and CLI priorities are settled; no icon asset is selected in this update.
+
+The native suite passed, including 269 AppKit checks, 526 tiling checks and 40
+creation/optional-shortcut checks. Fixtures exercise the Settings switch through
+an injected empty desktop, preservation of the old Codex chord, independent keys,
+reference/menu hints and tab/button placement. Signed build and repository
+validation passed. No fixture moved live application windows.
+
+Before installation, tiling was off and no stashed windows remained. Signed build
+45 was installed and restarted. Accessibility and Agent access stayed enabled;
+both layout catalogs and all existing product settings, including the owner's
+New Codex Window binding, matched their pre-install hashes. Two distinct backup
+builds remained. The installed UI showed the Settings switch off, About last,
+Shortcut Reference in General, the preserved Codex chord and the new row unassigned.
+Normal owner shortcut/toggle interaction acceptance remains pending. Desktop
+automation was left idle for the recording check. All existing control algorithms
+and the Hammerspoon fallback were unchanged.

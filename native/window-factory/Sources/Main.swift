@@ -2,7 +2,8 @@ import AppKit
 
 @MainActor
 final class FactoryApp: NSObject, NSApplicationDelegate {
-    var newWindowShortcut: NewWindowShortcut?
+    var tilingShortcut: OptionalCommandShortcut?
+    var newWindowShortcut: OptionalCommandShortcut?
     var newWindow: NewWindowAction?
     private let newWindowHUD = GeometryHUD()
     var tiling: TilingFeature?
@@ -54,14 +55,17 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             let bindings = preview ? nil : KeybindingManager(store:preferences.shortcuts)
             keybindings = bindings
             let appLauncher = ApplicationLauncher(shortcuts:preferences.shortcuts,live:!preview);applications=appLauncher
-            let creationKey = preview ? nil : NewWindowShortcut(store:preferences.shortcuts,others:{[weak appLauncher] in appLauncher?.reservedShortcuts ?? []});newWindowShortcut=creationKey
+            let creationKey = preview ? nil : OptionalCommandShortcut(store:preferences.shortcuts,others:{[weak self,weak appLauncher] in (appLauncher?.reservedShortcuts ?? [])+(self?.tilingShortcut?.reserved ?? [])});newWindowShortcut=creationKey
+            let tilingKey = preview ? nil : OptionalCommandShortcut(command:.tilingControls,store:preferences.shortcuts,others:{[weak creationKey,weak appLauncher] in (appLauncher?.reservedShortcuts ?? [])+(creationKey?.reserved ?? [])});tilingShortcut=tilingKey
+            let optionalKeys=[creationKey,tilingKey].compactMap{$0}
             creationKey?.action = { [weak self] in self?.newCodexWindow(nil) }
-            appLauncher.additionalShortcuts = { [weak creationKey] in creationKey?.reserved ?? [] }
-            bindings?.additionalShortcuts = { [weak appLauncher,weak creationKey] in (appLauncher?.reservedShortcuts ?? [])+(creationKey?.reserved ?? []) }
+            tilingKey?.action = { [weak self] in self?.showTiling(nil) }
+            appLauncher.additionalShortcuts = { [weak self] in (self?.newWindowShortcut?.reserved ?? [])+(self?.tilingShortcut?.reserved ?? []) }
+            bindings?.additionalShortcuts = { [weak self,weak appLauncher] in (appLauncher?.reservedShortcuts ?? [])+(self?.newWindowShortcut?.reserved ?? [])+(self?.tilingShortcut?.reserved ?? []) }
             try bindings?.restore()
             shortcutReference = ShortcutReferenceWindow(preferences:preferences)
             settings = SettingsWindow(store:store,preferences:preferences,keybindings:bindings)
-            settings?.shortcutEditor.newWindow=creationKey;shortcutReference?.newWindow=creationKey
+            settings?.shortcutEditor.optionalCommands=optionalKeys;shortcutReference?.optionalCommands=optionalKeys
             library = LibraryWindow(store:store,registry:registry,preview:preview,preferences:preferences)
             settings?.onImport = { [weak self] in self?.library?.show(); self?.library?.importLayouts() }
             settings?.onExport = { [weak self] in self?.library?.show(); self?.library?.exportLayouts() }
@@ -79,15 +83,15 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 appLauncher.launchFailed = { [weak search] in search?.showError($0) }
                 appLauncher.blocked = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil || NSApp.modalWindow != nil }
                 appLauncher.changed = { [weak self] in self?.settings?.refresh();self?.shortcutReference?.refresh() }
-                creationKey?.changed = { [weak self] in self?.shortcutReference?.refresh();self?.spaceIndicator?.refreshMenuShortcuts();if let menu=NSApp.mainMenu?.items.first(where:{$0.submenu?.title == "Window"})?.submenu,let item=menu.items.first(where:{$0.identifier?.rawValue == "codex.new-window"}){WindowCreationMenus.applyShortcut(to:item,chord:self?.newWindowShortcut?.chord)} }
+                for key in optionalKeys {key.changed = { [weak self] in self?.refreshOptionalCommandMenus() }}
                 settings?.applicationsEditor.connect(appLauncher);shortcutReference?.applications=appLauncher
                 library?.onApplications = { [weak self] in self?.showApplications(nil) };library?.applyPreferences()
                 appLauncher.restore()
                 let launchControls = LauncherControls(preferences:preferences); launcher = launchControls
                 launchControls.toggleLibrary = { [weak self] in self?.toggleLibrary() }
                 launchControls.toggleShortcuts = { [weak self] in self?.toggleShortcuts() }
-                launchControls.changed = { [weak self,weak creationKey,weak launchControls] in
-                    do {try creationKey?.setOwnerEnabled(launchControls?.active == true)}catch{self?.library?.status.stringValue=error.localizedDescription}
+                launchControls.changed = { [weak self,weak launchControls] in
+                    for key in optionalKeys {do {try key.setOwnerEnabled(launchControls?.active == true)}catch{self?.library?.status.stringValue=error.localizedDescription}}
                     self?.settings?.refresh(); self?.shortcutReference?.refresh()
                 }
                 settings?.launcher = launchControls; shortcutReference?.launcher = launchControls
@@ -137,7 +141,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             if !preview,let library {
                 let feature=TilingFeature(library:library,geometry:geometry,stash:stash,accordion:accordion,spaceMove:spaceMove,switcher:switcher);tiling=feature
                 settings?.addTiling(feature.settings.view)
-                spaceIndicator?.openTiling = {[weak feature] in feature?.show()}
+                spaceIndicator?.openTiling = {[weak feature] in feature?.toggle()}
+                spaceIndicator?.tilingChord = { [weak tilingKey] in tilingKey?.chord }
                 let creator=NewWindowAction(adapters:library.coordinator.adapters,backend:.live(library.coordinator.services));newWindow=creator
                 creator.blocked = { [weak self] in self?.library?.task != nil || self?.library?.frozen != nil || self?.tiling?.controller.isBusy == true || self?.geometry?.isBusy == true || self?.stash?.isBusy == true || self?.accordion?.isBusy == true || self?.spaceMove?.isMoving == true || self?.switcher?.isOpen == true || ShortcutRecorder.current?.isRecording == true }
                 creator.changed = { [weak self,weak creator] in guard let creator,!creator.isBusy else{return};self?.newWindowHUD.show(creator.lastResult) }
@@ -190,8 +195,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             shortcutItem.target = self
             let appsItem = windowMenu.addItem(withTitle:"Applications",action:#selector(showApplications(_:)),keyEquivalent:"a")
             appsItem.keyEquivalentModifierMask = [.command,.shift]; appsItem.target = self
-            let tilingItem=windowMenu.addItem(withTitle:"Tiling…",action:#selector(showTiling(_:)),keyEquivalent:"");tilingItem.target=self
-            let newCodex=windowMenu.addItem(withTitle:"New Codex Window",action:#selector(newCodexWindow(_:)),keyEquivalent:"");newCodex.target=self;newCodex.identifier=NSUserInterfaceItemIdentifier("codex.new-window");WindowCreationMenus.applyShortcut(to:newCodex,chord:creationKey?.chord)
+            let tilingItem=windowMenu.addItem(withTitle:"Tiling…",action:#selector(showTiling(_:)),keyEquivalent:"");tilingItem.target=self;tilingItem.identifier=NSUserInterfaceItemIdentifier("tiling.controls");MenuShortcut.apply(tilingKey?.chord,to:tilingItem)
+            let newCodex=windowMenu.addItem(withTitle:"New Codex Window",action:#selector(newCodexWindow(_:)),keyEquivalent:"");newCodex.target=self;newCodex.identifier=NSUserInterfaceItemIdentifier("codex.new-window");MenuShortcut.apply(creationKey?.chord,to:newCodex)
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
             NSApp.mainMenu = menu
             loginLaunch = loginLaunch || LauncherControls.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent)
@@ -236,12 +241,19 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
         case .ignore:break
         }
     }
+    private func refreshOptionalCommandMenus() {
+        shortcutReference?.refresh();spaceIndicator?.refreshMenuShortcuts()
+        guard let menu=NSApp.mainMenu?.items.first(where:{$0.submenu?.title == "Window"})?.submenu else{return}
+        for key in [newWindowShortcut,tilingShortcut].compactMap({$0}) {
+            if let item=menu.items.first(where:{$0.identifier?.rawValue == key.definition.id}) {MenuShortcut.apply(key.chord,to:item)}
+        }
+    }
     func applicationDockMenu(_ sender: NSApplication)->NSMenu? {
         WindowCreationMenus.dock(target:self,open:#selector(openFromDock(_:)),create:#selector(newCodexWindow(_:)),available:newWindow?.available("com.openai.codex") == true,chord:newWindowShortcut?.chord)
     }
     @objc func openFromDock(_ sender: Any?) { library?.show() }
     @objc func newCodexWindow(_ sender: Any?) { newWindow?.run("com.openai.codex") }
-    @objc func showTiling(_ sender: Any?) { tiling?.show() }
+    @objc func showTiling(_ sender: Any?) { tiling?.toggle() }
     @objc func showApplications(_ sender: Any?) { applicationSearch?.show() }
     @objc func showSwitcher(_ sender: Any?) { switcher?.toggle() }
     @objc func showShortcuts(_ sender: Any?) { shortcutReference?.show() }
@@ -249,7 +261,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); launcher?.refreshLoginState(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { newWindowShortcut?.stop();newWindow?.stop();newWindowHUD.stop();tiling?.stop();applications?.stop();applicationSearch?.stop();agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { tilingShortcut?.stop();newWindowShortcut?.stop();newWindow?.stop();newWindowHUD.stop();tiling?.stop();applications?.stop();applicationSearch?.stop();agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main

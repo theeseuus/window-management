@@ -243,3 +243,12 @@ and starts unassigned. Keyboard Shortcuts and the menus follow the saved chord;
 resetting that row clears it. The Library group switch releases the binding.
 The command keeps its current-desktop creation behavior independently of its name
 and shortcut. See [Window Factory](native/window-factory/README.md#new-codex-window-on-the-current-desktop).
+
+
+## Tiling controls access
+
+The optional **Open / close Tiling controls** command is configured in Settings →
+Shortcuts → Library. It starts unassigned and toggles the panel; it does not enable
+tiling or place windows by itself. The chosen chord appears in Keyboard Shortcuts
+and the Tiling menu entries. The panel and Settings → Tiling share one session
+switch. About is the rightmost Settings tab; Shortcut Reference is in General.

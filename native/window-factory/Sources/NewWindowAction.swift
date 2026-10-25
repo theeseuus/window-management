@@ -121,12 +121,6 @@ final class NewWindowAction {
 
 @MainActor
 enum WindowCreationMenus {
-  static func applyShortcut(to item: NSMenuItem, chord: ShortcutChord?) {
-    item.keyEquivalent = chord?.menuKeyEquivalent ?? ""
-    item.keyEquivalentModifierMask = chord?.menuModifiers ?? []
-    item.toolTip = chord?.actionHint
-  }
-
   static func dock(
     target: AnyObject?, open: Selector, create: Selector, available: Bool,
     chord: ShortcutChord? = nil
@@ -138,7 +132,7 @@ enum WindowCreationMenus {
     let window = menu.addItem(withTitle: "New Codex Window", action: create, keyEquivalent: "")
     window.target = target
     window.isEnabled = available
-    applyShortcut(to: window, chord: chord)
+    MenuShortcut.apply(chord,to:window)
     return menu
   }
 }

@@ -15,7 +15,11 @@ final class TilingFeature {
       backend: .live(services: library.coordinator.services), options: options, events: events)
     panel = TilingPanel(controller: controller)
     settings = TilingSettings(options: options)
-    controller.changed = { [weak panel] in panel?.refresh() }
+    settings.connect(controller)
+    controller.changed = { [weak panel, weak settings] in
+      panel?.refresh()
+      settings?.refreshSession()
+    }
     controller.externalBusy = {
       [weak library, weak geometry, weak stash, weak accordion, weak spaceMove, weak switcher] in
       library?.task != nil || library?.frozen != nil || geometry?.isBusy == true
@@ -57,6 +61,18 @@ final class TilingFeature {
     }
   }
   func show() { panel.show() }
+  func toggle() {
+    let window = panel.window
+    switch FactoryLaunchPolicy.libraryAction(
+      visible: window.isVisible, key: window.isKeyWindow, active: NSApp.isActive,
+      onActiveSpace: window.isOnActiveSpace,
+      modal: NSApp.modalWindow != nil || window.attachedSheet != nil)
+    {
+    case .show: panel.show()
+    case .close: window.close()
+    case .ignore: break
+    }
+  }
   func stop() {
     controller.stop()
     panel.stop()

@@ -71,7 +71,7 @@ final class ShortcutEditor: NSObject,NSTableViewDataSource,NSTableViewDelegate {
     private let table = NSTableView()
     private var recorders: [ShortcutRecorder] = []
     private let manager: KeybindingManager?
-    var newWindow: NewWindowShortcut? { didSet { changeGroup() } }
+    var optionalCommands: [OptionalCommandShortcut] = [] { didSet { changeGroup() } }
     var isEnabled: ((ShortcutGroup)->Bool)?
     var changeEnabled: ((ShortcutGroup,Bool)->Void)?
     private var definitions: [ShortcutDefinition] = []
@@ -97,7 +97,7 @@ final class ShortcutEditor: NSObject,NSTableViewDataSource,NSTableViewDelegate {
         reset.isEnabled = manager != nil; changeGroup()
     }
     var group: ShortcutGroup { ShortcutGroup.allCases[max(0,groups.indexOfSelectedItem)] }
-    @objc private func changeGroup() { cancelRecording(); definitions = ShortcutDefinition.all.filter{$0.group == group}; if group == .library,newWindow != nil { definitions.append(NewWindowShortcut.definition) }; table.reloadData(); refresh() }
+    @objc private func changeGroup() { cancelRecording(); definitions = ShortcutDefinition.all.filter{$0.group == group}; definitions += optionalCommands.filter{$0.definition.group == group}.map(\.definition); table.reloadData(); refresh() }
     func refresh() { enabled.state = isEnabled?(group) == true ? .on : .off; enabled.isEnabled = manager != nil && changeEnabled != nil; enabled.setAccessibilityLabel("\(group.title) shortcuts") }
     @objc private func toggleGroup() { changeEnabled?(group,enabled.state == .on); refresh() }
     var isRecording: Bool { ShortcutRecorder.current?.isRecording == true }
@@ -111,7 +111,7 @@ final class ShortcutEditor: NSObject,NSTableViewDataSource,NSTableViewDelegate {
             NSLayoutConstraint.activate([label.leadingAnchor.constraint(equalTo:cell.leadingAnchor,constant:4),label.trailingAnchor.constraint(equalTo:cell.trailingAnchor,constant:-4),label.centerYAnchor.constraint(equalTo:cell.centerYAnchor)])
             return cell
         }
-        let custom = definition.id == NewWindowShortcut.definition.id ? newWindow : nil
+        let custom = optionalCommands.first{$0.definition.id == definition.id}
         let recorder: ShortcutRecorder
         if let custom {
             recorder=ShortcutRecorder(definition,manager:nil,read:{[weak custom] in custom?.chord},save:{[weak custom] chord in try custom?.set(chord)})
@@ -123,18 +123,18 @@ final class ShortcutEditor: NSObject,NSTableViewDataSource,NSTableViewDelegate {
         let stack = NSStackView(views:[recorder,reset]); stack.spacing = 8
         recorder.widthAnchor.constraint(equalToConstant:140).isActive = true
         recorders.append(recorder)
-        recorder.finished = { [weak self,weak reset,weak custom] in reset?.isEnabled = definition.id == NewWindowShortcut.definition.id ? custom?.chord != nil : self?.manager?.store.overrides[definition.id] != nil }
+        recorder.finished = { [weak self,weak reset,weak custom] in reset?.isEnabled = custom != nil ? custom?.chord != nil : self?.manager?.store.overrides[definition.id] != nil }
         return stack
     }
     @objc private func resetRow(_ sender: NSButton) {
         cancelRecording()
-        do { if definitions[sender.tag].id == NewWindowShortcut.definition.id {try newWindow?.set(nil)}else{try manager?.set(nil,for:definitions[sender.tag])}; table.reloadData() } catch { showError(error) }
+        do { if let command=optionalCommands.first(where:{$0.definition.id == definitions[sender.tag].id}) {try command.set(nil)}else{try manager?.set(nil,for:definitions[sender.tag])}; table.reloadData() } catch { showError(error) }
     }
     @objc private func resetAll() {
         cancelRecording()
         let alert = NSAlert(); alert.messageText = "Reset all shortcuts?"; alert.addButton(withTitle:"Cancel"); alert.addButton(withTitle:"Reset All")
         if alert.runModal() == .alertSecondButtonReturn {
-            do { try manager?.reset(); try newWindow?.set(nil); table.reloadData() } catch { showError(error) }
+            do { try manager?.reset(); for command in optionalCommands {try command.set(nil)}; table.reloadData() } catch { showError(error) }
         }
     }
     private func showError(_ error: Error) {
@@ -186,7 +186,8 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         hints.target = self; hints.action = #selector(changePreferences)
         loginSettings.target = self; loginSettings.action = #selector(openLoginSettings); loginSettings.bezelStyle = .rounded
         let permission = NSButton(title:"Accessibility Settings…",target:self,action:#selector(openAccess)); permission.bezelStyle = .rounded
-        let general = Self.page([Self.row("Dock icon",dockIcon),Self.row("Menu-bar indicator",indicatorEnabled),Self.row("Start at login",loginEnabled),loginSettings,Self.row("Keep library on top",floating),Self.row("Shortcuts on buttons",hints),Self.row("Agent access",agentAccess),Self.row("Accessibility",access),permission])
+        let shortcuts = NSButton(title:"Shortcut Reference",target:self,action:#selector(openShortcuts)); shortcuts.bezelStyle = .rounded
+        let general = Self.page([Self.row("Dock icon",dockIcon),Self.row("Menu-bar indicator",indicatorEnabled),Self.row("Start at login",loginEnabled),loginSettings,Self.row("Keep library on top",floating),Self.row("Shortcuts on buttons",hints),Self.row("Agent access",agentAccess),Self.row("Accessibility",access),permission,shortcuts])
         addTab("General",general); addTab("Shortcuts",shortcutEditor.view); addTab("Applications",applicationsEditor.view)
         shortcutEditor.isEnabled = { [weak self] in self?.groupEnabled($0) ?? false }
         shortcutEditor.changeEnabled = { [weak self] in self?.changeGroup($0,enabled:$1) }
@@ -197,15 +198,14 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "unknown",build = Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unknown"
         let release = NSTextField(labelWithString:"Version \(version) (\(build))")
         let diagnostics = NSButton(title:"Diagnostics…",target:self,action:#selector(showDiagnostics)); diagnostics.bezelStyle = .rounded
-        let shortcuts = NSButton(title:"Shortcut Reference",target:self,action:#selector(openShortcuts)); shortcuts.bezelStyle = .rounded
-        addTab("About",Self.page([title,release,shortcuts,diagnostics]))
+        addTab("About",Self.page([title,release,diagnostics]))
         monitor = NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
             let handled = MainActor.assumeIsolated { guard let self,event.window === self.window,event.keyCode == 53,!self.shortcutEditor.isRecording else { return false }; self.window.close(); return true }
             return handled ? nil : event
         }
         refresh()
     }
-    func addTiling(_ view: NSView) { addTab("Tiling",view) }
+    func addTiling(_ view: NSView) { let item=NSTabViewItem(identifier:"Tiling");item.label="Tiling";item.view=view;let index=tabs.tabViewItems.firstIndex{$0.label == "About"} ?? tabs.numberOfTabViewItems;tabs.insertTabViewItem(item,at:index) }
     private static func row(_ title: String,_ control: NSView) -> NSView {
         let label = NSTextField(labelWithString:title); label.font = .systemFont(ofSize:13)
         control.setAccessibilityLabel(title)

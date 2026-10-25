@@ -222,6 +222,12 @@ import AppKit
         func allViews(_ root: NSView) -> [NSView] { [root]+root.subviews.flatMap{allViews($0)} }
         let general = settingsTabs.tabViewItems[0].view!,about = settingsTabs.tabViewItems[3].view!
         check(allViews(general).compactMap{$0 as? NSButton}.contains{$0.title == "Accessibility Settings…"},"Accessibility lives in General")
+        check(allViews(general).compactMap{$0 as? NSButton}.contains{$0.title == "Shortcut Reference"},"shortcut reference lives in General")
+        let aboutPageForButtons=settingsTabs.tabViewItems.first{$0.label == "About"}!.view!
+        check(!allViews(aboutPageForButtons).compactMap{$0 as? NSButton}.contains{$0.title == "Shortcut Reference"},"About is limited to app information")
+        settings.addTiling(NSView())
+        check(settingsTabs.tabViewItems.map(\.label)==["General","Shortcuts","Applications","Layouts","Tiling","About"],"About remains far right after Tiling is attached")
+
         check(!allViews(about).compactMap{$0 as? NSButton}.contains{$0.title == "Accessibility Settings…"},"About does not duplicate permission controls")
         let reference = ShortcutReferenceWindow(preferences:dockPreferences)
         reference.refresh(); reference.window.contentView!.layoutSubtreeIfNeeded()

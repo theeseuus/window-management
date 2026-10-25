@@ -48,6 +48,31 @@ arbitrary scripts and arbitrary file paths are not
 exposed in protocol 1. Their working keyboard implementations remain in place.
 Use `capabilities`; do not infer a command from a UI label.
 
+## Coverage review and next increments
+
+Reviewed against the installed capabilities and current native features on
+2026-10-25. Protocol 1 exposes nine commands and covers the accepted saved-layout
+workflow. It does not yet provide agent access to all Window Factory features.
+
+| Area | Current coverage | Proposed next increment |
+| --- | --- | --- |
+| Status and saved layouts | Status, capabilities, active-desktop windows, list, Capture, Restore, Establish, jobs and cancellation | Retain existing behavior and structured receipts |
+| Tiling visibility | Not exposed | Read-only session target, enabled/paused state, tree/ratios, tiled/floating/parked IDs, last result and undo availability |
+| Applications | Not exposed | List/search installed apps and launch/activate by exact bundle identity through ApplicationLauncher |
+| Standalone window creation | Not exposed | Invoke the reviewed NewWindowAction with explicit desktop context and a single-dispatch receipt |
+| Tiling actions | Not exposed | Context-bound enable/disable, pause/resume, split edit, balance/swap, float/rejoin and previous-frame restore through TilingController |
+| Direct controls | Not exposed | Explicit window-ID geometry, focus, stash/restore and Space movement; avoid simulating keys or driving the interactive switcher |
+| Catalog management | Read/list and Capture only | Consider rename/order/delete/import/export separately, with deliberate replacement and recovery semantics |
+| Preferences and bindings | Not exposed | Keep access enablement owner-controlled; shortcut/config editing needs a separate decision |
+
+Recommended sequence is read-only tiling/app visibility first, then application
+and standalone-window actions, then tiling mutations. Direct-control and catalog
+parity can follow demonstrated agent use cases. Any additions must reuse existing
+operation owners, preserve Agent access and same-user checks, require explicit
+window/desktop identities for mutations, define idempotency and cancellation, and
+return observed receipts rather than claim completion at dispatch. UI commands do
+not automatically become agent commands. No API capability is added by this review.
+
 ## Practical use
 
 Run the installed app normally, enable Agent access, then inspect:

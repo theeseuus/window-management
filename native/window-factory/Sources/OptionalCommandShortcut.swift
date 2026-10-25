@@ -5,14 +5,31 @@ struct OptionalShortcutEnvelope: Codable {
   let chord: ShortcutChord
 }
 
-// Optional app command, independent of the established 31 fixed control slots.
-// Slot 65 has its own callback; app search and all 64 app slots keep their owners.
+enum OptionalCommand: CaseIterable {
+  case newCodexWindow, tilingControls
+  var definition: ShortcutDefinition {
+    switch self {
+    case .newCodexWindow:
+      return ShortcutDefinition(
+        id: "codex.new-window", title: "New Codex Window", group: .library, index: 2,
+        standard: ShortcutChord(key: 45, modifiers: ShortcutChord.hyper, name: "N"))
+    case .tilingControls:
+      return ShortcutDefinition(
+        id: "tiling.controls", title: "Open / close Tiling controls", group: .library, index: 3,
+        standard: ShortcutChord(key: 35, modifiers: ShortcutChord.hyper, name: "P"))
+    }
+  }
+  var preference: String {
+    self == .newCodexWindow ? "codexNewWindowShortcut.v1" : "tilingControlsShortcut.v1"
+  }
+  var slot: UInt32 { self == .newCodexWindow ? 65 : 66 }
+}
+
+// Optional commands keep independent registrations and no assigned default chords.
 @MainActor
-final class NewWindowShortcut {
-  static let definition = ShortcutDefinition(
-    id: "codex.new-window", title: "New Codex Window", group: .library, index: 2,
-    standard: ShortcutChord(key: 45, modifiers: ShortcutChord.hyper, name: "N"))
-  private static let preference = "codexNewWindowShortcut.v1"
+final class OptionalCommandShortcut {
+  let command: OptionalCommand
+  var definition: ShortcutDefinition { command.definition }
   private let defaults: UserDefaults, store: KeybindingStore
   private let others: () -> [(String, ShortcutChord)]
   private let live: Bool
@@ -22,48 +39,51 @@ final class NewWindowShortcut {
   private(set) var error: String?
   var action: (() -> Void)?
   var changed: (() -> Void)?
-  var reserved: [(String, ShortcutChord)] { chord.map { [(Self.definition.title, $0)] } ?? [] }
+  var reserved: [(String, ShortcutChord)] { chord.map { [(definition.title, $0)] } ?? [] }
   init(
-    defaults: UserDefaults = .standard, store: KeybindingStore, live: Bool = true,
+    command: OptionalCommand = .newCodexWindow, defaults: UserDefaults = .standard,
+    store: KeybindingStore, live: Bool = true,
     others: @escaping () -> [(String, ShortcutChord)]
   ) {
+    self.command = command
     self.defaults = defaults
     self.store = store
     self.live = live
     self.others = others
-    if let data = defaults.data(forKey: Self.preference) {
+    if let data = defaults.data(forKey: command.preference) {
       do {
         let value = try JSONDecoder().decode(OptionalShortcutEnvelope.self, from: data)
         guard value.version == 1 else {
-          throw FactoryError("Unknown New Codex Window shortcut format.")
+          throw FactoryError("Unknown \(definition.title) shortcut format.")
         }
         try validate(value.chord)
         chord = value.chord
       } catch {
-        self.error = "New Codex Window shortcut could not be loaded: \(error.localizedDescription)"
+        self.error =
+          "\(definition.title) shortcut could not be loaded: \(error.localizedDescription)"
       }
     }
   }
   private func validate(_ chord: ShortcutChord) throws {
     try ShortcutValidation.validateLocalCommand(chord)
     try ShortcutValidation.validate(
-      store.overrides, additional: others() + [(Self.definition.title, chord)])
+      store.overrides, additional: others() + [(definition.title, chord)])
   }
   private func register(_ chord: ShortcutChord?, enabled: Bool) throws {
     if live {
       var rollback: Int32 = 0
       let status = WFConfigureApplicationHotKey(
-        65, chord?.key ?? 0, chord?.modifiers ?? 0, enabled && chord != nil,
+        command.slot, chord?.key ?? 0, chord?.modifiers ?? 0, enabled && chord != nil,
         { _, context in
           MainActor.assumeIsolated {
-            let owner = Unmanaged<NewWindowShortcut>.fromOpaque(context).takeUnretainedValue()
+            let owner = Unmanaged<OptionalCommandShortcut>.fromOpaque(context).takeUnretainedValue()
             owner.action?()
           }
         }, Unmanaged.passUnretained(self).toOpaque(), &rollback)
       guard status == 0 else {
         if rollback != 0 { active = false }
         throw FactoryError(
-          "New Codex Window shortcut is unavailable (status \(status)). Previous settings were kept."
+          "\(definition.title) shortcut is unavailable (status \(status)). Previous settings were kept."
         )
       }
     }
@@ -79,9 +99,9 @@ final class NewWindowShortcut {
     }
     try register(value, enabled: ownerEnabled)
     if let data {
-      defaults.set(data, forKey: Self.preference)
+      defaults.set(data, forKey: command.preference)
     } else {
-      defaults.removeObject(forKey: Self.preference)
+      defaults.removeObject(forKey: command.preference)
     }
     chord = value
     error = nil
@@ -93,7 +113,7 @@ final class NewWindowShortcut {
     do {
       try register(chord, enabled: enabled)
       ownerEnabled = enabled
-      if chord != nil || defaults.object(forKey: Self.preference) == nil { error = nil }
+      if chord != nil || defaults.object(forKey: command.preference) == nil { error = nil }
       changed?()
     } catch {
       self.error = error.localizedDescription

@@ -131,7 +131,7 @@ struct NewWindowTests {
     defer { defaults.removePersistentDomain(forName: suite) }
     let keys = KeybindingStore(defaults: defaults)
     let appChord = ShortcutChord(key: 17, modifiers: ShortcutChord.hyper, name: "T")
-    let key = NewWindowShortcut(
+    let key = OptionalCommandShortcut(
       defaults: defaults, store: keys, live: false, others: { [("Rex", appChord)] })
     check(
       key.chord == nil && !key.active
@@ -144,7 +144,7 @@ struct NewWindowTests {
     check(
       key.chord == chosen && key.active,
       "recording enables optional key only within enabled Library group")
-    let reloaded = NewWindowShortcut(
+    let reloaded = OptionalCommandShortcut(
       defaults: defaults, store: keys, live: false, others: { [("Rex", appChord)] })
     try reloaded.setOwnerEnabled(true)
     check(reloaded.chord == chosen && reloaded.active, "optional binding survives restart")
@@ -179,7 +179,7 @@ struct NewWindowTests {
         "app binding cannot steal optional command key")
     }
     let editor = ShortcutEditor(manager: manager)
-    editor.newWindow = key
+    editor.optionalCommands = [key]
     editor.groups.selectItem(withTitle: "Library")
     editor.groups.sendAction(editor.groups.action, to: editor.groups.target)
     func descendants(_ view: NSView) -> [NSView] {
@@ -188,7 +188,7 @@ struct NewWindowTests {
     let table = descendants(editor.view).compactMap { $0 as? NSTableView }.first!
     check(table.numberOfRows == 3, "Library editor contains optional New Codex Window row")
     let ref = ShortcutReferenceWindow(preferences: FactoryPreferences(defaults: defaults))
-    ref.newWindow = key
+    ref.optionalCommands = [key]
     ref.refresh()
     let text = descendants(ref.window.contentView!).compactMap { $0 as? NSTextView }.first!
     check(
@@ -208,12 +208,61 @@ struct NewWindowTests {
         && defaults.object(forKey: "codexNewWindowShortcut.v1") == nil,
       "clear restores the unassigned default")
     defaults.set(Data("bad".utf8), forKey: "codexNewWindowShortcut.v1")
-    let corrupt = NewWindowShortcut(defaults: defaults, store: keys, live: false, others: { [] })
+    let corrupt = OptionalCommandShortcut(
+      defaults: defaults, store: keys, live: false, others: { [] })
     try corrupt.setOwnerEnabled(true)
     check(
       corrupt.error != nil && corrupt.chord == nil
         && defaults.data(forKey: "codexNewWindowShortcut.v1") == Data("bad".utf8),
       "corrupt optional data does not activate or overwrite existing controls")
+    let pairSuite = "local.windowfactory.optional-pair.\(UUID())"
+    let pairDefaults = UserDefaults(suiteName: pairSuite)!
+    defer { pairDefaults.removePersistentDomain(forName: pairSuite) }
+    let pairStore = KeybindingStore(defaults: pairDefaults)
+    let existing = OptionalCommandShortcut(
+      defaults: pairDefaults, store: pairStore, live: false, others: { [] })
+    try existing.setOwnerEnabled(true)
+    try existing.set(chosen)
+    let preserved = pairDefaults.data(forKey: "codexNewWindowShortcut.v1")!
+    let access = OptionalCommandShortcut(
+      command: .tilingControls, defaults: pairDefaults, store: pairStore, live: false,
+      others: { existing.reserved })
+    check(
+      access.chord == nil && access.command.slot == 66, "tiling access is separately unassigned")
+    do {
+      try access.set(chosen)
+      check(false, "two optional commands cannot share a chord")
+    } catch {
+      check(
+        pairDefaults.data(forKey: "codexNewWindowShortcut.v1") == preserved,
+        "tiling collision preserves Codex binding")
+    }
+    let accessChord = ShortcutChord(key: 32, modifiers: ShortcutChord.hyper, name: "U")
+    try access.setOwnerEnabled(true)
+    try access.set(accessChord)
+    let accessReloaded = OptionalCommandShortcut(
+      command: .tilingControls, defaults: pairDefaults, store: pairStore, live: false,
+      others: { existing.reserved })
+    try accessReloaded.setOwnerEnabled(true)
+    check(
+      accessReloaded.chord == accessChord && existing.chord == chosen
+        && pairDefaults.data(forKey: "codexNewWindowShortcut.v1") == preserved,
+      "new optional binding preserves the original preference format")
+    editor.optionalCommands = [existing, access]
+    check(table.numberOfRows == 4, "Library displays both optional commands")
+    ref.optionalCommands = [existing, access]
+    ref.refresh()
+    check(
+      text.string.contains("\tU\tOpen / close Tiling controls"),
+      "reference follows tiling access binding")
+    let tilingItem = NSMenuItem(title: "Tiling…", action: nil, keyEquivalent: "")
+    MenuShortcut.apply(accessChord, to: tilingItem)
+    check(
+      tilingItem.keyEquivalent == "u" && tilingItem.toolTip == "Tab + U",
+      "tiling menu hint uses shared formatter")
+    access.stop()
+    accessReloaded.stop()
+    existing.stop()
     key.stop()
     reloaded.stop()
     corrupt.stop()

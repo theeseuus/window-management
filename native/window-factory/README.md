@@ -23,7 +23,7 @@ and accepted in Window Factory. No core controller group remains to port.
 | Menu-bar Space badge and app access | Accepted |
 | Library launcher, Dock visibility, optional login startup | Tab+R and Dock visibility accepted; actual login startup remains untested; Settings observed enabled on 2026-10-25 |
 | Capture, Restore, Establish, repeat without duplicates | Accepted Rex/Safari/Codex desktop pilots; all 16 adapters shipped, broader live coverage remains |
-| Configurable keybindings and reference | Accepted; 31 fixed controls plus optional New Codex Window binding; Tab+/ toggles reference |
+| Configurable keybindings and reference | Accepted; 31 fixed controls plus optional New Codex Window and Tiling controls bindings; Tab+/ toggles reference |
 | Library presentation | Thumbnails/icons, Delete/context menu, name-ranked search, optional proportional preview and drag ordering accepted |
 | Binary-tree tiling | Rex/Safari empty-desktop insertion, mixed-app resizing/stash/restore and prior Rex reflow/undo accepted; build 44 New Codex Window shortcut opens on the current Space and joins automatically |
 | Applications and launch shortcuts | Tab+A search, Tab+T Rex activation and Tab+S clash rejection accepted; build 41 installed with bindings retained |
@@ -64,6 +64,12 @@ Remaining verification and polish, before adding a new feature:
 
 Deferred feature choices:
 
+- **Agent CLI coverage:** inventory/app launching, standalone window creation,
+  tiling and direct controls are not all exposed. The phased audit is in
+  [CLI.md](CLI.md#coverage-review-and-next-increments); this UI update does not
+  expand agent access.
+- **Application icon:** develop a visual identity after Settings and the CLI
+  priorities are settled. No icon asset is selected yet.
 - **Custom geometries:** add user-defined size/position geometries later.
 - **Layout editor:** drag/resize the saved window rectangles with save/cancel
   and undo; separate from ordering layout rows.
@@ -76,9 +82,35 @@ Implementation and dated pilot receipts are preserved in
 [development history](DEVELOPMENT.md); the [original transition plan](../../docs/native-window-factory.md)
 is historical planning, not the current backlog.
 
+## Remaining tiling verification
+
+The accepted Rex and mixed Rex/Safari/Codex pilots cover ordinary-desktop tiling,
+preview split resizing, geometry float/rejoin, open/close reflow, mixed-app
+stash/restore, Rex previous-position restoration, empty-desktop Rex/Safari
+insertion, and Codex insertion via the New Codex Window shortcut.
+
+Remaining live checks are distinct from requests for more tiling features:
+
+- Ordinary Space departure/return during queued placement, move-and-follow,
+  full-screen/sticky-window rejection and display resize/disconnect/reconnect.
+- An app refusing a narrow tile: pause/error behavior, float to recover and
+  explicit resume, without repeated placement fights.
+- Hide/minimize/unminimize, app quit/relaunch, and longer ordinary-use sessions.
+- Split-axis changes, balance and swap; exclusions and gap/margin persistence;
+  paused membership changes and mixed-app previous-position restoration.
+- The Settings session switch and optional Tiling-panel shortcut added in build
+  45 need normal owner interaction checks after the installed UI review.
+
+Multi-desktop/display ownership, saved tree templates and tiling agent commands
+remain feature choices; they are not promised by the current one-session design.
+
 ## Binary-tree tiling
 
-Open **Tiling…** from the Space badge menu or Window menu. Enable the **Tiling session** switch on the intended ordinary desktop. The first version owns one
+Open **Tiling…** from the Space badge menu or Window menu. The optional
+**Open / close Tiling controls** binding is under Settings → Shortcuts → Library;
+its chosen chord appears in Keyboard Shortcuts and the menu hints. It starts
+unassigned and opens/closes only the panel. Enable the **Tiling session** switch
+in the panel or Settings → Tiling on the intended ordinary desktop. The first version owns one
 explicit desktop/display session at a time. It starts off and never re-enables
 a session at app launch. Enabling on an empty desktop waits for new windows;
 enabling on an occupied desktop adopts its eligible windows in a balanced tree.
@@ -199,11 +231,13 @@ records in DEVELOPMENT.md for the tested scope.
 
 ## Configurable shortcuts and Settings
 
-Settings has General, Shortcuts, Applications, Layouts, About and Tiling tabs.
+Settings has General, Shortcuts, Applications, Layouts, Tiling and About tabs.
+About stays at the far right. Shortcut Reference is in General.
 The Tiling page is present in the normal installed app. General uses
 concise labelled switches. Shortcuts offers all 31 global commands in the seven
 existing groups, with a group switch and a recorder beside each action. Library
-also includes the optional New Codex Window command, unassigned by default. Click a
+also includes optional New Codex Window and Open / close Tiling controls
+commands, both unassigned by default. Click a
 binding, press a new combination, or Escape to cancel. Individual reset buttons
 and a confirmed Reset All restore defaults. The Keyboard Shortcuts window reads
 the same saved bindings, including changes after restart. Local library and

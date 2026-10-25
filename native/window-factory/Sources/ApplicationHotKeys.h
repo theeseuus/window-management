@@ -1,5 +1,5 @@
 // Independent app/optional-command keys: window-control slots are never released.
-#define WF_APP_KEY_LIMIT 66 // 0 search, 1...64 apps, 65 optional New Codex Window
+#define WF_APP_KEY_LIMIT 67 // 0 search, 1...64 apps, 65 new window, 66 tiling controls
 static struct { EventHotKeyRef ref; UInt32 key,mods; WFHotKeyCallback callback; void *context; } wfAppKeys[WF_APP_KEY_LIMIT];
 static EventHandlerRef wfAppHandler;
 static OSStatus wfAppEvent(EventHandlerCallRef next,EventRef event,void *context) {

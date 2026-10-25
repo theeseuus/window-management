@@ -6,7 +6,7 @@ final class ShortcutReferenceWindow: NSObject {
     private let preferences: FactoryPreferences
     private let text = NSTextView()
     private let restore = NSButton(title:"Restore last stashed window",target:nil,action:nil)
-    weak var newWindow: NewWindowShortcut?
+    var optionalCommands: [OptionalCommandShortcut] = []
     weak var launcher: LauncherControls?
     weak var spaceIndicator: SpaceIndicator?
     weak var spaceMove: DirectSpaceMoveControls?
@@ -57,9 +57,9 @@ final class ShortcutReferenceWindow: NSObject {
                 return row(chord.modifierLabel,chord.name,$0.title)
             }
             var shownRows=rows
-            if group == .library,let newWindow {
-                let value=newWindow.chord
-                shownRows.append(row(value?.modifierLabel ?? "",value?.name ?? "—","New Codex Window"+(newWindow.active ? "" : " [Off]")))
+            for command in optionalCommands where command.definition.group == group {
+                let value=command.chord
+                shownRows.append(row(value?.modifierLabel ?? "",value?.name ?? "—",command.definition.title+(command.active ? "" : " [Off]")))
             }
             sections.append("\(group.title.uppercased())  [\(states[group] == true ? "On" : "Off")]\n"+shownRows.joined(separator:"\n"))
         }
