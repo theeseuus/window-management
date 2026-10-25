@@ -1535,3 +1535,28 @@ settings, working controls and the Hammerspoon fallback remain unchanged. The
 prior native regression and 522-assertion tiling fixture results remain applicable;
 repository validation was rerun for this documentation commit. Empty-desktop
 activation, display changes and further application coverage remain open checks.
+
+
+### Build 42 empty-desktop insertion pilot accepted with Codex qualification, 2026-10-25
+
+The owner enabled tiling on an empty ordinary desktop and confirmed that the
+first two new-window insertions, Rex and Safari, worked automatically. Resizing
+windows through the preview also worked well.
+
+Codex had no Dock New Window item in this test. The owner used Window Factory
+to create a Codex window, which was floating, then manually added it to the
+tiling tree successfully. Record that route as accepted creation plus manual
+joining, not as evidence of automatic Codex insertion. No cause is assigned to
+the initial floating state from this report alone. A direct new-Codex-window
+insertion while tiling remains active is still an open verification item.
+
+The post-pilot read-only hash comparison confirmed that both saved layout
+catalogs match the empty-desktop pre-pilot baseline. The owner report establishes
+the visual tiling results; no extra window-identity or focus measurements were
+collected for this run.
+
+This acceptance commit changes documentation only. Executable code, settings,
+shortcuts, working controls and the Hammerspoon fallback remain unchanged.
+Repository validation was rerun; the prior native regression and 522-assertion
+tiling fixture results remain applicable. Display changes and broader app
+coverage remain open checks.
