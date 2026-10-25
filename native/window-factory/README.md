@@ -28,6 +28,7 @@ and accepted in Window Factory. No core controller group remains to port.
 | Binary-tree tiling | Rex/Safari empty-desktop insertion, mixed-app resizing/stash/restore and prior Rex reflow/undo accepted; build 44 New Codex Window shortcut opens on the current Space and joins automatically |
 | Applications and launch shortcuts | Tab+A search, Tab+T Rex activation and Tab+S clash rejection accepted; build 41 installed with bindings retained |
 | Agent CLI | Read-only/off-switch checks and live Rex Capture/Restore/Establish/repeat passed; see [CLI.md](CLI.md) |
+| Application icon | Sculpted blue installed in build 47; standard 1x/2x ICNS sizes, local alpha cleanup and preserved signed identity; [design/source notes](Resources/Design/README.md) |
 
 Hammerspoon retains recoverable original implementations and Tab+Shift+R for
 its library when running. The managed loader releases all seven direct-control
@@ -66,8 +67,6 @@ Remaining verification and polish, before adding a new feature:
 
 Deferred feature choices:
 
-- **Application icon:** blue Pane arrangement selected; refined concept in
-  [Resources/Design](Resources/Design/README.md), pending small-size review and packaging.
 - Other feature work is deferred while the owner uses the app in daily work.
 - **Custom geometries:** add user-defined size/position geometries later.
 - **Layout editor:** drag/resize the saved window rectangles with save/cancel

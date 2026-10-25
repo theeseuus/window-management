@@ -1744,3 +1744,32 @@ Space scenario. Hammerspoon source/configuration and fallback were unchanged.
 Owner selected the blue Pane arrangement icon direction from three generated
 concepts. Refined transparent concept saved in Resources/Design; not yet packaged
 or installed. Other feature ideas are deferred while the owner uses the app.
+
+
+### Build 47 sculpted blue icon installed, 2026-10-25
+
+Owner selected Sculpted blue and accepted the 16–192px light/dark size study.
+The image cleanup attempt retained external flecks, so the owner explicitly
+approved a precise local transparency mask. The deterministic Swift cleanup
+trims the original concept's outer contour without repainting the panes, preserves
+989,869 interior pixel positions byte-for-byte before encoding, and independently
+checks the saved PNG for clear exterior alpha and unchanged opaque interior.
+The original concept is retained; Resources/WindowFactory.png is the production
+master. Packaging generates all ten conventional macOS icon representations,
+verified by ICNS round-trip and size checks. Build 47 adds CFBundleIconFile;
+no Sources files, control algorithms, keybindings or Hammerspoon files changed.
+
+Signed build and repository validation pass, as do shell syntax and diff checks.
+Before restart: app idle, tiling off, no saved stashes. Installed through the
+existing identity-checking installer with two distinct backup builds retained.
+After restart: build/icon metadata and installed resource hash verified; exact
+catalog/previous-catalog hashes and all serialized preference values match the
+fresh baseline. Accessibility/Agent access remain enabled, entitlements and
+signing requirement unchanged, native control sources and Hammerspoon fallback
+sources unchanged. No new permission grants were required.
+
+macOS initially returned a cached generic app icon. Forced Launch Services
+registration refresh and an app-directory timestamp refresh made NSWorkspace
+resolve the installed sculpted icon. The macOS-resolved view includes the system's
+surrounding plate. Runtime controls were not re-piloted for this resource/packaging
+change; their implementations and bindings are unchanged.

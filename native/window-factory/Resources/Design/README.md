@@ -1,17 +1,26 @@
 # Window Factory icon
 
-The owner selected **Pane arrangement** from three concepts on 2026-10-25.
-The refined transparent raster concept is `pane-arrangement-concept.png`:
-one tall window pane on the left, two stacked panes on the right, a cobalt base.
-Generated with the built-in image-generation tool; it is a design asset, not
-an installed app resource yet. The build does not package this Design directory.
+The installed icon is **Sculpted blue**, chosen after the pane-arrangement and
+material explorations below. Build 47 packages `../WindowFactory.png` into a
+standard macOS ICNS and sets `CFBundleIconFile` to `WindowFactory`.
 
-Before shipping: review the refined form at Dock and 16/32 px sizes, clean the
-outer alpha contour if necessary, prepare the complete macOS icon set and add
-CFBundleIconFile to the bundle. Keep the existing bundle/signing identity so
-icon changes do not invalidate Accessibility. The status-bar desktop badge
-continues to show its number; it is independent of the app icon.
+The owner explicitly approved precise local transparency cleanup on 2026-10-25
+after the image tool retained stray external pixels. `../../scripts/clean-icon.swift`
+uses the original `pane-sculpted-concept.png`, trims only the outer contour with
+an antialiased squircle mask and independently decodes the saved PNG to verify
+clear exterior alpha and unchanged opaque interior pixels. The original remains
+untouched. Regeneration uses the installed Apple Swift/ImageIO/CoreGraphics tools.
 
+`../../scripts/package-icon.sh` generates the ten conventional 1x/2x PNG
+representations (16, 32, 128, 256, 512 point sizes, up to 1024 physical pixels) and
+uses Apple's `iconutil` to build the ICNS. Generated iconsets/ICNS live in the build
+cache; only the approved master PNG and reproducible scripts are source assets.
+The build does not package the Design directory or discarded concepts.
+
+The bundle/signing identity remains unchanged to preserve Accessibility access.
+The status-bar desktop-number badge is independent of the app icon. The installed
+icon was checked through macOS's resolved app icon after refreshing Launch
+Services registration; macOS adds its surrounding plate in that resolved view.
 
 ## Material variations — 2026-10-25
 
@@ -34,5 +43,6 @@ bevels, cyan tint, controlled reflections and a tonal wave demonstrating refract
 Sculpted variant: carved negative-space cavities, softened inner bevels, deep
 indigo interiors and electric-blue rim lighting, with no white-filled panes.
 
-The generated alpha contours still need production cleanup before packaging.
-Material and small-size legibility selection should precede that work.
+These concepts preserve the exploration history. The selected sculpted variant
+was subsequently reviewed at 16–192px on light/dark backgrounds and cleaned for
+production as described above.
