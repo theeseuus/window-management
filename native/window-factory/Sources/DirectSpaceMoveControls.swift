@@ -8,6 +8,7 @@ final class DirectSpaceMoveControls {
     var active = false
     var isMoving: Bool { task != nil }
     var lastResult = "Native Space movement is disabled."
+    var willMove: (()->Void)?
     var workspaceBusy: () -> Bool = { false }
     var changed: (() -> Void)?
     init(preferences: FactoryPreferences) { self.preferences = preferences }
@@ -68,6 +69,7 @@ final class DirectSpaceMoveControls {
         guard active,!isMoving,!workspaceBusy() else { return }
         do {
             let (window,context) = try snapshot()
+            willMove?()
             let entries = try topology(context.display)
             let plan = try SpaceMovement.plan(entries,current:context.space,direction:direction)
             let sourceWindows = (CGWindowListCopyWindowInfo(.optionOnScreenOnly,kCGNullWindowID) as? [[String:Any]] ?? []).compactMap { entry -> (UInt32,pid_t)? in

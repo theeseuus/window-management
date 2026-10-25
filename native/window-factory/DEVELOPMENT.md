@@ -1451,3 +1451,35 @@ additional moved-app re-selection behavior is covered by fixtures; the physical
 shortcut acceptance above was on build 40, followed by registration/preservation
 checks on build 41. This update did not repeat every geometry or Space-movement
 operation, and did not change their implementations.
+
+
+### Build 42: first binary-tree tiling candidate, 2026-10-25
+
+Implemented an opt-in, one-desktop/display tiling session, with independent pure
+tree geometry, an injectable session controller, a native desktop/events adapter,
+a proportional interactive panel and a small composition layer. The native
+adapter reuses the existing collection, eligibility and direct frame application
+interfaces. Existing controllers gained optional handoff callbacks rather than
+new placement algorithms. No global shortcut defaults or Hammerspoon sources
+changed. No tiling CLI endpoint was added.
+
+The candidate supports adoption of an occupied desktop, waiting on an empty
+one, event-driven admission/removal, split resizing/axis changes, balancing,
+swapping, float/rejoin, parking stashed windows, pause/resume and previous-frame
+restoration. Settings hold gaps, margins, insertion axis and app exclusions.
+Sessions are not persisted or automatically re-enabled at startup.
+
+The native regression suite passed, including 522 tiling geometry/lifecycle and
+panel-key assertions using an injected desktop. The final minor UI change disables
+inapplicable panel controls while off/busy; the final signed build compiled and
+its inactive controls were inspected in the installed UI. Repository validation
+also passed. No test fixture queried or moved live desktop windows.
+
+Signed build 42 was installed and restarted. Accessibility and Agent access
+remained enabled, both layout catalog hashes and all 16 existing product settings
+were unchanged, and retention left two distinct backup builds. No stashed windows
+were present before restart. The installed Tiling panel was inspected with its
+session off, and Settings showed the gap/margin/axis/exclusion controls. Tiling
+has not been enabled on the working desktop. Live window-event and interaction
+acceptance remains pending an owner-operated disposable desktop pilot; offline
+checks are not a live app-compatibility claim.

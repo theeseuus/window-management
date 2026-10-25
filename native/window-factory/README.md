@@ -59,8 +59,6 @@ Remaining verification and polish, before adding a new feature:
 Deferred feature choices:
 
 - **Custom geometries:** add user-defined size/position geometries later.
-- **Binary-tree tiling:** KiwiDesk-style splits, sizing and reflow would be new
-  layout behavior, not a missing accordion port.
 - **Layout editor:** drag/resize the saved window rectangles with save/cancel
   and undo; separate from ordering layout rows.
 - **Application state:** browser URLs, terminal commands and selected chats.
@@ -71,6 +69,68 @@ Deferred feature choices:
 Implementation and dated pilot receipts are preserved in
 [development history](DEVELOPMENT.md); the [original transition plan](../../docs/native-window-factory.md)
 is historical planning, not the current backlog.
+
+## Binary-tree tiling
+
+Open **Tiling…** from the Space badge menu or Window menu. Enable the **Tiling session** switch on the intended ordinary desktop. The first version owns one
+explicit desktop/display session at a time. It starts off and never re-enables
+a session at app launch. Enabling on an empty desktop waits for new windows;
+enabling on an occupied desktop adopts its eligible windows in a balanced tree.
+Dialogs, sheets, credential apps, full-screen and all-Space windows are excluded
+by the shared window eligibility rules. No apps are launched by tiling.
+
+The panel shows a proportional tree. Click a tile or select its window in the
+list. Drag a divider and release to change its split. **− / +** changes the
+selected window's nearest split by five percentage points. **Side by side** and
+**Top / bottom** change that split's axis and the direction for subsequent
+insertions. **Balance** resets split ratios; **Swap** exchanges the selected
+window with the next tile. New windows split beside the selected tiled window;
+closing a window collapses its branch. Hidden/minimized windows are temporarily
+omitted from placement and can rejoin their retained tree position.
+
+**Float / Rejoin** releases or rejoins a window. Existing geometry shortcuts
+float their target synchronously before running their unchanged placement logic.
+Manual pointer moves/resizes also float a window after the input settles.
+Stash temporarily parks a window and restores its tree position when retrieved.
+Accordion, Restore and Establish pause tiling before they arrange windows.
+**Pause** retains the tree without placing windows; **Resume** reconciles the
+current inventory. **Restore previous positions** restores surviving admitted
+windows to their pre-tiling frames and leaves tiling paused. Turning the switch
+off releases the session and leaves current frames in place.
+
+Settings → Tiling contains window gaps, outer margins, the new-split axis and
+excluded application bundles. Settings persist independently of layout recipes;
+removing an exclusion does not silently rejoin a previously floating window.
+App minimum-size constraints cannot all be predicted. Plans reject undersized
+rectangles before writing, and an unfulfilled frame request pauses tiling with
+an error. It does not endlessly reapply a rejected arrangement. Returning to an
+inactive tiled desktop triggers reconciliation; display changes require an
+explicit resume. Multi-display tiling, saved tree templates and tiling CLI
+commands are outside this first version.
+
+Panel keys are local: arrows select a window, −/+ resize its split, V/H set the
+axis, B balances, S swaps, F floats/rejoins, P pauses/resumes and Escape closes.
+They appear in Keyboard Shortcuts. No new global chords are registered, and all
+existing bindings and the Hammerspoon fallback remain unchanged.
+
+### Implementation boundaries
+
+| Component | Owns | Does not own |
+| --- | --- | --- |
+| `TilingTree.swift` | Pure tree edits and frame plans | macOS access, UI, preferences |
+| `TilingController.swift` | Session lifecycle, admission, floating, pause and undo | AX elements or widget actions |
+| `TilingBackend.swift` | Desktop/window adapter and event observation | Tree policy or saved recipes |
+| `TilingPanel.swift` | Tree display, divider input and Settings controls | Direct window writes |
+| `TilingFeature.swift` | Composition and explicit handoffs from existing owners | Alternate geometry or layout engines |
+
+The adapter reuses `MacServices.collect`, `Context`/`LiveWindow` eligibility and
+`DirectFrameApplication`. Observers exist only while a session is enabled;
+notification bursts are debounced rather than serviced by continuous polling.
+Existing controllers expose small optional handoff callbacks; their algorithms
+and shortcut registration remain their own. Pure geometry and an injected
+backend exercise the state machine without desktop mutations. Offline tests do
+not establish live app compatibility; physical acceptance is recorded separately
+in DEVELOPMENT.md.
 
 ## Applications and launch shortcuts
 
@@ -106,7 +166,8 @@ endpoints; existing Agent access remains separately controlled.
 
 ## Configurable shortcuts and Settings
 
-Settings has five tabs: General, Shortcuts, Applications, Layouts and About. General uses
+Settings has General, Shortcuts, Applications, Layouts, About and Tiling tabs.
+The Tiling page is present in the normal installed app. General uses
 concise labelled switches. Shortcuts offers all 31 global commands in the seven
 existing groups, with a group switch and a recorder beside each action. Click a
 binding, press a new combination, or Escape to cancel. Individual reset buttons

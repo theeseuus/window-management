@@ -8,6 +8,7 @@ final class DirectAccordionControls {
     var isBusy: Bool { task != nil }
     var active = false
     var lastResult = "Native accordion is disabled."
+    var willArrange: (()->Void)?
     var workspaceBusy: () -> Bool = { false }
     var changed: (() -> Void)?
     init(preferences: FactoryPreferences) { self.preferences = preferences }
@@ -116,6 +117,7 @@ final class DirectAccordionControls {
         guard active,task == nil,!workspaceBusy() else { return }
         do {
             let (anchor,context,others) = try snapshot()
+            willArrange?()
             task = Task { @MainActor [weak self] in
                 guard let self else { return }
                 defer { task = nil; changed?() }

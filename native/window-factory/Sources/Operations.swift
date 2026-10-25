@@ -13,10 +13,12 @@ struct Receipt: Codable {
 @MainActor
 final class Coordinator {
     let services = MacServices()
+    var willApply: ((Context)->Void)?
     let adapters: [String:Adapter]
     init(registry: AdapterRegistry) { adapters = Dictionary(uniqueKeysWithValues:registry.adapters.map { ($0.bundleID,$0) }) }
     func apply(_ recipe: Recipe,establish: Bool,context: Context,progress: (String)->Void) async throws -> Receipt {
         try recipe.validate(); try services.requireAccess(); try context.check()
+        willApply?(context)
         var receipt = Receipt(), created = Set<UInt32>()
         let initial = try await services.collect(context)
         let initialIDs = Set(initial.map(\.id))

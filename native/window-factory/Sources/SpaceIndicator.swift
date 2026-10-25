@@ -13,6 +13,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate {
     var changed: (() -> Void)?
     var openLibrary: (() -> Void)?
     var openSettings: (() -> Void)?
+    var openTiling: (()->Void)?
     var openShortcuts: (() -> Void)?
     init(preferences: FactoryPreferences) { self.preferences = preferences; super.init() }
     func enable() {
@@ -35,7 +36,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate {
         let menu = NSMenu(),description = NSMenuItem(title:"Reading active Space…",action:nil,keyEquivalent:"")
         menu.delegate = target
         description.isEnabled = false; menu.addItem(description); menu.addItem(.separator())
-        for (title,selector,id) in [("Open Window Factory",#selector(showLibrary),"library.0"),("Settings…",#selector(showSettings),"settings"),("Keyboard Shortcuts…",#selector(showShortcuts),"library.1")] {
+        for (title,selector,id) in [("Open Window Factory",#selector(showLibrary),"library.0"),("Settings…",#selector(showSettings),"settings"),("Keyboard Shortcuts…",#selector(showShortcuts),"library.1"),("Tiling…",#selector(showTiling),"tiling")] {
             let entry = menu.addItem(withTitle:title,action:selector,keyEquivalent:""); entry.target = target; entry.identifier = NSUserInterfaceItemIdentifier(id)
         }
         let settings = menu.items.first{$0.identifier?.rawValue == "settings"}!
@@ -128,6 +129,7 @@ final class SpaceIndicator: NSObject, NSMenuDelegate {
         }
         image.isTemplate = true; return image
     }
+    @objc private func showTiling() { openTiling?() }
     @objc private func showLibrary() { openLibrary?() }
     @objc private func showSettings() { openSettings?() }
     @objc private func showShortcuts() { openShortcuts?() }

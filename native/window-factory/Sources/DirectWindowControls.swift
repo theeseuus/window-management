@@ -44,6 +44,7 @@ final class DirectWindowControls {
     var lastResult = "Native geometry shortcuts are disabled."
     var workspaceBusy: () -> Bool = { false }
     var changed: (() -> Void)?
+    var willChangeFrame: ((UInt32)->Void)?
     init(preferences: FactoryPreferences) { self.preferences = preferences }
     func enable() throws {
         guard AXIsProcessTrusted() else { throw FactoryError("Accessibility access is required before enabling geometry shortcuts.") }
@@ -84,6 +85,7 @@ final class DirectWindowControls {
         let target: (LiveWindow,Context)
         do { target = try focused() }
         catch { lastResult = "\(command.title): \(error.localizedDescription)"; hud.show(lastResult); changed?(); return }
+        willChangeFrame?(target.0.id)
         let frame = pendingFrame.flatMap { $0.pid == target.0.pid && $0.id == target.0.id ? $0.frame : nil } ?? target.0.frame
         task?.cancel()
         operationSerial += 1

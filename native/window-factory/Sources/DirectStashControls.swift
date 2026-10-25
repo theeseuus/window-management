@@ -14,7 +14,9 @@ final class DirectStashControls {
     var lastResult = "Native stash/restore is disabled."
     var workspaceBusy: () -> Bool = { false }
     var changed: (() -> Void)?
+    var tilingTransition: ((UInt32,Bool)->Void)?
     var count: Int { saved.count }
+    var windowIDs: Set<UInt32> { Set(saved.values.map { $0.window.id }) }
     init(preferences: FactoryPreferences) { self.preferences = preferences }
     func enable() throws {
         guard AXIsProcessTrusted() else { throw FactoryError("Accessibility access is required for stash/restore.") }
@@ -107,6 +109,7 @@ final class DirectStashControls {
         lastResult = "No saved stashed windows remain."; changed?()
     }
     private func launch(_ entry: Saved,restoring: Bool,bringForward: Bool) {
+        tilingTransition?(entry.window.id,restoring)
         task?.cancel(); serial += 1; let current = serial
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
         task = Task { @MainActor [weak self] in

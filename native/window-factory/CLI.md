@@ -43,7 +43,8 @@ or unavailable desktop produces `context_changed` and does not start an operatio
 The existing engine continues checking its context during execution.
 
 Direct geometry, focus, stash, switcher, accordion and move-and-follow commands,
-layout import/export/delete, arbitrary scripts and arbitrary file paths are not
+tiling, application launching/shortcut editing, layout import/export/delete,
+arbitrary scripts and arbitrary file paths are not
 exposed in protocol 1. Their working keyboard implementations remain in place.
 Use `capabilities`; do not infer a command from a UI label.
 

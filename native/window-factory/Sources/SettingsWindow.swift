@@ -199,6 +199,7 @@ final class SettingsWindow: NSObject,NSWindowDelegate,NSTabViewDelegate {
         }
         refresh()
     }
+    func addTiling(_ view: NSView) { addTab("Tiling",view) }
     private static func row(_ title: String,_ control: NSView) -> NSView {
         let label = NSTextField(labelWithString:title); label.font = .systemFont(ofSize:13)
         control.setAccessibilityLabel(title)

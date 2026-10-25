@@ -99,3 +99,12 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     "$native_root/Sources/LaunchPolicy.swift" "$native_root/Tests/LaunchPolicyTests.swift" \
     -o "$native_root/.build/launch-policy-tests"
 "$native_root/.build/launch-policy-tests"
+
+# Tiling state machine uses an injected desktop; never observes or moves real windows.
+xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
+    -module-cache-path "$native_root/.build/ModuleCache" \
+    -import-objc-header "$native_root/Sources/Bridge.h" \
+    "$@" "$native_root/Tests/TilingTests.swift" "$native_root/.build/panel-test-bridge.o" \
+    -framework Cocoa -framework ApplicationServices -framework Carbon -framework ScreenCaptureKit \
+    -o "$native_root/.build/tiling-tests"
+"$native_root/.build/tiling-tests"

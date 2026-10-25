@@ -2,6 +2,7 @@ import AppKit
 
 @MainActor
 final class FactoryApp: NSObject, NSApplicationDelegate {
+    var tiling: TilingFeature?
     var applications: ApplicationLauncher?
     var applicationSearch: ApplicationsWindow?
     var library: LibraryWindow?
@@ -123,8 +124,11 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 shortcutReference?.geometry = controls; shortcutReference?.focus = focusControls; shortcutReference?.stash = stashControls
             }
             if !preview,let library {
+                let feature=TilingFeature(library:library,geometry:geometry,stash:stash,accordion:accordion,spaceMove:spaceMove,switcher:switcher);tiling=feature
+                settings?.addTiling(feature.settings.view)
+                spaceIndicator?.openTiling = {[weak feature] in feature?.show()}
                 let service=AgentService(preferences:preferences,library:library);agent=service;settings?.agent=service
-                service.extraBusy = { [weak self] in self?.geometry?.isBusy == true || self?.focus?.isBusy == true || self?.stash?.isBusy == true || self?.accordion?.isBusy == true || self?.spaceMove?.isMoving == true || self?.switcher?.isOpen == true }
+                service.extraBusy = { [weak self] in self?.geometry?.isBusy == true || self?.focus?.isBusy == true || self?.stash?.isBusy == true || self?.accordion?.isBusy == true || self?.spaceMove?.isMoving == true || self?.switcher?.isOpen == true || self?.tiling?.controller.isBusy == true }
                 service.changed = { [weak self] in self?.settings?.refresh() }
                 do {try service.restorePreference()} catch {preferences.agentAccessEnabled=false;library.status.stringValue="Agent access: \(error.localizedDescription)"}
                 settings?.refresh()
@@ -169,6 +173,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             shortcutItem.target = self
             let appsItem = windowMenu.addItem(withTitle:"Applications",action:#selector(showApplications(_:)),keyEquivalent:"a")
             appsItem.keyEquivalentModifierMask = [.command,.shift]; appsItem.target = self
+            let tilingItem=windowMenu.addItem(withTitle:"Tiling…",action:#selector(showTiling(_:)),keyEquivalent:"");tilingItem.target=self
             windowItem.submenu = windowMenu; menu.addItem(windowItem)
             NSApp.mainMenu = menu
             loginLaunch = loginLaunch || LauncherControls.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent)
@@ -213,6 +218,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
         case .ignore:break
         }
     }
+    @objc func showTiling(_ sender: Any?) { tiling?.show() }
     @objc func showApplications(_ sender: Any?) { applicationSearch?.show() }
     @objc func showSwitcher(_ sender: Any?) { switcher?.toggle() }
     @objc func showShortcuts(_ sender: Any?) { shortcutReference?.show() }
@@ -220,7 +226,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication,hasVisibleWindows flag: Bool) -> Bool { library?.show(); return true }
     func applicationDidBecomeActive(_ notification: Notification) { library?.updateButtons(); launcher?.refreshLoginState(); settings?.refresh() }
-    func applicationWillTerminate(_ notification: Notification) { applications?.stop();applicationSearch?.stop();agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { tiling?.stop();applications?.stop();applicationSearch?.stop();agent?.stop(); launcher?.stop(); spaceIndicator?.stop(); spaceMove?.stop(); accordion?.stop(); switcher?.stop(); stash?.stop(); shortcutReference?.stop(); focus?.stop(); geometry?.stop(); library?.stop(); settings?.stop() }
 }
 
 @main

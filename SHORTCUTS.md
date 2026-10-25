@@ -211,3 +211,25 @@ independent Settings switch owns only those arrows; the managed loader sets
 `TheseusWindow.spaceMoveHotkeys = false`. The original Spoon transport remains
 the fallback. Native `Control + Left/Right` still moves only the user. See the
 [native pilot record](native/window-factory/README.md) for verification and scope.
+
+
+## Tiling panel (local keys)
+
+Open Tiling from Window Factory's Space badge menu or Window menu. Its session
+starts off; enabling it owns the current ordinary desktop/display. These keys
+apply only while the Tiling panel is focused and register no global bindings.
+
+| Key | Action |
+| --- | --- |
+| Up / Down | Select window |
+| − / + | Shrink / grow the selected side of its split |
+| V / H | Side by side / top-bottom split |
+| B | Balance split ratios |
+| S | Swap with next tile |
+| F | Float / rejoin |
+| P | Pause / resume |
+| Escape | Close panel; session continues |
+
+The existing geometry commands float their target before resizing it. Restore,
+Establish and accordion pause the current tiling session. Details and limits are
+in [Window Factory](native/window-factory/README.md#binary-tree-tiling).
