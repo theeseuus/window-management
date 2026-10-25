@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-final class SpaceIndicator {
+final class SpaceIndicator: NSObject, NSMenuDelegate {
     private let preferences: FactoryPreferences
     private var item: NSStatusItem?
     private var observers: [(NotificationCenter,NSObjectProtocol)] = []
@@ -14,14 +14,14 @@ final class SpaceIndicator {
     var openLibrary: (() -> Void)?
     var openSettings: (() -> Void)?
     var openShortcuts: (() -> Void)?
-    init(preferences: FactoryPreferences) { self.preferences = preferences }
+    init(preferences: FactoryPreferences) { self.preferences = preferences; super.init() }
     func enable() {
         stop()
         let status = NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength)
         status.button?.imagePosition = .imageOnly
         item = status; preferences.spaceIndicatorEnabled = true
         let menu = Self.menu(target:self); descriptionItem = menu.items.first
-        status.menu = menu
+        status.menu = menu; refreshMenuShortcuts()
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.activeSpaceDidChangeNotification,NSWorkspace.didActivateApplicationNotification,NSWorkspace.didWakeNotification] {
             observe(workspace,name)
@@ -33,15 +33,28 @@ final class SpaceIndicator {
     }
     static func menu(target: SpaceIndicator?) -> NSMenu {
         let menu = NSMenu(),description = NSMenuItem(title:"Reading active Space…",action:nil,keyEquivalent:"")
+        menu.delegate = target
         description.isEnabled = false; menu.addItem(description); menu.addItem(.separator())
-        for (title,selector) in [("Open Window Factory",#selector(showLibrary)),("Settings…",#selector(showSettings)),("Keyboard Shortcuts…",#selector(showShortcuts))] {
-            let entry = menu.addItem(withTitle:title,action:selector,keyEquivalent:""); entry.target = target
+        for (title,selector,id) in [("Open Window Factory",#selector(showLibrary),"library.0"),("Settings…",#selector(showSettings),"settings"),("Keyboard Shortcuts…",#selector(showShortcuts),"library.1")] {
+            let entry = menu.addItem(withTitle:title,action:selector,keyEquivalent:""); entry.target = target; entry.identifier = NSUserInterfaceItemIdentifier(id)
         }
+        let settings = menu.items.first{$0.identifier?.rawValue == "settings"}!
+        settings.keyEquivalent = ","; settings.keyEquivalentModifierMask = .command
         menu.addItem(.separator())
         let quit = menu.addItem(withTitle:"Quit Window Factory",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
         quit.keyEquivalentModifierMask = [.command]; quit.target = NSApp
         return menu
     }
+    static func updateShortcuts(in menu: NSMenu,preferences: FactoryPreferences) {
+        for definition in ShortcutDefinition.all where definition.group == .library {
+            guard let entry = menu.items.first(where:{$0.identifier?.rawValue == definition.id}) else { continue }
+            let chord = preferences.shortcuts.chord(definition)
+            entry.keyEquivalent = chord.menuKeyEquivalent; entry.keyEquivalentModifierMask = chord.menuModifiers
+            entry.toolTip = chord.actionHint
+        }
+    }
+    func refreshMenuShortcuts() { if let menu = item?.menu { Self.updateShortcuts(in:menu,preferences:preferences) } }
+    func menuNeedsUpdate(_ menu: NSMenu) { Self.updateShortcuts(in:menu,preferences:preferences) }
     private func observe(_ center: NotificationCenter,_ name: Notification.Name) {
         let token = center.addObserver(forName:name,object:nil,queue:.main) { [weak self] _ in
             MainActor.assumeIsolated { self?.scheduleRefresh() }

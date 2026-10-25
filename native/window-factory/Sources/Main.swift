@@ -55,7 +55,7 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
             settings?.onExport = { [weak self] in self?.library?.show(); self?.library?.exportLayouts() }
             settings?.onReport = { [weak self] in self?.library?.showReport() }
             settings?.layoutActionsAvailable = { [weak self] in self?.library?.task == nil && self?.library?.frozen == nil }
-            bindings?.changed = { [weak self] in self?.shortcutReference?.refresh(); self?.settings?.refresh(); self?.library?.applyPreferences() }
+            bindings?.changed = { [weak self] in self?.shortcutReference?.refresh(); self?.settings?.refresh(); self?.library?.applyPreferences(); self?.spaceIndicator?.refreshMenuShortcuts() }
             bindings?.recoverRegistrations = { [weak self] in self?.restoreShortcutOwners() }
             library?.onShortcuts = { [weak self] in self?.showShortcuts(nil) }
             settings?.onShortcuts = { [weak self] in self?.showShortcuts(nil) }

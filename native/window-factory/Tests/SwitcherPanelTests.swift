@@ -162,6 +162,22 @@ import AppKit
         let statusMenu = SpaceIndicator.menu(target:nil)
         check(statusMenu.items.last?.title == "Quit Window Factory" && statusMenu.items.last?.keyEquivalent == "q","badge menu offers Quit")
         check(statusMenu.items.last?.keyEquivalentModifierMask == .command,"badge Quit uses standard Command Q")
+        SpaceIndicator.updateShortcuts(in:statusMenu,preferences:dockPreferences)
+        let menuLibrary = statusMenu.items.first{$0.identifier?.rawValue == "library.0"}!
+        let menuReference = statusMenu.items.first{$0.identifier?.rawValue == "library.1"}!
+        check(menuLibrary.keyEquivalent == "r" && menuLibrary.keyEquivalentModifierMask == [.control,.option,.command],"badge library hint uses saved default chord")
+        check(menuReference.keyEquivalent == "/" && statusMenu.items.first{$0.identifier?.rawValue == "settings"}?.keyEquivalent == ",","reference and Settings show their commands")
+        let customMenuChord = ShortcutChord(key:79,modifiers:ShortcutChord.hyper,name:"F18")
+        try dockPreferences.shortcuts.save(["library.0":customMenuChord])
+        SpaceIndicator.updateShortcuts(in:statusMenu,preferences:dockPreferences)
+        check(menuLibrary.keyEquivalent == String(UnicodeScalar(0xF715)!) && menuLibrary.toolTip == "Tab + F18","badge hint refreshes from a changed stored binding")
+        try dockPreferences.shortcuts.save([:])
+        SpaceIndicator.updateShortcuts(in:statusMenu,preferences:dockPreferences)
+        check(menuLibrary.keyEquivalent == "r","reset restores the menu hint")
+        check(ShortcutChord(key:123,modifiers:ShortcutChord.hyper,name:"←").menuKeyEquivalent == String(UnicodeScalar(0xF702)!),"special-key menu hints use native key equivalents")
+        check(!richRow.dragGrip.isHidden && richRow.dragGrip.image != nil,"full rows expose a drag grip")
+        let filteredRow = LayoutRowView(recipe:rowRecipe,canReorder:false) { _ in nil }
+        check(filteredRow.dragGrip.isHidden,"filtered/busy rows do not advertise unavailable dragging")
         let library = definitions.first{$0.group == .library}!
         let custom = ShortcutChord(key:79,modifiers:ShortcutChord.hyper,name:"F18")
         let shortcutStore = KeybindingStore(defaults:dockDefaults)

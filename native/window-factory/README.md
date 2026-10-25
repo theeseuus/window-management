@@ -24,6 +24,7 @@ and accepted in Window Factory. No core controller group remains to port.
 | Library launcher, Dock visibility, optional login startup | Tab+R and Dock visibility accepted; actual login startup remains untested; Settings observed enabled on 2026-10-25 |
 | Capture, Restore, Establish, repeat without duplicates | Accepted Rex/Safari/Codex desktop pilots; all 16 adapters shipped, broader live coverage remains |
 | Configurable keybindings and reference | Accepted; 31 global commands, Tab+/ toggles reference |
+| Library presentation | Thumbnails/icons, Delete/context menu, name-ranked search, optional proportional preview and drag ordering accepted |
 | Agent CLI | Read-only/off-switch checks and live Rex Capture/Restore/Establish/repeat passed; see [CLI.md](CLI.md) |
 
 Hammerspoon retains recoverable original implementations and Tab+Shift+R for
@@ -50,8 +51,8 @@ Remaining verification and polish, before adding a new feature:
 - Review deliberate, consistent visible stash edges. The current native command
   requests a right-edge stash and accepts macOS constraints; it does not promise
   a chosen visible strip width or provide a left/right stash selector.
-- Observe the compact library, proportional optional preview, ranked search
-  and manual layout ordering in ordinary use (builds 35–36).
+- Consider a keyboard equivalent for manual row ordering; dragging is currently
+  mouse/trackpad-only. The existing arrow keys still select rows.
 
 Deferred feature choices, with none selected by this review:
 
@@ -60,6 +61,8 @@ Deferred feature choices, with none selected by this review:
   forward actions; hand bindings over individually from Raycast after testing.
 - **Binary-tree tiling:** KiwiDesk-style splits, sizing and reflow would be new
   layout behavior, not a missing accordion port.
+- **Layout editor:** drag/resize the saved window rectangles with save/cancel
+  and undo; separate from ordering layout rows.
 - **Application state:** browser URLs, terminal commands and selected chats.
 - **Coordinated animation:** presentation after reliable final placement.
 - **Distribution:** notarization/updating beyond the current signed local installer.
@@ -470,3 +473,33 @@ inspection. Both catalog hashes and all prior app settings were unchanged;
 only the new presentation preferences were written. No Restore, Establish,
 Capture or Delete operation ran during these UI checks. Existing controller
 source files, adapter operations and Hammerspoon fallback were unchanged.
+
+
+## Library acceptance, drag grip and menu shortcut hints (build 37)
+
+On 2026-10-25 the owner accepted name-ranked search, the preview toggle, manual
+drag ordering and the improved compact layout, after accepting thumbnails/icons,
+search and right-click in build 34 and Delete/right-click in build 33. These are
+completed library features, not outstanding migrations.
+
+Rows now show a native six-dot drag grip with an open-hand cursor. It is hidden
+in filtered results, preview mode, capture naming and active operations. The grip
+is an affordance for the existing native row drag; it does not implement another
+reordering path or change keyboard selection.
+
+The desktop badge menu shows native shortcut columns for Open Window Factory,
+Settings, Keyboard Shortcuts and Quit. The two Library items read the shared
+saved binding store, refresh on a successful Settings change/reset and refresh
+again whenever the menu opens. Function/navigation keys use native menu glyphs.
+Their tooltips also explain the configured Tab/Hyper chord. Settings remains
+app-local Command-comma and Quit remains Command-Q. No extra global hotkey owner
+or controller binding was added. The normal menu actions remain unchanged.
+
+
+Build 37 passed the full native suite with 238 AppKit assertions, including
+changed/reset Library bindings, native special-key equivalents and drag-grip
+visibility. Repository validation and strict installed-signature verification
+passed. Live visual inspection showed the six-dot grips; catalog and complete
+app-settings hashes, including manual order and bindings, were unchanged after
+restart. The live CLI reported Accessibility and Agent access enabled. The
+controller implementations and Hammerspoon fallback remained unchanged.

@@ -195,6 +195,9 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         cancel.isHidden = task == nil && frozen == nil
         search.isEnabled = task == nil && frozen == nil
         status.isHidden = status.stringValue.isEmpty
+        for row in 0..<table.numberOfRows {
+            (table.view(atColumn:0,row:row,makeIfNecessary:false) as? LayoutRowView)?.setReorderingAvailable(canReorder)
+        }
     }
     func contextMenu(for row: Int) -> NSMenu? {
         guard !preview, task == nil, frozen == nil, filtered.indices.contains(row) else { return nil }
@@ -237,7 +240,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     }
     func numberOfRows(in tableView: NSTableView) -> Int { filtered.count }
     func tableView(_ tableView: NSTableView,viewFor tableColumn: NSTableColumn?,row: Int) -> NSView? {
-        LayoutRowView(recipe:filtered[row],aspectRatio:drawing.aspectRatio) { [self] bundleID in
+        LayoutRowView(recipe:filtered[row],aspectRatio:drawing.aspectRatio,canReorder:canReorder) { [self] bundleID in
             if let cached = appIcons[bundleID] { return cached }
             let image = NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundleID).map { NSWorkspace.shared.icon(forFile:$0.path) }
                 ?? NSImage(systemSymbolName:"app",accessibilityDescription:"Application")

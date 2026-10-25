@@ -46,13 +46,17 @@ final class LayoutRowView: NSTableCellView {
     let thumbnail: LayoutThumbnailView
     let apps: [LayoutRowApp]
     let icons = NSStackView()
+    let dragGrip = NSImageView()
     let nameLabel: NSTextField
     static let visibleAppLimit = 4
-    init(recipe: Recipe,aspectRatio: Double = 1.6,iconForBundle: (String)->NSImage?) {
+    init(recipe: Recipe,aspectRatio: Double = 1.6,canReorder: Bool = true,iconForBundle: (String)->NSImage?) {
         apps = LayoutRowApp.apps(in:recipe); thumbnail = LayoutThumbnailView(recipe:recipe)
         thumbnail.aspectRatio = aspectRatio
         nameLabel = NSTextField(labelWithString:recipe.name)
         super.init(frame:.zero)
+        dragGrip.image = Self.gripImage()
+        dragGrip.contentTintColor = .tertiaryLabelColor; dragGrip.imageScaling = .scaleProportionallyDown
+        dragGrip.toolTip = "Drag to reorder"; dragGrip.isHidden = !canReorder; dragGrip.setAccessibilityElement(false)
         nameLabel.font = .systemFont(ofSize:13,weight:.semibold)
         nameLabel.lineBreakMode = .byTruncatingTail; nameLabel.maximumNumberOfLines = 1
         nameLabel.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
@@ -80,16 +84,35 @@ final class LayoutRowView: NSTableCellView {
             overflow.setAccessibilityLabel("Additional apps: " + overflow.toolTip!)
             icons.addArrangedSubview(overflow)
         }
-        for view in [thumbnail,nameLabel,icons] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
+        for view in [thumbnail,nameLabel,icons,dragGrip] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
         NSLayoutConstraint.activate([
             thumbnail.leadingAnchor.constraint(equalTo:leadingAnchor,constant:6),thumbnail.centerYAnchor.constraint(equalTo:centerYAnchor),
             thumbnail.widthAnchor.constraint(equalToConstant:84),thumbnail.heightAnchor.constraint(equalToConstant:52),
-            nameLabel.leadingAnchor.constraint(equalTo:thumbnail.trailingAnchor,constant:10),nameLabel.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-6),
+            nameLabel.leadingAnchor.constraint(equalTo:thumbnail.trailingAnchor,constant:10),nameLabel.trailingAnchor.constraint(equalTo:dragGrip.leadingAnchor,constant:-8),
             nameLabel.topAnchor.constraint(equalTo:topAnchor,constant:10),
             icons.leadingAnchor.constraint(equalTo:nameLabel.leadingAnchor),icons.topAnchor.constraint(equalTo:nameLabel.bottomAnchor,constant:6),
-            icons.trailingAnchor.constraint(lessThanOrEqualTo:trailingAnchor,constant:-6)
+            icons.trailingAnchor.constraint(lessThanOrEqualTo:dragGrip.leadingAnchor,constant:-8),
+            dragGrip.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-10),dragGrip.centerYAnchor.constraint(equalTo:centerYAnchor),
+            dragGrip.widthAnchor.constraint(equalToConstant:10),dragGrip.heightAnchor.constraint(equalToConstant:18)
         ])
         toolTip = recipe.name + "\n" + recipe.summary
+    }
+    private static func gripImage() -> NSImage {
+        let image = NSImage(size:NSSize(width:10,height:18),flipped:false) { _ in
+            NSColor.labelColor.setFill()
+            for x: CGFloat in [2.5,7.5] { for y: CGFloat in [4,9,14] {
+                NSBezierPath(ovalIn:NSRect(x:x-1,y:y-1,width:2,height:2)).fill()
+            } }
+            return true
+        }
+        image.isTemplate = true; return image
+    }
+    func setReorderingAvailable(_ available: Bool) {
+        dragGrip.isHidden = !available; window?.invalidateCursorRects(for:self)
+    }
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        if !dragGrip.isHidden { addCursorRect(dragGrip.frame,cursor:.openHand) }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unsupported") }
 }
