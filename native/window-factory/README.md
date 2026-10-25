@@ -25,6 +25,7 @@ and accepted in Window Factory. No core controller group remains to port.
 | Capture, Restore, Establish, repeat without duplicates | Accepted Rex/Safari/Codex desktop pilots; all 16 adapters shipped, broader live coverage remains |
 | Configurable keybindings and reference | Accepted; 31 global commands, Tab+/ toggles reference |
 | Library presentation | Thumbnails/icons, Delete/context menu, name-ranked search, optional proportional preview and drag ordering accepted |
+| Binary-tree tiling | Build 42 Rex pilot accepted: tiling, split resizing, float/rejoin, open/close reflow and previous-position restoration; broader app/display coverage remains |
 | Applications and launch shortcuts | Tab+A search, Tab+T Rex activation and Tab+S clash rejection accepted; build 41 installed with bindings retained |
 | Agent CLI | Read-only/off-switch checks and live Rex Capture/Restore/Establish/repeat passed; see [CLI.md](CLI.md) |
 
@@ -40,6 +41,9 @@ JSON; the installed app does not require Hammerspoon to run.
 
 Remaining verification and polish, before adding a new feature:
 
+- Extend tiling acceptance beyond the two/three-window Rex pilot to other apps,
+  empty-desktop activation, stash/rejoin and display changes. Observe whether
+  the order of panel operations needs refinement during ordinary use.
 - Exercise the other installed app adapters; current live pilots do not establish
   native compatibility for every entry. Include failure/cancellation cases.
 - Validate multiple displays, display changes and full-screen/unsupported-Space

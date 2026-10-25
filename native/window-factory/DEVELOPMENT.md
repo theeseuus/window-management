@@ -1483,3 +1483,32 @@ session off, and Settings showed the gap/margin/axis/exclusion controls. Tiling
 has not been enabled on the working desktop. Live window-event and interaction
 acceptance remains pending an owner-operated disposable desktop pilot; offline
 checks are not a live app-compatibility claim.
+
+
+### Build 42 Rex tiling pilot accepted, 2026-10-25
+
+The owner completed the disposable Rex desktop pilot and explicitly confirmed:
+
+- Two Rex windows tiled successfully.
+- Split resizing worked.
+- Manual geometry floated a window and it could rejoin the tree.
+- Opening and closing a third Rex window triggered the expected reflow.
+- Restore previous positions returned both original test windows correctly.
+
+This accepts the tested build 42 workflow against Rex Beta 0.1.0 (1408).
+Post-pilot read-only checks found both saved layout catalogs unchanged, all
+three original Rex window identities and Space memberships retained, and three
+Rex windows remaining in total. Those checks are separate from the owner's
+visual confirmation of the disposable windows' restored frames.
+
+The owner reported that the feature worked well; some confusion concerned the
+order of operations while becoming familiar with binary-tree management. Record
+that as usability feedback to observe in ordinary use, not a failed placement
+check or a request to change controls in this commit.
+
+This documentation-only acceptance commit changes no executable code, settings,
+shortcuts or Hammerspoon fallback. The prior 522-assertion tiling fixture suite
+and native regression results remain applicable. This pilot does not establish
+other-app compatibility or live acceptance of every tiling/control interaction;
+stash/rejoin, empty-desktop activation and display changes remain separately
+listed verification work.
