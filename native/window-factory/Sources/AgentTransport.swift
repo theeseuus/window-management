@@ -21,6 +21,10 @@ enum AgentSocket {
         addr.sun_len=UInt8(MemoryLayout<sockaddr_un>.size);return addr
     }
     static func timeouts(_ fd: Int32) {
+        // Darwin accept inherits the listener's O_NONBLOCK flag. Request/reply
+        // streams need blocking I/O so the bounded socket timeouts can apply.
+        let flags=fcntl(fd,F_GETFL)
+        if flags>=0 { _=fcntl(fd,F_SETFL,flags & ~O_NONBLOCK) }
         var timeout=timeval(tv_sec:3,tv_usec:0),yes:Int32=1
         _=setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,socklen_t(MemoryLayout<timeval>.size))
         _=setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&timeout,socklen_t(MemoryLayout<timeval>.size))

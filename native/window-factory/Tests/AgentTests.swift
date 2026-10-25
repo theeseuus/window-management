@@ -55,6 +55,12 @@ import Darwin
         check(service.enabled && preferences.agentAccessEnabled,"enabling starts endpoint and saves preference")
         try AgentSocket.owned((path as NSString).deletingLastPathComponent,type:S_IFDIR,mode:0o700)
         try AgentSocket.owned(path,type:S_IFSOCK,mode:0o600)
+        let probeFD=socket(AF_UNIX,SOCK_STREAM,0)
+        check(probeFD>=0,"blocking-mode fixture socket opens")
+        _=fcntl(probeFD,F_SETFL,O_NONBLOCK)
+        AgentSocket.timeouts(probeFD)
+        check(fcntl(probeFD,F_GETFL)&O_NONBLOCK == 0,"request streams clear inherited nonblocking mode before bounded reads")
+        close(probeFD)
         let wire=try JSONEncoder().encode(AgentRequest(command:.status))
         let responseBytes=try await Task.detached {try AgentSocket.exchange(wire,path:path)}.value
         let response=try AgentResponse.decode(responseBytes)
