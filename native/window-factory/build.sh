@@ -5,7 +5,7 @@ repo_root=${1:-$(CDPATH='' cd -- "$native_root/../.." && pwd)}
 # App bundles must stay outside the File Provider-managed source checkout.
 output=${WINDOW_FACTORY_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/window-factory/build}
 . "$native_root/signing-config.sh"
-build_number=${WINDOW_FACTORY_BUILD_NUMBER:-47}
+build_number=${WINDOW_FACTORY_BUILD_NUMBER:-48}
 case "$build_number" in ''|*[!0-9]*) echo "Build number must be numeric" >&2; exit 1;; esac
 app="$output/Window Factory.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$output/ModuleCache"
@@ -13,8 +13,9 @@ mise exec -- lua "$native_root/scripts/export-adapters.lua" \
     "$repo_root/Hammerspoon/TheseusWorkspace.spoon/app_adapters.lua" > "$output/adapters.json"
 cmp "$output/adapters.json" "$native_root/Resources/adapters.json"
 cp "$output/adapters.json" "$app/Contents/Resources/adapters.json"
-"$native_root/scripts/package-icon.sh" "$native_root/Resources/WindowFactory.png" "$output/icon"
+"$native_root/scripts/package-icon.sh" "$native_root/Resources/WindowFactory.icon" "$output/icon"
 cp "$output/icon/WindowFactory.icns" "$app/Contents/Resources/WindowFactory.icns"
+cp "$output/icon/Assets.car" "$app/Contents/Resources/Assets.car"
 xcrun --sdk macosx clang -fobjc-arc -Wall -Wextra -Werror \
     -c "$native_root/Sources/Bridge.m" -o "$output/Bridge.o"
 xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors \
@@ -29,6 +30,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <key>CFBundleName</key><string>Window Factory</string>
 <key>CFBundleDisplayName</key><string>Window Factory</string>
 <key>CFBundleExecutable</key><string>WindowFactory</string>
+<key>CFBundleIconName</key><string>WindowFactory</string>
 <key>CFBundleIconFile</key><string>WindowFactory</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.2.0</string>

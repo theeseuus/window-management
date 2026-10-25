@@ -1,14 +1,14 @@
 #!/bin/sh
-# Generate all standard macOS 1x/2x icon representations from the approved master.
+# Let Apple's compiler apply the modern outer mask and generate legacy fallback.
 set -eu
-source=${1:?Expected source PNG}
+source=${1:?Expected Icon Composer document}
 output=${2:?Expected output directory}
 mkdir -p "$output"
-iconset="$output/WindowFactory.iconset"
-mkdir -p "$iconset"
-for size in 16 32 128 256 512; do
-    sips -s format png -z "$size" "$size" "$source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-    retina=$((size * 2))
-    sips -s format png -z "$retina" "$retina" "$source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+xcrun actool "$source" --compile "$output" --app-icon WindowFactory \
+    --platform macosx --minimum-deployment-target 14.0 --target-device mac \
+    --development-region en --output-partial-info-plist "$output/icon-info.plist"
+for key in CFBundleIconName CFBundleIconFile; do
+    value=$(/usr/libexec/PlistBuddy -c "Print :$key" "$output/icon-info.plist")
+    [ "$value" = WindowFactory ] || { echo "Unexpected compiled icon identity" >&2; exit 1; }
 done
-iconutil -c icns "$iconset" -o "$output/WindowFactory.icns"
+[ -s "$output/Assets.car" ] && [ -s "$output/WindowFactory.icns" ]

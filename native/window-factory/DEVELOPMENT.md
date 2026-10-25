@@ -1773,3 +1773,31 @@ registration refresh and an app-directory timestamp refresh made NSWorkspace
 resolve the installed sculpted icon. The macOS-resolved view includes the system's
 surrounding plate. Runtime controls were not re-piloted for this resource/packaging
 change; their implementations and bindings are unchanged.
+
+
+### Build 48 blue-to-the-edge icon packaging correction, 2026-10-25
+
+Owner correctly flagged build 47's pale surround. Treating it as acceptable system
+styling was wrong: the approved blue artwork was intended to fill the icon body.
+Apple's current icon workflow supplies the background and applies the mask in the
+native asset pipeline. Created a native .icon document with Icon Composer after
+the owner personally accepted its first-use licence. The unchanged cleaned PNG
+was moved into its Assets directory; the blue canvas fills the outer mask and
+extra glass effects are disabled on the artwork layer. The asset compiler now
+provides Assets.car plus legacy ICNS, with CFBundleIconName/CFBundleIconFile.
+
+An unlaunched disposable app bundle proved the actual NSWorkspace-resolved image
+has no pale surround before installation. Signed build 48, shell/diff checks and
+repository validation passed. Installed through the existing guarded installer,
+refreshed Launch Services registration, restarted and inspected the installed
+system-resolved icon. Four outer-body pixel samples independently confirm opaque
+blue. This covers the default installed rendering; other appearance-mode polish
+was not separately accepted. Icon Composer test session was closed.
+
+Before restart: app idle, tiling off, no stashes. After restart: all serialized
+preferences, current/previous catalog hashes, signing requirement, entitlements,
+native controller source hashes and Hammerspoon fallback source hashes match the
+fresh baseline; Accessibility/Agent access remain enabled. Modern/fallback icon
+resource hashes match the signed candidate. Two backup builds retained. No
+control algorithms, bindings, permission grants or Hammerspoon configuration
+changed. Build 47's historical receipt remains above as incident evidence.

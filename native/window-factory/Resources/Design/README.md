@@ -1,26 +1,34 @@
 # Window Factory icon
 
-The installed icon is **Sculpted blue**, chosen after the pane-arrangement and
-material explorations below. Build 47 packages `../WindowFactory.png` into a
-standard macOS ICNS and sets `CFBundleIconFile` to `WindowFactory`.
+The installed icon is **Sculpted blue**. Build 48 uses the native
+`../WindowFactory.icon` document with Apple's asset compiler (`actool`) to generate
+`Assets.car` for current macOS and `WindowFactory.icns` as the legacy fallback.
+Both `CFBundleIconName` and `CFBundleIconFile` identify `WindowFactory`.
 
 The owner explicitly approved precise local transparency cleanup on 2026-10-25
 after the image tool retained stray external pixels. `../../scripts/clean-icon.swift`
 uses the original `pane-sculpted-concept.png`, trims only the outer contour with
-an antialiased squircle mask and independently decodes the saved PNG to verify
-clear exterior alpha and unchanged opaque interior pixels. The original remains
-untouched. Regeneration uses the installed Apple Swift/ImageIO/CoreGraphics tools.
+an antialiased squircle mask and independently verifies the saved PNG. The
+unchanged cleaned artwork now lives at
+`../WindowFactory.icon/Assets/WindowFactory.png`; the original concept is retained.
 
-`../../scripts/package-icon.sh` generates the ten conventional 1x/2x PNG
-representations (16, 32, 128, 256, 512 point sizes, up to 1024 physical pixels) and
-uses Apple's `iconutil` to build the ICNS. Generated iconsets/ICNS live in the build
-cache; only the approved master PNG and reproducible scripts are source assets.
-The build does not package the Design directory or discarded concepts.
+The native icon document was created in Apple's Icon Composer after the owner
+accepted its first-use licence. The artwork layer has extra glass effects off;
+the blue canvas supplies the outer background and the system applies its mask.
+This follows Apple's [icon preparation guidance](https://developer.apple.com/videos/play/wwdc2025/361/).
 
-The bundle/signing identity remains unchanged to preserve Accessibility access.
-The status-bar desktop-number badge is independent of the app icon. The installed
-icon was checked through macOS's resolved app icon after refreshing Launch
-Services registration; macOS adds its surrounding plate in that resolved view.
+Build 47's legacy-only ICNS path made macOS shrink the already-rounded transparent
+artwork onto a pale tile. That observed white surround was a packaging defect,
+not an accepted design treatment. Build 48's native assets resolve to blue through
+the outer body in macOS's actual app-icon rendering. The approved master pixels
+were moved into the native document without repainting the panes.
+
+`../../scripts/package-icon.sh` compiles the native document and verifies the
+compiler's icon identity fields. Generated CAR/ICNS and partial plist remain in
+the build cache. Xcode's installed asset compiler is required; no new toolchain or
+package install was added. The build does not package the Design directory.
+The bundle/signing identity is unchanged; the desktop-number badge is independent
+of the app icon.
 
 ## Material variations — 2026-10-25
 
