@@ -29,12 +29,20 @@ final class LayoutStore {
         guard replace || catalog.recipes[recipe.name] == nil else { throw FactoryError("A layout with that name already exists.") }
         var copy = catalog; copy.recipes[recipe.name] = recipe; try self.replace(copy)
     }
+    func rename(_ name: String,to newName: String) throws {
+        guard let recipe=catalog.recipes[name],catalog.recipes[newName]==nil else{throw FactoryError("Source layout is missing or destination exists.")}
+        var copy=catalog;copy.recipes.removeValue(forKey:name);var renamed=recipe;renamed.name=newName;try renamed.validate();copy.recipes[newName]=renamed;try replace(copy)
+    }
     func delete(_ name: String) throws {
         var copy = catalog; copy.recipes.removeValue(forKey:name); try replace(copy)
     }
     func importCatalog(_ url: URL) throws {
         guard url.standardizedFileURL != self.url.standardizedFileURL else { return }
         let imported = try JSONDecoder().decode(Catalog.self,from:Data(contentsOf:url))
+        try merge(imported)
+    }
+    func merge(_ imported: Catalog) throws {
+        try imported.validate()
         var copy = catalog
         for (name,recipe) in imported.recipes {
             guard copy.recipes[name] == nil || copy.recipes[name] == recipe else {

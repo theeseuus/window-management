@@ -59,6 +59,8 @@ final class TilingController {
   private var replay = false
   private var serial = 0
   private var touched: Set<UInt32> = []
+  var agentOperation = false
+  var hasPendingWork: Bool { task != nil || pending != nil }
   var changed: (() -> Void)?
   var externalBusy: () -> Bool = { false }
   var parkedWindows: () -> Set<UInt32> = { [] }

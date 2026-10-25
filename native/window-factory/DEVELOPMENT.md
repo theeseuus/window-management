@@ -1711,3 +1711,36 @@ settings, working controls or Hammerspoon fallback. Repository validation passed
 prior native regression results remain applicable. The owner's next direction
 is to address CLI coverage, then icon design, leaving other feature work until
 ordinary use provides more feedback.
+
+### Build 46 agent controls and icon direction, 2026-10-25
+
+Extended protocol 1 additively from nine to twenty commands. Application
+inventory/activation, reviewed standalone creation, tiling status/actions,
+explicit-window geometry/focus/stash/restore/accordion/Space movement and catalog
+rename/delete/order/import/export now reuse the existing operation owners.
+All mutations retain tracked jobs, identical-request deduplication, context
+requirements, cancellation and conservative side-effect reporting. Agent access
+and permission grants remain UI-owned. Catalog import sends validated inline
+JSON, not a server-side filesystem path; delete requires explicit confirmation.
+
+Shared direct-control bodies were extracted without changing keyboard bindings
+or geometry algorithms. Scoped agent ownership leases allow the existing tiling,
+accordion and Space owners to run inside their own serialized CLI job. Tiling
+settlement is bounded and cancellation pauses pending work. Creation remains
+single-dispatch and schedules normal reflow after the job releases ownership.
+CLI.md documents action flags, cached observed/planned frames and limits.
+
+Validation: signed build; full native suite (81 CLI assertions, 17 store, 43
+single-window creation; existing geometry/focus/stash/switcher/accordion/Space,
+AppKit and 526 tiling assertions all pass), repository validation and diff checks.
+Installed build 46 after observing tiling off and zero stashes. Read-only installed
+status/capabilities/apps/tiling-status/layout-export/current-desktop windows pass:
+20 commands, 178 discoverable apps, AX/Agent access retained. Catalog and previous
+catalog hashes and all serialized preference values match before/after. Installer
+retains two distinct backup builds. Extended live mutation coverage remains a
+separate disposable-desktop acceptance check; fixtures do not prove every app or
+Space scenario. Hammerspoon source/configuration and fallback were unchanged.
+
+Owner selected the blue Pane arrangement icon direction from three generated
+concepts. Refined transparent concept saved in Resources/Design; not yet packaged
+or installed. Other feature ideas are deferred while the owner uses the app.

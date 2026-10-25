@@ -46,6 +46,11 @@ final class DirectWindowControls {
     var changed: (() -> Void)?
     var willChangeFrame: ((UInt32)->Void)?
     init(preferences: FactoryPreferences) { self.preferences = preferences }
+    func forAgent(_ command: GeometryCommand,window: LiveWindow,context: Context) async throws {
+        guard !isBusy else{throw AgentFailure("busy","Geometry owner is busy.")}
+        willChangeFrame?(window.id);defer{pendingFrame=nil;changed?()}
+        try await perform(command,window:window,context:context,frame:window.frame,requireFocus:false,showHUD:false)
+    }
     func enable() throws {
         guard AXIsProcessTrusted() else { throw FactoryError("Accessibility access is required before enabling geometry shortcuts.") }
         let shortcuts = GeometryShortcut.all
@@ -134,12 +139,13 @@ final class DirectWindowControls {
             throw FactoryError("Focused window changed; command stopped.")
         }
     }
-    private func perform(_ command: GeometryCommand,window: LiveWindow,context: Context,frame: Frame) async throws {
+    private func perform(_ command: GeometryCommand,window: LiveWindow,context: Context,frame: Frame,requireFocus: Bool = true,showHUD: Bool = true) async throws {
+        func checkTarget() throws {try window.eligible(in:context);if requireFocus{try sameFocus(window,context)}}
         let screen = context.frame
         let identity = "\(window.pid):\(window.id)"
         if cycles.count+restores.count>512 { cycles.removeAll(); restores.removeAll() }
         if command == .minimize {
-            try sameFocus(window,context); try window.eligible(in:context)
+            try checkTarget()
             guard AXUIElementSetAttributeValue(window.element,kAXMinimizedAttribute as CFString,kCFBooleanTrue) == .success else { throw FactoryError("Minimize request rejected.") }
             try await Task.sleep(for:.milliseconds(160)); try context.check()
             guard WFWindowID(window.element) == window.id, attribute(window.element,kAXMinimizedAttribute) as? Bool == true else { throw FactoryError("Minimize was not confirmed.") }
@@ -164,7 +170,7 @@ final class DirectWindowControls {
             }
             pendingFrame = (window.pid,window.id,target)
             let actual = try await DirectFrameApplication.apply(target:target,from:frame,
-                check: { try self.sameFocus(window,context); try window.eligible(in:context) },
+                check: { try checkTarget() },
                 read: {
                     var rect = CGRect.zero
                     guard WFReadFrame(window.element,&rect) else { throw FactoryError("Window frame unavailable during placement.") }
@@ -185,7 +191,7 @@ final class DirectWindowControls {
                 throw FactoryError("Application did not reach the requested frame after settling (size or position may be constrained).")
             }
         }
-        lastResult = "\(command.title): verified."; hud.show(command.title,on:context.screen)
+        lastResult = "\(command.title): verified."; if showHUD{hud.show(command.title,on:context.screen)}
     }
     func stop() { WFUnregisterHotKeys(); active = false; task?.cancel(); hud.stop() }
 }

@@ -6,7 +6,7 @@ final class AgentService {
     private let preferences: FactoryPreferences
     private let library: LibraryWindow
     private let listener = AgentListener()
-    private let backend: AgentBackend
+    private var backend: AgentBackend
     private let endpoint: String
     private var generation = UUID()
     private var jobs: [UUID:AgentJob] = [:]
@@ -14,10 +14,13 @@ final class AgentService {
     private var seen: [UUID:AgentRequest] = [:]
     private var requestJobs: [UUID:UUID] = [:]
     private var activeJob: UUID?
+    var stashedWindowIDs: ()->[UInt32] = {[]}
     var extraBusy: ()->Bool = { false }
     var changed: (()->Void)?
     private(set) var enabled = false
     init(preferences: FactoryPreferences,library: LibraryWindow,backend: AgentBackend? = nil,endpoint: String = AgentSocket.path) {self.preferences=preferences;self.library=library;self.backend=backend ?? .live(library);self.endpoint=endpoint}
+    var ownedCommand: AgentCommand? {activeJob.flatMap{jobs[$0]?.command}}
+    func connectTools(query: @escaping @MainActor (AgentRequest) async throws->AgentToolResult,mutate: @escaping @MainActor (AgentRequest) async throws->AgentToolResult) {backend.toolQuery=query;backend.toolMutate=mutate}
     func setEnabled(_ value: Bool) throws {
         if value {
             guard !enabled else {return}
@@ -40,7 +43,7 @@ final class AgentService {
     func stop() {enabled=false;generation=UUID();listener.stop();if activeJob != nil {library.task?.cancel()}}
     private var busy: Bool {library.task != nil || library.frozen != nil || extraBusy()}
     private func status() -> AgentStatus {
-        AgentStatus(instanceID:instanceID,agentAccess:enabled,accessibility:backend.accessibility(),busy:busy,desktops:backend.desktops())
+        AgentStatus(instanceID:instanceID,agentAccess:enabled,accessibility:backend.accessibility(),busy:busy,desktops:backend.desktops(),stashedWindowIDs:stashedWindowIDs())
     }
     func handle(_ data: Data) async -> AgentResponse {
         var request: AgentRequest?
@@ -59,8 +62,11 @@ final class AgentService {
                 let windows=try await backend.windows(context)
                 guard enabled else {throw AgentFailure("agent_disabled","Agent access is disabled.")}
                 payload.windows=windows
-            case .capture,.restore,.establish:
+            case .capture,.restore,.establish,.appOpen,.newWindow,.tiling,.window,.layoutRename,.layoutDelete,.layoutOrder,.layoutImport:
                 payload.job=try submit(decoded)
+            case .apps,.tilingStatus,.layoutExport:
+                payload.tools=try await backend.toolQuery(decoded)
+                guard enabled else{throw AgentFailure("agent_disabled","Agent access was disabled.")}
             case .job:
                 guard let id=decoded.jobID,let job=jobs[id] else {throw AgentFailure("job_not_found","Job is unknown or its result expired; it has not been resubmitted.")};payload.job=job
             case .cancel:
@@ -81,11 +87,11 @@ final class AgentService {
         guard !busy,NSApp.modalWindow==nil,library.window.attachedSheet==nil else {throw AgentFailure("busy","Finish the current Window Factory operation first; nothing was queued.")}
         guard backend.accessibility() else {throw AgentFailure("accessibility_required","Window Factory needs Accessibility access for layout operations.")}
         try backend.requireAccess()
-        let context=try backend.context(request),name=request.name!
+        let context=try backend.context(request),name=request.name ?? request.command.rawValue
         let recipe=library.store.catalog.recipes[name]
         if request.command == .capture {
             if recipe != nil && !request.replace {throw AgentFailure("layout_exists","Use --replace explicitly to replace this layout.")}
-        } else if recipe==nil {throw AgentFailure("layout_not_found","No saved layout has that exact name.")}
+        } else if [.restore,.establish,.layoutRename,.layoutDelete].contains(request.command),recipe==nil {throw AgentFailure("layout_not_found","No saved layout has that exact name.")}
         let job=AgentJob(id:UUID(),requestID:request.id,command:request.command,name:name,context:context,startedAt:Date())
         seen[request.id]=request;requestJobs[request.id]=job.id;jobs[job.id]=job;order.append(job.id);activeJob=job.id
         while order.count>100 {let oldest=order.removeFirst();jobs.removeValue(forKey:oldest)}
@@ -94,7 +100,12 @@ final class AgentService {
             defer {activeJob=nil;library.task=nil;library.updateButtons();changed?()}
             do {
                 try Task.checkCancellation();_ = try backend.context(request)
-                if request.command == .capture {
+                if request.command.toolMutation {
+                    jobs[job.id]?.sideEffectsPossible=true
+                    jobs[job.id]?.tools=try await backend.toolMutate(request)
+                    try Task.checkCancellation();guard enabled else{throw CancellationError()}
+                    jobs[job.id]?.status="succeeded"
+                } else if request.command == .capture {
                     var captured=try await backend.capture(context)
                     try Task.checkCancellation();guard enabled else {throw CancellationError()}
                     captured.name=name;_ = try backend.context(request)

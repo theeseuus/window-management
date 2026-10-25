@@ -35,6 +35,16 @@ enum StoreTests {
         let reopened = try LayoutStore(url:url); try reopened.delete("Other")
         check(reopened.catalog.recipes.isEmpty,"Deletion persists empty catalog")
         check(try JSONDecoder().decode(Catalog.self,from:Data(contentsOf:previousURL)) == external,"Deletion retains recoverable prior catalog")
+        try reopened.save(recipe,replace:false)
+        try reopened.rename("Work",to:"Renamed")
+        check(reopened.catalog.recipes["Work"]==nil && reopened.catalog.recipes["Renamed"]?.name=="Renamed","rename preserves recipe identity and removes old name")
+        check(try JSONDecoder().decode(Catalog.self,from:Data(contentsOf:previousURL)).recipes["Work"]==recipe,"rename keeps recoverable catalog")
+        rejects { try reopened.rename("Missing",to:"Other") }
+        rejects { try reopened.merge(external);try reopened.rename("Renamed",to:"Other") }
+        let beforeConflict=try Data(contentsOf:url)
+        var conflict=Catalog();conflict.recipes["Other"]=Recipe(name:"Other",capturedAt:"different",windows:recipe.windows)
+        rejects {try reopened.merge(conflict)}
+        check(try Data(contentsOf:url)==beforeConflict,"inline conflicting merge preserves all bytes")
         print("native store: \(assertions) assertions passed; temporary state cleaned")
     }
 }

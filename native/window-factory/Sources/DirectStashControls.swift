@@ -116,10 +116,17 @@ final class DirectStashControls {
             guard let self else { return }
             defer { if serial == current { task = nil; changed?() } }
             do {
+                try await perform(entry,restoring:restoring,bringForward:bringForward,front:front,requireFocus:true,showHUD:true)
+            } catch is CancellationError { }
+            catch { if serial == current { lastResult = error.localizedDescription; hud.show(lastResult) } }
+        }
+    }
+    private func perform(_ entry: Saved,restoring: Bool,bringForward: Bool,front: pid_t?,requireFocus: Bool,showHUD: Bool) async throws {
                 try check(entry)
                 let w = entry.window
                 @MainActor func guardFocus() throws {
                     try self.check(entry)
+                    if !requireFocus{return}
                     guard NSWorkspace.shared.frontmostApplication?.processIdentifier == front else { throw FactoryError("Focus changed; stash operation stopped.") }
                     if !bringForward {
                         let root = AXUIElementCreateApplication(w.pid); AXUIElementSetMessagingTimeout(root,0.15)
@@ -136,7 +143,7 @@ final class DirectStashControls {
                     guard actual.matches(w.frame) else { throw FactoryError("Saved frame not reached; restoration remains available.") }
                     saved.removeValue(forKey:key(w)); order.removeAll{$0 == key(w)}
                     if bringForward { var main: Int32 = 0, raised: Int32 = 0; _ = WFRequestWindowFocus(w.element,w.pid,&main,&raised) }
-                    lastResult = "Restored \(w.appName)."; hud.show("RESTORED",on:entry.context.screen)
+                    lastResult = "Restored \(w.appName)."; if showHUD{hud.show("RESTORED",on:entry.context.screen)}
                 } else {
                     try guardFocus()
                     let destination = StashGeometry.destination(w.frame,on:entry.context.frame)
@@ -147,11 +154,28 @@ final class DirectStashControls {
                         if StashGeometry.confirmed(try read(w),original:w.frame,screen:entry.context.frame) { confirmed = true; break }
                     }
                     guard confirmed else { throw FactoryError("Stash position not confirmed; original frame is retained for recovery.") }
-                    lastResult = "Stashed \(w.appName). Press Tab + S again to restore."; hud.show("STASH",on:entry.context.screen)
+                    lastResult = "Stashed \(w.appName). Press Tab + S again to restore."; if showHUD{hud.show("STASH",on:entry.context.screen)}
                 }
-            } catch is CancellationError { }
-            catch { if serial == current { lastResult = error.localizedDescription; hud.show(lastResult) } }
-        }
     }
+    func forAgent(id: UInt32,restoring: Bool,window: LiveWindow?,context: Context) async throws->Frame {
+        guard !isBusy else{throw AgentFailure("busy","Stash owner is busy.")}
+        let entry: Saved
+        if restoring {
+            guard let value=saved.values.first(where:{$0.window.id==id && $0.context.display==context.display && $0.context.space==context.space}) else{throw AgentFailure("stash_not_found","No saved stash matches that window and desktop.")};entry=value
+        }else{
+            if let prior=saved.values.first(where:{$0.window.id==id && $0.context.display==context.display && $0.context.space==context.space}){return try read(prior.window)}
+            guard let window,window.id==id else{throw AgentFailure("window_not_found","Window is not eligible here.")}
+            if saved[key(window)] != nil{return try read(window)}
+            try window.eligible(in:context)
+            guard saved.count<512 else{throw AgentFailure("stash_full","Restore saved windows before adding another stash.")}
+            let destination=StashGeometry.destination(window.frame,on:context.frame),top=NSScreen.screens.first?.frame.maxY ?? 0
+            for screen in NSScreen.screens where screen !== context.screen {let f=screen.frame;if destination.isVisible(in:Frame(x:f.minX,y:top-f.maxY,w:f.width,h:f.height)){throw FactoryError("Stash would enter another display.")}}
+            entry=Saved(window:window,context:context);saved[key(window)]=entry;order.append(key(window))
+        }
+        tilingTransition?(id,restoring);defer{changed?()}
+        try await perform(entry,restoring:restoring,bringForward:false,front:nil,requireFocus:false,showHUD:false)
+        return try read(entry.window)
+    }
+    func agentStashes()->[UInt32] {windowIDs.sorted()}
     func stop() { WFUnregisterStashHotKey(); task?.cancel(); active = false; hud.stop() }
 }

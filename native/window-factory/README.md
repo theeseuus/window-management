@@ -66,12 +66,9 @@ Remaining verification and polish, before adding a new feature:
 
 Deferred feature choices:
 
-- **Agent CLI coverage:** inventory/app launching, standalone window creation,
-  tiling and direct controls are not all exposed. The phased audit is in
-  [CLI.md](CLI.md#coverage-review-and-next-increments); this UI update does not
-  expand agent access.
-- **Application icon:** develop a visual identity after Settings and the CLI
-  priorities are settled. No icon asset is selected yet.
+- **Application icon:** blue Pane arrangement selected; refined concept in
+  [Resources/Design](Resources/Design/README.md), pending small-size review and packaging.
+- Other feature work is deferred while the owner uses the app in daily work.
 - **Custom geometries:** add user-defined size/position geometries later.
 - **Layout editor:** drag/resize the saved window rectangles with save/cancel
   and undo; separate from ordering layout rows.
@@ -215,7 +212,7 @@ adapter, and checks for one newly eligible window on the captured desktop.
 This action does not use the layout Coordinator, apply frames, explicitly
 activate Codex, or pause/rejoin the tiler. It is suitable for testing whether
 a window arrives through normal automatic tiling insertion. Establish retains
-its existing pause-and-place semantics. No default global chord or CLI command is added. Configure an optional binding
+its existing pause-and-place semantics. No default global chord is added; agent creation is documented in [CLI.md](CLI.md). Configure an optional binding
 in **Settings → Shortcuts → Library → New Codex Window**. It starts unassigned;
 record a chord to use it, or use the row reset to clear it. The Library group
 switch also releases this binding. Keyboard Shortcuts and menu hints read the

@@ -11,6 +11,8 @@ struct AgentBackend {
     var windows: @MainActor (AgentDesktop) async throws -> [AgentWindow]
     var capture: @MainActor (AgentDesktop) async throws -> Recipe
     var apply: @MainActor (Recipe,Bool,AgentDesktop,@escaping @MainActor (String)->Void) async throws -> Receipt
+    var toolQuery: @MainActor (AgentRequest) async throws->AgentToolResult = {_ in throw AgentFailure("unavailable","Tool backend is unavailable.")}
+    var toolMutate: @MainActor (AgentRequest) async throws->AgentToolResult = {_ in throw AgentFailure("unavailable","Tool backend is unavailable.")}
     static func live(_ library: LibraryWindow) -> Self {
         func resolve(_ display: UInt32?,_ space: UInt64?) throws -> Context {
             guard let display,let space,let screen=NSScreen.screens.first(where:{($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value==display}) else {throw AgentFailure("context_changed","Requested display is unavailable.")}

@@ -118,6 +118,53 @@ import Darwin
         check(parsed.request.command == .capture && parsed.waitSeconds==60,"CLI accepts documented invocation")
         let unknownFields=Data("{\"version\":1,\"id\":\"\(UUID().uuidString)\",\"command\":\"status\",\"replace\":false,\"enable\":true}".utf8)
         check(!(await service.handle(unknownFields)).ok,"unknown wire fields rejected")
+        var toolDispatches=0
+        service.stashedWindowIDs={ [71] }
+        service.connectTools(query:{request in
+            AgentToolResult(message:request.command.rawValue)
+        },mutate:{request in
+            toolDispatches+=1
+            try await Task.sleep(for:.milliseconds(35))
+            return AgentToolResult(windowID:request.windowID,message:request.command.rawValue)
+        })
+        check(await call(AgentRequest(command:.status)).result?.status?.stashedWindowIDs == [71],"shared stash IDs are discoverable")
+        for command in [AgentCommand.apps,.tilingStatus,.layoutExport] {
+            let answer=await call(AgentRequest(command:command))
+            check(answer.ok && answer.result?.tools?.message==command.rawValue,"read-only tool query routes without opening UI")
+        }
+        var toolRequests:[AgentRequest]=[]
+        for command in [AgentCommand.appOpen,.newWindow] {var value=request(command);value.bundleID="local.fixture";toolRequests.append(value)}
+        var tile=request(.tiling);tile.action="options";tile.gap=12;toolRequests.append(tile)
+        var win=request(.window);win.action="geometry";win.windowID=7;win.geometry="centeredHalf";toolRequests.append(win)
+        var rename=request(.layoutRename,name:"Fixture");rename.newName="Renamed";toolRequests.append(rename)
+        var deletion=request(.layoutDelete,name:"Fixture");deletion.confirm=true;toolRequests.append(deletion)
+        var ordering=request(.layoutOrder);ordering.names=["Fixture"];toolRequests.append(ordering)
+        var importing=request(.layoutImport);var catalog=Catalog();catalog.recipes[fixture.name]=fixture;importing.catalog=catalog;toolRequests.append(importing)
+        for value in toolRequests {
+            let before=toolDispatches
+            let start=await call(value);check(start.code=="accepted","tool mutation is a tracked job")
+            let duplicate=await call(value)
+            check(duplicate.result?.job?.id==start.result?.job?.id,"tool retry returns same job")
+            let finish=try await completed(start.result!.job!.id)
+            check(finish.status=="succeeded" && finish.tools?.message==value.command.rawValue && toolDispatches==before+1,"tool receipt is terminal and dispatch occurs once")
+        }
+        let contextFlags=["--display","1","--space","42"]
+        let invalidToolArgs:[[String]]=[
+            ["app-open","--bundle-id","bad/path"]+contextFlags,
+            ["window","--action","geometry","--window","7","--geometry","unknown"]+contextFlags,
+            ["window","--action","focus","--window","7","--direction","1"]+contextFlags,
+            ["tiling","--action","options"]+contextFlags,
+            ["tiling","--action","split","--split",UUID().uuidString,"--ratio","0.99"]+contextFlags,
+            ["tiling","--action","float"]+contextFlags,
+            ["layout-delete","--name","Fixture"]+contextFlags,
+            ["layout-order","--names-json","[\"Fixture\",\"Fixture\"]"]+contextFlags,
+            ["status","--action","enable"]]
+        for args in invalidToolArgs {do{_ = try AgentCLI.parse(args);check(false,"invalid tool arguments accepted")}catch{check(true,"strict action fields rejected before dispatch")}}
+        var cancelTool=request(.newWindow);cancelTool.bundleID="local.fixture"
+        let toolStart=await call(cancelTool)
+        var cancelToolRequest=AgentRequest(command:.cancel);cancelToolRequest.jobID=toolStart.result!.job!.id
+        _=await call(cancelToolRequest)
+        check(try await completed(toolStart.result!.job!.id).status=="cancelled","tool cancellation shares job cancellation")
         service.stop()
         let unsafe=root.appendingPathComponent("unsafe").path
         try FileManager.default.createDirectory(atPath:unsafe,withIntermediateDirectories:false,attributes:[.posixPermissions:0o755])

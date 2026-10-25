@@ -5,7 +5,8 @@ final class DirectAccordionControls {
     private let preferences: FactoryPreferences
     private let hud = GeometryHUD()
     private var task: Task<Void,Never>?
-    var isBusy: Bool { task != nil }
+    private var agentRunning=false
+    var isBusy: Bool { task != nil || agentRunning }
     var active = false
     var lastResult = "Native accordion is disabled."
     var willArrange: (()->Void)?
@@ -71,7 +72,7 @@ final class DirectAccordionControls {
     }
     private func check(_ anchor: LiveWindow,_ context: Context) throws {
         try Task.checkCancellation(); try anchor.eligible(in:context)
-        guard !workspaceBusy(),NSWorkspace.shared.frontmostApplication?.processIdentifier == anchor.pid else { throw FactoryError("Focus or workspace operation changed; accordion stopped.") }
+        guard (!workspaceBusy() || agentRunning),NSWorkspace.shared.frontmostApplication?.processIdentifier == anchor.pid else { throw FactoryError("Focus or workspace operation changed; accordion stopped.") }
         let root = AXUIElementCreateApplication(anchor.pid); AXUIElementSetMessagingTimeout(root,0.1)
         guard let focused = axElement(attribute(root,kAXFocusedWindowAttribute)),WFWindowID(focused) == anchor.id,
               try read(anchor.element).matches(anchor.frame) else { throw FactoryError("Anchor changed; accordion stopped.") }
@@ -85,7 +86,7 @@ final class DirectAccordionControls {
         // app's focused window; the anchor is raised and restored last.
         for id in AccordionGeometry.raiseOrder(anchor:anchor.id,fan:plan) {
             try context.check()
-            guard !workspaceBusy(),NSWorkspace.shared.frontmostApplication?.processIdentifier == anchor.pid,
+            guard (!workspaceBusy() || agentRunning),NSWorkspace.shared.frontmostApplication?.processIdentifier == anchor.pid,
                   try read(anchor.element).matches(anchor.frame),
                   let target = windows.first(where:{$0.id == id}) else { throw FactoryError("Focus or anchor changed; accordion ordering stopped.") }
             try target.eligible(in:context)
@@ -101,7 +102,7 @@ final class DirectAccordionControls {
         let expected = [anchor.id]+plan.map(\.id),ids = Set(expected)
         for _ in 0..<6 {
             try await Task.sleep(for:.milliseconds(30)); try context.check()
-            guard !workspaceBusy(),NSWorkspace.shared.frontmostApplication?.processIdentifier == anchor.pid,
+            guard (!workspaceBusy() || agentRunning),NSWorkspace.shared.frontmostApplication?.processIdentifier == anchor.pid,
                   try read(anchor.element).matches(anchor.frame) else { throw FactoryError("Focus or anchor changed; accordion verification stopped.") }
             try anchor.eligible(in:context)
             let root = AXUIElementCreateApplication(anchor.pid); AXUIElementSetMessagingTimeout(root,0.1)
@@ -114,7 +115,7 @@ final class DirectAccordionControls {
         throw FactoryError(rejected ? "Frames placed; the app rejected accordion stacking and the expected order was not confirmed." : "Frames placed; accordion stacking order was not confirmed.")
     }
     func run() {
-        guard active,task == nil,!workspaceBusy() else { return }
+        guard active,task == nil,!agentRunning,!workspaceBusy() else { return }
         do {
             let (anchor,context,others) = try snapshot()
             willArrange?()
@@ -122,6 +123,13 @@ final class DirectAccordionControls {
                 guard let self else { return }
                 defer { task = nil; changed?() }
                 do {
+                    try await perform(anchor:anchor,context:context,others:others,showHUD:true)
+                } catch is CancellationError { lastResult = "Accordion cancelled." }
+                catch { lastResult = error.localizedDescription; hud.show(lastResult) }
+            }
+        } catch { lastResult = error.localizedDescription; hud.show(lastResult); changed?() }
+    }
+    private func perform(anchor: LiveWindow,context: Context,others: [LiveWindow],showHUD: Bool) async throws {
                     let plan = AccordionGeometry.plan(anchor:AccordionRecord(id:anchor.id,frame:anchor.frame),others:others.map{AccordionRecord(id:$0.id,frame:$0.frame)},screen:context.frame)
                     for destination in plan {
                         try check(anchor,context)
@@ -142,11 +150,14 @@ final class DirectAccordionControls {
                     }
                     guard placed == plan.count else { throw FactoryError("Accordion placed \(placed) of \(plan.count) other windows; the app constrained the remaining frames.") }
                     try await stack(plan,anchor:anchor,others:others,context:context)
-                    lastResult = "Accordion: \(plan.count+1) windows; anchor unchanged."; hud.show("ACC \(plan.count+1)",on:context.screen)
-                } catch is CancellationError { lastResult = "Accordion cancelled." }
-                catch { lastResult = error.localizedDescription; hud.show(lastResult) }
-            }
-        } catch { lastResult = error.localizedDescription; hud.show(lastResult); changed?() }
+                    lastResult = "Accordion: \(plan.count+1) windows; anchor unchanged."; if showHUD{hud.show("ACC \(plan.count+1)",on:context.screen)}
+    }
+    func forAgent(id: UInt32,context: Context) async throws {
+        guard !isBusy else{throw AgentFailure("busy","Accordion owner is busy.")}
+        let (anchor,actual,others)=try snapshot()
+        guard anchor.id==id,actual.space==context.space,actual.display==context.display else{throw AgentFailure("window_changed","Exact accordion anchor changed.")}
+        agentRunning=true;defer{agentRunning=false;changed?()};willArrange?()
+        try await perform(anchor:anchor,context:actual,others:others,showHUD:false)
     }
     func stop() { WFUnregisterAccordionHotKey(); task?.cancel(); active = false; hud.stop() }
 }

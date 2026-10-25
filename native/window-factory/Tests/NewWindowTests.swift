@@ -267,6 +267,11 @@ struct NewWindowTests {
     reloaded.stop()
     corrupt.stop()
     ref.stop()
+    here=target;mode="success";ids=[1,2];let beforeAgent=creates
+    let agentReceipt=try await action.forAgent("com.openai.codex",target:target)
+    check(creates==beforeAgent+1 && agentReceipt.target==target && !action.isBusy,"agent creation shares one-dispatch engine and explicit target")
+    mode="prepare-fail";let beforeRejected=creates
+    do{_ = try await action.forAgent("com.openai.codex",target:target);check(false,"agent preparation must fail")}catch{check(creates==beforeRejected,"agent preflight failure never dispatches")}
     print(
       "native new-window action: \(count) assertions passed; injected desktop only, no live app creation or UI activation"
     )

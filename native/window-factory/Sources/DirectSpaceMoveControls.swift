@@ -6,7 +6,8 @@ final class DirectSpaceMoveControls {
     private let hud = GeometryHUD()
     private var task: Task<Void,Never>?
     var active = false
-    var isMoving: Bool { task != nil }
+    private var agentRunning=false
+    var isMoving: Bool { task != nil || agentRunning }
     var lastResult = "Native Space movement is disabled."
     var willMove: (()->Void)?
     var workspaceBusy: () -> Bool = { false }
@@ -65,11 +66,9 @@ final class DirectSpaceMoveControls {
         try window.eligible(in:context)
         return (window,context)
     }
-    func run(_ direction: Int) {
-        guard active,!isMoving,!workspaceBusy() else { return }
-        do {
-            let (window,context) = try snapshot()
-            willMove?()
+    private struct Prepared {let entries: [SpaceMoveEntry];let plan: SpaceMovePlan;let sourceWindows: [(UInt32,pid_t)];let input: [UInt32]}
+    private func inputCounts()->[UInt32] {[CGEventType.keyDown,.leftMouseDown,.rightMouseDown,.otherMouseDown].map{CGEventSource.counterForEventType(.combinedSessionState,eventType:$0)}}
+    private func prepare(_ direction: Int,window: LiveWindow,context: Context)throws->Prepared {
             let entries = try topology(context.display)
             let plan = try SpaceMovement.plan(entries,current:context.space,direction:direction)
             let sourceWindows = (CGWindowListCopyWindowInfo(.optionOnScreenOnly,kCGNullWindowID) as? [[String:Any]] ?? []).compactMap { entry -> (UInt32,pid_t)? in
@@ -78,17 +77,10 @@ final class DirectSpaceMoveControls {
                       (entry[kCGWindowLayer as String] as? Int) == 0,WFWindowSpaces(id)?.map(\.uint64Value) == [plan.source] else { return nil }
                 return (id,pid)
             }
-            // Counts reveal intervening input without reading key contents,
-            // installing an event tap, or requesting Input Monitoring.
-            func inputCounts() -> [UInt32] {
-                [CGEventType.keyDown,.leftMouseDown,.rightMouseDown,.otherMouseDown].map {
-                    CGEventSource.counterForEventType(.combinedSessionState,eventType:$0)
-                }
-            }
-            let startingInput = inputCounts()
-            task = Task { @MainActor [weak self] in
-                guard let self else { return }
-                defer { task = nil; changed?() }
+        return Prepared(entries:entries,plan:plan,sourceWindows:sourceWindows,input:inputCounts())
+    }
+    private func perform(_ direction: Int,window: LiveWindow,context: Context,prepared: Prepared) async throws {
+        let entries=prepared.entries,plan=prepared.plan,sourceWindows=prepared.sourceWindows,startingInput=prepared.input
                 var moved = false,followed = false
                 do {
                     @MainActor func current() throws -> UInt64 {
@@ -99,7 +91,7 @@ final class DirectSpaceMoveControls {
                     @MainActor func identity() throws {
                         try Task.checkCancellation()
                         guard inputCounts() == startingInput else { throw FactoryError("New keyboard or pointer input; Space command stopped.") }
-                        guard !workspaceBusy(),
+                        guard (!workspaceBusy() || agentRunning),
                               NSRunningApplication(processIdentifier:window.pid)?.bundleIdentifier == window.bundleID,
                               NSRunningApplication(processIdentifier:window.pid)?.isHidden == false,
                               WFWindowID(window.element) == window.id,
@@ -175,15 +167,32 @@ final class DirectSpaceMoveControls {
                             return WFWindowID(focused) == window.id
                         })
                     })
-                    lastResult = "\(direction<0 ? "←" : "→") Desktop \(plan.ordinal): exact window moved, followed and focused."
-                    hud.show(lastResult,on:context.screen)
-                } catch is CancellationError { lastResult = "Space command cancelled; verify the moved window's desktop." }
-                catch {
-                    let prefix = moved ? (followed ? "Move/follow dispatched. " : "Move dispatched. ") : ""
-                    lastResult = prefix+error.localizedDescription; hud.show(lastResult,on:context.screen)
+                    lastResult="\(direction<0 ? "←" : "→") Desktop \(plan.ordinal): exact window moved, followed and focused."
+                }catch is CancellationError{throw CancellationError()}catch{
+                    let prefix=moved ? (followed ? "Move/follow dispatched. " : "Move dispatched. ") : ""
+                    throw FactoryError(prefix+error.localizedDescription)
                 }
+    }
+    func run(_ direction: Int) {
+        guard active,!isMoving,!workspaceBusy() else{return}
+        do {
+            let (window,context)=try snapshot();willMove?();let prepared=try prepare(direction,window:window,context:context)
+            task=Task{@MainActor [weak self] in
+                guard let self else{return};defer{task=nil;changed?()}
+                do{try await perform(direction,window:window,context:context,prepared:prepared);hud.show(lastResult,on:context.screen)}
+                catch is CancellationError{lastResult="Space command cancelled; verify the moved window's desktop."}
+                catch{lastResult=error.localizedDescription;hud.show(lastResult,on:context.screen)}
             }
-        } catch { lastResult = error.localizedDescription; hud.show(lastResult); changed?() }
+        }catch{lastResult=error.localizedDescription;hud.show(lastResult);changed?()}
+    }
+    func forAgent(_ direction: Int,id: UInt32,context: Context) async throws->UInt64 {
+        guard !isMoving else{throw AgentFailure("busy","Space owner is busy.")}
+        let (window,actual)=try snapshot()
+        guard window.id==id,actual.display==context.display,actual.space==context.space else{throw AgentFailure("window_changed","Exact move target changed.")}
+        agentRunning=true;defer{agentRunning=false;changed?()};willMove?()
+        let prepared=try prepare(direction,window:window,context:actual)
+        try await perform(direction,window:window,context:actual,prepared:prepared)
+        return prepared.plan.destination
     }
     func stop() { WFUnregisterSpaceMoveHotKeys(); task?.cancel(); active = false; hud.stop() }
 }

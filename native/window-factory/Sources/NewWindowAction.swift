@@ -67,7 +67,8 @@ final class NewWindowAction {
   private(set) var dispatched = false
   var blocked: () -> Bool = { false }
   var changed: (() -> Void)?
-  var isBusy: Bool { task != nil }
+  private var agentBusy = false
+  var isBusy: Bool { task != nil || agentBusy }
   init(adapters: [String: Adapter], backend: NewWindowBackend) {
     self.adapters = adapters
     self.backend = backend
@@ -87,34 +88,47 @@ final class NewWindowAction {
         changed?()
       }
       do {
-        let target = try backend.target()
-        try backend.prepare(adapter, target)
-        let before = try await backend.inventory(adapter, target)
-        try Task.checkCancellation()
-        try backend.prepare(adapter, target)
-        // Mark uncertainty before dispatch. Never resend after an error or timeout.
-        dispatched = true
-        try await backend.create(adapter, target)
-        for _ in 0..<50 {
-          try Task.checkCancellation()
-          let fresh = try await backend.inventory(adapter, target).subtracting(before)
-          guard fresh.count <= 1 else {
-            throw FactoryError("Multiple new windows appeared. The request was not retried.")
-          }
-          if let id = fresh.first {
-            receipt = NewWindowReceipt(windowID: id, target: target)
-            lastResult = "New window created here."
-            return
-          }
-          try await backend.wait()
-        }
-        throw FactoryError(
-          "The new window was not confirmed on this desktop. The request was not retried.")
+        receipt = try await perform(adapter, target: backend.target())
+        lastResult = "New window created here."
       } catch is CancellationError {
         lastResult = "Window request stopped; any window already created is left open."
       } catch { lastResult = error.localizedDescription }
     }
     changed?()
+  }
+  private func perform(_ adapter: Adapter, target: NewWindowTarget) async throws -> NewWindowReceipt
+  {
+    try backend.prepare(adapter, target)
+    let before = try await backend.inventory(adapter, target)
+    try Task.checkCancellation()
+    try backend.prepare(adapter, target)
+    // Mark uncertainty before dispatch. Never resend after an error or timeout.
+    dispatched = true
+    try await backend.create(adapter, target)
+    for _ in 0..<50 {
+      try Task.checkCancellation()
+      let fresh = try await backend.inventory(adapter, target).subtracting(before)
+      guard fresh.count <= 1 else {
+        throw FactoryError("Multiple new windows appeared. The request was not retried.")
+      }
+      if let id = fresh.first {
+        return NewWindowReceipt(windowID: id, target: target)
+      }
+      try await backend.wait()
+    }
+    throw FactoryError(
+      "The new window was not confirmed on this desktop. The request was not retried.")
+  }
+  func forAgent(_ bundleID: String, target: NewWindowTarget) async throws -> NewWindowReceipt {
+    guard !isBusy, let adapter = adapters[bundleID], adapter.kind != "launch-only" else {
+      throw AgentFailure("unavailable", "No reviewed window creation operation is available.")
+    }
+    agentBusy = true
+    dispatched = false
+    defer { agentBusy = false }
+    let result = try await perform(adapter, target: target)
+    receipt = result
+    return result
   }
   func stop() { task?.cancel() }
 }
@@ -132,7 +146,7 @@ enum WindowCreationMenus {
     let window = menu.addItem(withTitle: "New Codex Window", action: create, keyEquivalent: "")
     window.target = target
     window.isEnabled = available
-    MenuShortcut.apply(chord,to:window)
+    MenuShortcut.apply(chord, to: window)
     return menu
   }
 }

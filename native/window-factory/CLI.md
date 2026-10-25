@@ -1,6 +1,6 @@
 # Window Factory CLI
 
-`window-factory` provides JSON access to the running app's layout operations.
+`window-factory` provides JSON access to the running app's layout, application, tiling and direct window operations.
 It does not open Window Factory’s library, confirmation panels or Settings,
 activate Window Factory, register shortcuts, launch a second app instance or grant
 permissions. Establish can open the requested target-app windows; macOS may still
@@ -42,36 +42,55 @@ ordinal printed in the menu bar. Modifying requests require both IDs. A changed
 or unavailable desktop produces `context_changed` and does not start an operation.
 The existing engine continues checking its context during execution.
 
-Direct geometry, focus, stash, switcher, accordion and move-and-follow commands,
-tiling, application launching/shortcut editing, layout import/export/delete,
-arbitrary scripts and arbitrary file paths are not
-exposed in protocol 1. Their working keyboard implementations remain in place.
-Use `capabilities`; do not infer a command from a UI label.
+## Extended controls (build 46)
 
-## Coverage review and next increments
+The command set now includes the following operations. Mutations use the same
+tracked jobs, request-ID deduplication, access gate and busy protection as layouts.
+They require explicit active display/Space IDs, including catalog mutations.
 
-Reviewed against the installed capabilities and current native features on
-2026-10-25. Protocol 1 exposes nine commands and covers the accepted saved-layout
-workflow. It does not yet provide agent access to all Window Factory features.
+| Command | Target and result |
+| --- | --- |
+| `apps` | Installed app identities and running state; credential apps, Hammerspoon and Window Factory itself excluded |
+| `app-open --bundle-id ID` | Activate/open an exact installed app through ApplicationLauncher; activation can follow its existing window to another Space |
+| `new-window --bundle-id ID` | One reviewed adapter creation on the requested current desktop; app must already be running |
+| `tiling-status` | Session target/state, selected/tiled/floating/parked IDs, split UUIDs/ratios, options, exclusions and undo availability |
+| `tiling --action ACTION` | Enable/disable, pause/resume, select, float/rejoin, split edit, balance/swap, restore previous positions and gap/margin/axis options |
+| `window --action ACTION --window ID` | Exact-window geometry, focus, stash/restore, adjacent-Space move-and-follow and accordion |
+| `layout-rename --name NAME --new-name NAME` | Rename through the atomic store and retain library ordering |
+| `layout-delete --name NAME --confirm` | Explicit deletion with previous-catalog recovery |
+| `layout-order --names-json JSON` | Every current layout name exactly once |
+| `layout-export` | Catalog in `result.tools.catalog`, order in `result.tools.names` |
+| `layout-import --input FILE` | Client reads a raw Catalog JSON file and sends it inline; merge rejects conflicting replacements |
 
-| Area | Current coverage | Proposed next increment |
-| --- | --- | --- |
-| Status and saved layouts | Status, capabilities, active-desktop windows, list, Capture, Restore, Establish, jobs and cancellation | Retain existing behavior and structured receipts |
-| Tiling visibility | Not exposed | Read-only session target, enabled/paused state, tree/ratios, tiled/floating/parked IDs, last result and undo availability |
-| Applications | Not exposed | List/search installed apps and launch/activate by exact bundle identity through ApplicationLauncher |
-| Standalone window creation | Not exposed | Invoke the reviewed NewWindowAction with explicit desktop context and a single-dispatch receipt |
-| Tiling actions | Not exposed | Context-bound enable/disable, pause/resume, split edit, balance/swap, float/rejoin and previous-frame restore through TilingController |
-| Direct controls | Not exposed | Explicit window-ID geometry, focus, stash/restore and Space movement; avoid simulating keys or driving the interactive switcher |
-| Catalog management | Read/list and Capture only | Consider rename/order/delete/import/export separately, with deliberate replacement and recovery semantics |
-| Preferences and bindings | Not exposed | Keep access enablement owner-controlled; shortcut/config editing needs a separate decision |
+`--help` lists action flags. Window geometry names are `sizeNext`, `sizePrevious`,
+`positionNext`, `positionPrevious`, `halvesNext`, `halvesPrevious`, `thirdsNext`,
+`thirdsPrevious`, `quartersNext`, `quartersPrevious`, `eighthsNext`,
+`eighthsPrevious`, `centeredHalf`, `restoreFrame`, `centerHorizontally`, `narrower`,
+`wider`, `maximize`, `minimize`. Manual geometry floats a tiled window as usual.
+Stash is explicit/idempotent rather than a toggle; `status.stashedWindowIDs`
+identifies saved stashes for `restore-stash` even if offscreen.
 
-Recommended sequence is read-only tiling/app visibility first, then application
-and standalone-window actions, then tiling mutations. Direct-control and catalog
-parity can follow demonstrated agent use cases. Any additions must reuse existing
-operation owners, preserve Agent access and same-user checks, require explicit
-window/desktop identities for mutations, define idempotency and cancellation, and
-return observed receipts rather than claim completion at dispatch. UI commands do
-not automatically become agent commands. No API capability is added by this review.
+Tiling actions `select`, `float`, `rejoin`, `swap` require `--window ID`.
+`split` requires `--split UUID` plus `--ratio 0.15...0.85` and/or
+`--axis columns|rows`. `options` requires at least one of `--gap 0...48`,
+`--margin 0...48`, `--axis columns|rows`. Other actions take no window ID.
+`move-space` requires `--direction -1` or `1`. Tiling operations have a bounded
+settlement wait and pause on cancellation/timeout. The session must belong to
+the requested desktop. Status reports cached `observedFrame` alongside
+`plannedFrame`; use `windows` for a fresh live inventory. New-window completion
+confirms creation, not completion of the subsequently scheduled tiling reflow.
+
+New tool jobs place their result in `result.job.tools`; read-only tool queries use
+`result.tools`. The original layout recipe/receipt fields remain unchanged.
+Import accepts Catalog JSON, not the full export response envelope. It never asks
+the app to read an arbitrary filesystem path. Export does not write files.
+
+Preferences, shortcut editing, permission grants, arbitrary scripts, interactive
+switcher driving and application-state capture remain outside the agent API.
+Tiling exclusions are inspectable; edit them through Settings. Use explicit focus
+rather than simulating the switcher. Existing working keyboard paths are shared,
+not duplicated. Broader live mutation acceptance remains a separate desktop pilot;
+fixture checks are not proof of all installed app/Space scenarios.
 
 ## Practical use
 

@@ -13,6 +13,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
     var settings: SettingsWindow?
     var shortcutReference: ShortcutReferenceWindow?
     var agent: AgentService?
+    var agentTools: AgentTools?
+    var agentWindows: AgentDirectWindows?
     var keybindings: KeybindingManager?
     var launcher: LauncherControls?
     private var loginLaunch = false
@@ -150,8 +152,13 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 spaceIndicator?.newCodexChord = { [weak creationKey] in creationKey?.chord }
                 spaceIndicator?.newCodexAvailable = { [weak creator] in creator?.available("com.openai.codex") == true }
                 let service=AgentService(preferences:preferences,library:library);agent=service;settings?.agent=service
-                service.extraBusy = { [weak self] in self?.geometry?.isBusy == true || self?.focus?.isBusy == true || self?.stash?.isBusy == true || self?.accordion?.isBusy == true || self?.spaceMove?.isMoving == true || self?.switcher?.isOpen == true || self?.tiling?.controller.isBusy == true || self?.newWindow?.isBusy == true }
-                service.changed = { [weak self] in self?.settings?.refresh() }
+                service.extraBusy = { [weak self] in self?.geometry?.isBusy == true || self?.focus?.isBusy == true || self?.stash?.isBusy == true || self?.accordion?.isBusy == true || self?.spaceMove?.isMoving == true || self?.switcher?.isOpen == true || self?.tiling?.controller.isBusy == true || self?.newWindow?.isBusy == true || self?.applications?.isLaunching == true }
+                let tools=AgentTools(library:library,apps:appLauncher,creation:creator,tiling:feature.controller);agentTools=tools
+                let direct=AgentDirectWindows(geometry:geometry!,stash:stash!,move:spaceMove!,accordion:accordion!);agentWindows=direct
+                tools.windowOperation={ [weak direct] request,context,window in guard let direct else{throw AgentFailure("unavailable","Window owners unavailable.")};return try await direct.perform(request,context:context,window:window)}
+                service.stashedWindowIDs = {[weak stash] in stash?.agentStashes() ?? []}
+                service.connectTools(query:{[weak tools] in guard let tools else{throw AgentFailure("unavailable","Tools unavailable.")};return try await tools.query($0)},mutate:{[weak tools] in guard let tools else{throw AgentFailure("unavailable","Tools unavailable.")};return try await tools.mutate($0)})
+                service.changed = { [weak self] in self?.settings?.refresh();self?.tiling?.controller.schedule() }
                 do {try service.restorePreference()} catch {preferences.agentAccessEnabled=false;library.status.stringValue="Agent access: \(error.localizedDescription)"}
                 settings?.refresh()
             }

@@ -21,8 +21,8 @@ final class TilingFeature {
       settings?.refreshSession()
     }
     controller.externalBusy = {
-      [weak library, weak geometry, weak stash, weak accordion, weak spaceMove, weak switcher] in
-      library?.task != nil || library?.frozen != nil || geometry?.isBusy == true
+      [weak library, weak geometry, weak stash, weak accordion, weak spaceMove, weak switcher,weak controller] in
+      (library?.task != nil && controller?.agentOperation != true) || library?.frozen != nil || geometry?.isBusy == true
         || stash?.isBusy == true || accordion?.isBusy == true || spaceMove?.isMoving == true
         || switcher?.isOpen == true || ShortcutRecorder.current?.isRecording == true
     }
