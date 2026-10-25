@@ -23,9 +23,9 @@ and accepted in Window Factory. No core controller group remains to port.
 | Menu-bar Space badge and app access | Accepted |
 | Library launcher, Dock visibility, optional login startup | Tab+R and Dock visibility accepted; actual login startup remains untested; Settings observed enabled on 2026-10-25 |
 | Capture, Restore, Establish, repeat without duplicates | Accepted Rex/Safari/Codex desktop pilots; all 16 adapters shipped, broader live coverage remains |
-| Configurable keybindings and reference | Accepted; 31 global commands, Tab+/ toggles reference |
+| Configurable keybindings and reference | Accepted; 31 fixed controls plus optional New Codex Window binding; Tab+/ toggles reference |
 | Library presentation | Thumbnails/icons, Delete/context menu, name-ranked search, optional proportional preview and drag ordering accepted |
-| Binary-tree tiling | Build 42 Rex and mixed-app pilots accepted, including empty-desktop activation, automatic Rex/Safari insertion, preview resizing, mixed-app stash/restore and Codex manual joining; direct Codex automatic insertion remains unverified |
+| Binary-tree tiling | Rex/Safari empty-desktop insertion, mixed-app resizing/stash/restore and prior Rex reflow/undo accepted; build 44 New Codex Window shortcut opens on the current Space and joins automatically |
 | Applications and launch shortcuts | Tab+A search, Tab+T Rex activation and Tab+S clash rejection accepted; build 41 installed with bindings retained |
 | Agent CLI | Read-only/off-switch checks and live Rex Capture/Restore/Establish/repeat passed; see [CLI.md](CLI.md) |
 
@@ -42,10 +42,10 @@ JSON; the installed app does not require Hammerspoon to run.
 Remaining verification and polish, before adding a new feature:
 
 - Extend tiling acceptance to other apps and display changes. Empty-desktop
-  activation and automatic Rex/Safari insertion are accepted; automatic Codex
-  insertion still needs a direct new-window test. Its Window Factory creation
-  and manual joining route worked. Observe whether the order of panel operations
-  needs refinement during ordinary use.
+  activation and automatic Rex/Safari insertion are accepted; Codex creation
+  through the dedicated New Codex Window shortcut and automatic joining passed
+  on build 44. Observe whether the order of panel operations needs refinement
+  during ordinary use.
 - Exercise the other installed app adapters; current live pilots do not establish
   native compatibility for every entry. Include failure/cancellation cases.
 - Validate multiple displays, display changes and full-screen/unsupported-Space
@@ -193,8 +193,9 @@ The action issues at most one creation request, then performs bounded discovery.
 A desktop/display change, an ambiguous arrival or a timeout is reported without
 resending the request or closing any window. Existing windows are not selected
 as the result. While a conflicting operation is busy, the menu-bar/Dock action
-is unavailable. App-side behavior still needs a live current-desktop test; see
-the dated acceptance records in DEVELOPMENT.md.
+is unavailable. The owner accepted the build 44 shortcut, new-window creation
+on the current Space and automatic tiling insertion. See the dated acceptance
+records in DEVELOPMENT.md for the tested scope.
 
 ## Configurable shortcuts and Settings
 

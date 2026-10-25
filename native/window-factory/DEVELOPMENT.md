@@ -1630,3 +1630,23 @@ no Codex window was created through desktop automation for this update.
 Hammerspoon, the existing shortcut defaults and all working window-control
 algorithms remain unchanged. Historical build 43 entries retain their original
 New Codex Window Here wording as implementation history.
+
+
+### Build 44 shortcut creation and automatic Codex insertion accepted, 2026-10-25
+
+The owner confirmed that the configured New Codex Window shortcut works, creates
+a new Codex window on the current Space and automatically joins that window to
+the tiling tree. This closes the direct Codex creation/insertion verification gap
+left by the earlier manual-joining pilot. The report confirms the owner's normal
+keyboard path, not an automated shortcut simulation or an Establish operation.
+
+The post-pilot read-only comparison found both layout catalogs unchanged from
+the build 44 pre-install baseline. No additional window identity, timing or focus
+measurements were collected. The selected chord remains a user preference, not
+a new product default; the shipped default remains unassigned. Live Dock-menu
+interaction and further app/display coverage are separate from this acceptance.
+
+This documentation-only commit changes no executable code, shortcuts, settings,
+working controls or Hammerspoon fallback. Repository validation was rerun; the
+prior native regression results, including 34 creation/shortcut assertions and
+522 tiling assertions, remain applicable.
