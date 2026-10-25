@@ -55,9 +55,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     let shortcuts = NSButton(title:"Shortcuts…",target:nil,action:nil)
     var filtered: [Recipe] = [], frozen: Recipe?, task: Task<Void,Never>?, monitor: Any?
     private let naming = NSStackView()
-    private let previewToggle = NSButton(title:"Preview",target:nil,action:nil)
-    private var previewWidth: NSLayoutConstraint!
-    private var lastPreviewShown: Bool?
+    let quickLook = NSPopover()
     private var dragOrder: [String]?
     private let dragType = NSPasteboard.PasteboardType("local.windowfactory.layout-row")
     private var appIcons: [String:NSImage] = [:]
@@ -82,11 +80,10 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         table.target = self; table.doubleAction = #selector(restoreLayout)
         let scroll = NSScrollView(); scroll.documentView = table; scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
-        let split = NSStackView(views:[scroll,drawing]); split.orientation = .horizontal; split.spacing = 16
-        scroll.widthAnchor.constraint(greaterThanOrEqualToConstant:320).isActive = true
-        previewWidth = drawing.widthAnchor.constraint(equalToConstant:280)
-        split.setContentHuggingPriority(.defaultLow,for:.vertical)
-        split.heightAnchor.constraint(greaterThanOrEqualToConstant:240).isActive = true
+        let previewController = NSViewController(); previewController.view = drawing
+        quickLook.contentViewController = previewController; quickLook.behavior = .semitransient
+        scroll.setContentHuggingPriority(.defaultLow,for:.vertical)
+        scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:240).isActive = true
         for (button,action) in [(capture,#selector(startCapture)),(restore,#selector(restoreLayout)),
                                 (establish,#selector(establishLayout)),(delete,#selector(deleteLayout)),(save,#selector(saveCapture)),(cancel,#selector(cancelAction))] {
             button.target = self; button.action = action; button.bezelStyle = .rounded
@@ -98,13 +95,10 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         shortcuts.imagePosition = .imageOnly; shortcuts.setAccessibilityLabel("Keyboard Shortcuts")
         delete.image = NSImage(systemSymbolName:"trash",accessibilityDescription:"Delete layout")
         delete.imagePosition = .imageOnly; delete.bezelStyle = .inline; delete.setAccessibilityLabel("Delete layout")
-        previewToggle.setButtonType(.pushOnPushOff); previewToggle.bezelStyle = .rounded
-        previewToggle.image = NSImage(systemSymbolName:"sidebar.right",accessibilityDescription:nil)
-        previewToggle.imagePosition = .imageLeading; previewToggle.target = self; previewToggle.action = #selector(togglePreview)
         name.placeholderString = "Name the captured layout"; name.target = self; name.action = #selector(saveCapture)
         for view in [nameLabel,name,save,cancel] { naming.addArrangedSubview(view) }; naming.orientation = .horizontal
         name.widthAnchor.constraint(greaterThanOrEqualToConstant:180).isActive = true
-        let header = NSStackView(views:[search,capture,previewToggle]); header.spacing = 10
+        let header = NSStackView(views:[search,capture]); header.spacing = 10
         search.setContentHuggingPriority(.defaultLow,for:.horizontal)
         search.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
         for icon in [permission,shortcuts,delete] {
@@ -113,7 +107,7 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         }
         let spacer = NSView(); spacer.setContentHuggingPriority(.defaultLow,for:.horizontal)
         let footer = NSStackView(views:[permission,shortcuts,delete,spacer,restore,establish]); footer.spacing = 12
-        let stack = NSStackView(views:[header,split,naming,status,footer])
+        let stack = NSStackView(views:[header,scroll,naming,status,footer])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 14
         stack.edgeInsets = NSEdgeInsets(top:16,left:16,bottom:14,right:16)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -122,13 +116,13 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
             stack.trailingAnchor.constraint(equalTo:content.trailingAnchor),stack.topAnchor.constraint(equalTo:content.topAnchor),
             stack.bottomAnchor.constraint(equalTo:content.bottomAnchor),
             header.widthAnchor.constraint(equalTo:stack.widthAnchor,constant:-32),
-            split.widthAnchor.constraint(equalTo:stack.widthAnchor,constant:-32),
+            scroll.widthAnchor.constraint(equalTo:stack.widthAnchor,constant:-32),
             footer.widthAnchor.constraint(equalTo:stack.widthAnchor,constant:-32),
             status.widthAnchor.constraint(equalTo:stack.widthAnchor,constant:-32)])
         status.font = .systemFont(ofSize:12); status.textColor = .secondaryLabelColor
         monitor = NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
             let handled = MainActor.assumeIsolated {
-                guard let self, event.window === self.window else { return false }
+                guard let self, event.window === self.window || (self.quickLook.isShown && event.window === self.drawing.window) else { return false }
                 return self.handle(event)
             }
             return handled ? nil : event
@@ -147,13 +141,6 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         shortcuts.title = ""; shortcuts.imagePosition = .imageOnly
         shortcuts.toolTip = "Keyboard Shortcuts — " + preferences.shortcuts.chord(reference).actionHint
         delete.toolTip = "Delete layout — ⌘⌫"
-        let shown = preferences.libraryPreviewShown
-        drawing.isHidden = !shown; previewWidth.isActive = shown; previewToggle.state = shown ? .on : .off
-        if lastPreviewShown != shown {
-            window.minSize = NSSize(width:shown ? 860 : 560,height:440)
-            window.setContentSize(NSSize(width:shown ? 920 : 620,height:window.contentLayoutRect.height))
-            lastPreviewShown = shown
-        }
         updatePreviewAspect()
         capture.title = preferences.showShortcutHints ? "Capture…  ⌘N" : "Capture…"
         restore.title = preferences.showShortcutHints ? "Restore  ↩" : "Restore"
@@ -161,8 +148,16 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         save.title = preferences.showShortcutHints ? "Save  ↩" : "Save"
         cancel.title = preferences.showShortcutHints ? "Cancel  ⎋" : "Cancel"
     }
-    @objc func togglePreview() {
-        preferences.libraryPreviewShown.toggle(); applyPreferences()
+    @objc func toggleQuickLook() {
+        if quickLook.isShown { quickLook.close(); window.makeFirstResponder(table); return }
+        guard task == nil, frozen == nil, let selected,window.isVisible else { return }
+        drawing.recipe = selected; updatePreviewAspect()
+        quickLook.contentSize = NSSize(width:480,height:456/drawing.aspectRatio+24)
+        quickLook.show(relativeTo:table.rect(ofRow:table.selectedRow),of:table,preferredEdge:.maxX)
+    }
+    var canQuickLookFromKeyboard: Bool {
+        task == nil && frozen == nil && selected != nil &&
+            (quickLook.isShown || window.firstResponder === table || search.stringValue.isEmpty)
     }
     func updatePreviewAspect() {
         if let screen = window.screen ?? NSScreen.main { drawing.aspectRatio = screen.visibleFrame.width/screen.visibleFrame.height }
@@ -179,6 +174,8 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         case #selector(startCapture): return capture.isEnabled
         case #selector(restoreLayout), #selector(establishLayout): return restore.isEnabled
         case #selector(deleteLayout): return !preview && selected != nil
+        case #selector(moveLayoutUp): return canMoveSelectedLayout(-1)
+        case #selector(moveLayoutDown): return canMoveSelectedLayout(1)
         case #selector(importLayouts), #selector(exportLayouts): return !preview
         case #selector(focusSearch): return true
         default: return false
@@ -195,6 +192,10 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         cancel.isHidden = task == nil && frozen == nil
         search.isEnabled = task == nil && frozen == nil
         status.isHidden = status.stringValue.isEmpty
+        if quickLook.isShown {
+            if task != nil || frozen != nil || selected == nil { quickLook.close() }
+            else { quickLook.positioningRect = table.rect(ofRow:table.selectedRow) }
+        }
         for row in 0..<table.numberOfRows {
             (table.view(atColumn:0,row:row,makeIfNecessary:false) as? LayoutRowView)?.setReorderingAvailable(canReorder)
         }
@@ -223,6 +224,17 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
         guard canReorder,let order = LibraryPresentation.moving(filtered.map(\.name),name:name,to:row) else { return false }
         preferences.layoutOrder = order; reload(select:name); return true
     }
+    func canMoveSelectedLayout(_ direction: Int) -> Bool {
+        canReorder && [-1,1].contains(direction) && selected != nil && filtered.indices.contains(table.selectedRow+direction)
+    }
+    @discardableResult func moveSelectedLayout(_ direction: Int) -> Bool {
+        guard canMoveSelectedLayout(direction),let name = selected?.name else { return false }
+        let insertion = table.selectedRow + (direction>0 ? 2 : -1)
+        guard moveLayout(name,to:insertion) else { return false }
+        table.scrollRowToVisible(table.selectedRow); return true
+    }
+    @objc func moveLayoutUp() { moveSelectedLayout(-1) }
+    @objc func moveLayoutDown() { moveSelectedLayout(1) }
     func tableView(_ tableView: NSTableView,pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
         guard canReorder,filtered.indices.contains(row) else { return nil }
         dragOrder = filtered.map(\.name)
@@ -251,12 +263,21 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     func tableViewSelectionDidChange(_ notification: Notification) { drawing.recipe = selected; updateButtons() }
     func controlTextDidChange(_ obj: Notification) { if obj.object as? NSSearchField === search { reload() } }
     func handle(_ event: NSEvent) -> Bool {
-        if event.keyCode == 53 { cancelAction(); return true }
+        if event.keyCode == 53 {
+            if quickLook.isShown { quickLook.close(); window.makeFirstResponder(table) } else { cancelAction() }
+            return true
+        }
         if frozen != nil || task != nil { return false }
+        if event.keyCode == 49 && event.modifierFlags.intersection([.command,.option,.control,.shift]).isEmpty && canQuickLookFromKeyboard {
+            if !event.isARepeat { toggleQuickLook() }; return true
+        }
         if event.keyCode == 125 || event.keyCode == 126 {
+            let modifiers = event.modifierFlags.intersection([.command,.option,.control,.shift])
+            if modifiers == .option { moveSelectedLayout(event.keyCode == 125 ? 1 : -1); return true }
+            guard modifiers.isEmpty else { return false }
             if !filtered.isEmpty {
                 let next = max(0,min(filtered.count-1,table.selectedRow+(event.keyCode == 125 ? 1 : -1)))
-                table.selectRowIndexes(IndexSet(integer:next),byExtendingSelection:false); table.scrollRowToVisible(next)
+                table.selectRowIndexes(IndexSet(integer:next),byExtendingSelection:false); table.scrollRowToVisible(next); window.makeFirstResponder(table)
             }
             return true
         }
@@ -347,6 +368,6 @@ final class LibraryWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NS
     @objc func openAccessSettings() {
         NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
-    func windowWillClose(_ notification: Notification) { task?.cancel() }
-    func stop() { task?.cancel(); if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
+    func windowWillClose(_ notification: Notification) { quickLook.close(); task?.cancel() }
+    func stop() { quickLook.close(); task?.cancel(); if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
 }

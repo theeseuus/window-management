@@ -51,8 +51,8 @@ Remaining verification and polish, before adding a new feature:
 - Review deliberate, consistent visible stash edges. The current native command
   requests a right-edge stash and accepts macOS constraints; it does not promise
   a chosen visible strip width or provide a left/right stash selector.
-- Consider a keyboard equivalent for manual row ordering; dragging is currently
-  mouse/trackpad-only. The existing arrow keys still select rows.
+- Observe the new app-local keyboard ordering and Space-preview interaction
+  in ordinary use; no core migration work remains.
 
 Deferred feature choices, with none selected by this review:
 
@@ -192,6 +192,8 @@ library buttons display the main commands; the settings pane lists the full map:
 | Keyboard Shortcuts | Tab + / (configurable in Library) |
 | Capture | Command–N |
 | Select layout | Up / Down |
+| Move selected layout up / down | Option–Up / Option–Down, unfiltered list |
+| Show / hide layout preview | Space, selected row; press again to hide |
 | Restore existing windows | Return |
 | Establish missing windows | Command–Return |
 | Focus search | Command–F |
@@ -503,3 +505,45 @@ passed. Live visual inspection showed the six-dot grips; catalog and complete
 app-settings hashes, including manual order and bindings, were unchanged after
 restart. The live CLI reported Accessibility and Agent access enabled. The
 controller implementations and Hammerspoon fallback remained unchanged.
+
+
+## Keyboard ordering and Space Quick Look (build 39)
+
+Option+Up/Down moves the selected layout one row through the existing saved-order
+operation. Plain Up/Down still selects and now moves focus into the results
+list. Selection stays with the moved layout and scrolls into view. First/last
+boundaries are no-ops. Search filtering, capture naming, preview mode and active
+operations disable reordering, as with dragging. The Layout menu exposes Move
+Layout Up/Down and the shortcuts reference lists these fixed, app-local keys.
+No global chord, controller or fallback binding is added or changed.
+
+The owner replaced the persistent preview pane/button with a Quick Look-style
+popover. Space shows it and Space again hides it; held-key autorepeat does not
+flicker the toggle. Escape dismisses it first. Clicking outside uses normal
+popover dismissal. The preview follows list selection and keeps the current
+display's usable-screen ratio. Space in a nonempty search or capture name remains
+text input; use Up/Down or click a result to focus the list before previewing.
+When search is empty, Space can also preview the default selection immediately.
+
+There is no Preview button or extra main-window hint. The shortcuts reference
+includes Space. The popover is session-only; the obsolete `libraryPreviewShown`
+preference is no longer read or written, but its stored value is preserved.
+Recipe bytes and schema stay unchanged. The earlier build 35–36 pane behavior
+above is retained as a dated implementation record, superseded by this section.
+
+
+Build 39 is installed with strict signature verification. Full native tests
+passed (251 AppKit assertions), including Option-arrow moves in both directions,
+selection retention, plain-arrow selection, boundaries, filter/capture guards,
+unchanged recipe bytes and persisted ordering. Repository validation passed.
+
+Live checks moved Codex up with Option+Up and back with Option+Down, preserving
+selection and restoring the exact original order. Space created the popover
+and the next Space removed it. Selection could change with preview open. An
+explicitly focused search accepted `Native desktop` including its space; Down
+then Space previewed the filtered result and the next Space dismissed it. The
+Layout menu showed both ordering commands with the unavailable upward move
+disabled on the first row. There is no Preview button. No layout operation or
+deletion ran. Both catalog hashes and the complete app-settings hash matched
+before/after; Accessibility and Agent access stayed enabled. Existing window
+controller implementations and Hammerspoon fallback were unchanged.

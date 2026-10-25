@@ -166,6 +166,13 @@ menu with visible keyboard equivalents. Its action buttons show
 Restore, Establish, Capture, search and cancel commands. The complete current
 in-app map and preferences are documented in the
 [Window Factory guide](native/window-factory/README.md#settings-and-visible-keyboard-commands).
+Inside the native library, **Option + Up/Down** moves the selected layout one
+row; plain Up/Down selects. Reordering requires the unfiltered, idle list.
+**Space** toggles the selected layout's Quick Look-style preview; Space again
+hides it. Space remains normal text input in nonempty search/naming fields.
+Arrow into the list to preview a filtered result. Escape dismisses the popover
+before closing the library. These are app-local commands, not global bindings.
+
 These library commands apply inside Window Factory; direct-control groups and
 the launcher are independent global shortcuts while the app is running.
 

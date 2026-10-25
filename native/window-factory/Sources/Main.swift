@@ -138,6 +138,8 @@ final class FactoryApp: NSObject, NSApplicationDelegate {
                 ("Restore",#selector(LibraryWindow.restoreLayout),"\r",[]),
                 ("Establish here",#selector(LibraryWindow.establishLayout),"\r",.command),
                 ("Search",#selector(LibraryWindow.focusSearch),"f",.command),
+                ("Move Layout Up",#selector(LibraryWindow.moveLayoutUp),"\u{f700}",.option),
+                ("Move Layout Down",#selector(LibraryWindow.moveLayoutDown),"\u{f701}",.option),
                 ("Import…",#selector(LibraryWindow.importLayouts),"i",.command),
                 ("Export…",#selector(LibraryWindow.exportLayouts),"e",[.command,.shift]),
                 ("Delete…",#selector(LibraryWindow.deleteLayout),"\u{8}",.command),

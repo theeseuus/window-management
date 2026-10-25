@@ -130,10 +130,8 @@ import AppKit
         let wideCanvas = LibraryPresentation.canvas(in:NSRect(x:0,y:0,width:280,height:400),inset:12,aspect:16.0/9)
         check(abs(wideCanvas.width/wideCanvas.height-16.0/9)<0.001 && wideCanvas.midY == 200,"expanded preview letterboxes to display ratio")
         check(layoutUI.shortcuts.title.isEmpty && layoutUI.shortcuts.imagePosition == .imageOnly,"compact shortcut control has no overlapping title")
-        check(!dockPreferences.libraryPreviewShown && layoutUI.drawing.isHidden,"compact library defaults to no large preview")
-        layoutUI.togglePreview()
-        check(dockPreferences.libraryPreviewShown && !layoutUI.drawing.isHidden && FactoryPreferences(defaults:dockDefaults).libraryPreviewShown,"preview toggle persists and shows the pane")
-        layoutUI.togglePreview()
+        check(!layoutUI.quickLook.isShown && layoutUI.quickLook.contentViewController?.view === layoutUI.drawing,"preview is a closed popover outside the main layout")
+        check(layoutUI.quickLook.behavior == .semitransient,"Quick Look uses normal outside-dismissal behavior")
         layoutUI.filtered = [rowA,rowB];layoutUI.table.reloadData()
         check(layoutUI.moveLayout("B",to:0) && dockPreferences.layoutOrder == ["B","A"],"drop order is stored without changing recipes")
         check(FactoryPreferences(defaults:dockDefaults).layoutOrder == ["B","A"],"manual order survives preferences reload")
@@ -143,6 +141,33 @@ import AppKit
         check(!layoutUI.moveLayout("B",to:0),"reordering is disabled during capture naming")
         layoutUI.frozen = nil
         check(settingsStore.catalog.recipes.isEmpty,"presentation settings never alter layout catalog")
+        layoutUI.search.stringValue = "two words"
+        check(!layoutUI.canQuickLookFromKeyboard,"Space remains text input while editing a nonempty search")
+        layoutUI.search.stringValue = ""
+
+        let keyboardRecipes = ["A","B","C"].map { Recipe(name:$0,capturedAt:"fixture",windows:rowRecipe.windows) }
+        settingsStore.catalog.recipes = Dictionary(uniqueKeysWithValues:keyboardRecipes.map{($0.name,$0)})
+        let catalogBeforeOrdering = try settingsStore.catalog.encoded()
+        dockPreferences.layoutOrder = ["A","B","C"];layoutUI.reload(select:"B")
+        func arrow(_ code: UInt16,_ flags: NSEvent.ModifierFlags) -> NSEvent {
+            NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:flags,timestamp:0,windowNumber:0,context:nil,characters:"",charactersIgnoringModifiers:"",isARepeat:false,keyCode:code)!
+        }
+        check(layoutUI.handle(arrow(126,.option)) && layoutUI.filtered.map(\.name) == ["B","A","C"] && layoutUI.selected?.name == "B","Option Up moves and retains the selected layout")
+        check(!layoutUI.moveSelectedLayout(-1),"moving above the first row is a no-op")
+        check(layoutUI.handle(arrow(125,.option)) && layoutUI.filtered.map(\.name) == ["A","B","C"] && layoutUI.selected?.name == "B","Option Down moves down one row and keeps selection")
+        let orderBeforeSelection = dockPreferences.layoutOrder
+        check(layoutUI.handle(arrow(125,[])) && layoutUI.selected?.name == "C" && dockPreferences.layoutOrder == orderBeforeSelection,"plain arrows select without changing order")
+        check(!layoutUI.moveSelectedLayout(1),"moving below the last row is a no-op")
+        check(!layoutUI.handle(arrow(126,[.option,.command])) && layoutUI.selected?.name == "C","other modified arrow commands are not intercepted")
+        layoutUI.search.stringValue = "A";layoutUI.reload()
+        check(!layoutUI.moveSelectedLayout(1) && dockPreferences.layoutOrder == orderBeforeSelection,"keyboard ordering is disabled while filtering")
+        layoutUI.search.stringValue = "";layoutUI.reload(select:"B");layoutUI.frozen = rowA
+        check(!layoutUI.canQuickLookFromKeyboard,"capture naming cannot open Quick Look")
+        check(!layoutUI.moveSelectedLayout(-1),"keyboard ordering is disabled during capture naming")
+        layoutUI.frozen = nil;layoutUI.table.deselectAll(nil)
+        check(!layoutUI.moveSelectedLayout(-1),"no selection cannot reorder")
+        check(try settingsStore.catalog.encoded() == catalogBeforeOrdering,"keyboard ordering does not change recipe bytes")
+        check(FactoryPreferences(defaults:dockDefaults).layoutOrder == orderBeforeSelection,"keyboard ordering uses the same persisted order as dragging")
         let settings = SettingsWindow(store:settingsStore,preferences:FactoryPreferences())
         settings.refresh(); settings.window.contentView!.layoutSubtreeIfNeeded()
         let settingsTabs = settings.window.contentView!.subviews.compactMap{$0 as? NSTabView}.first!

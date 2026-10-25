@@ -61,7 +61,7 @@ final class ShortcutReferenceWindow: NSObject {
             title+"\n"+rows.map{row($0.0,$0.1,$0.2)}.joined(separator:"\n")
         }
         sections.append(section("SWITCHER NAVIGATION",[("","↑ / ↓","Previous / next window"),("","← / →","Previous / next desktop"),("","Return / Enter","Select window"),("","Escape","Close")]))
-        sections.append(section("LAYOUT LIBRARY",[("","↑ / ↓","Select layout"),("","Return","Restore"),("⌘","Return","Establish"),("⌘","N","Capture"),("⌘","F","Search"),("⌘","I","Import"),("⇧⌘","E","Export"),("⌘","Delete","Delete layout"),("","Escape","Cancel or close"),("⌘",",","Settings"),("⌘","W","Close window"),("⌘","Q","Quit Window Factory")]))
+        sections.append(section("LAYOUT LIBRARY",[("","↑ / ↓","Select layout"),("","Space","Show / hide layout preview"),("⌥","↑ / ↓","Move layout up / down"),("","Return","Restore"),("⌘","Return","Establish"),("⌘","N","Capture"),("⌘","F","Search"),("⌘","I","Import"),("⇧⌘","E","Export"),("⌘","Delete","Delete layout"),("","Escape","Cancel or close"),("⌘",",","Settings"),("⌘","W","Close window"),("⌘","Q","Quit Window Factory")]))
         sections.append(section("HAMMERSPOON FALLBACK",[("⌃⌥⇧⌘","R","Open fallback library"),("⌃","← / →","Switch desktop (macOS)")]))
         text.string = sections.joined(separator:"\n\n")
         let body = NSMutableAttributedString(string:text.string,attributes:[.font:NSFont.monospacedSystemFont(ofSize:13,weight:.regular),.foregroundColor:NSColor.labelColor])
