@@ -59,6 +59,8 @@ Remaining verification and polish, before adding a new feature:
 - Review deliberate, consistent visible stash edges. The current native command
   requests a right-edge stash and accepts macOS constraints; it does not promise
   a chosen visible strip width or provide a left/right stash selector.
+- Tidy the Accessibility status/action into one visually connected row in
+  General; the owner flagged the detached status and Settings button.
 - Observe the new app-local keyboard ordering and Space-preview interaction
   in ordinary use; no core migration work remains.
 
@@ -98,8 +100,8 @@ Remaining live checks are distinct from requests for more tiling features:
 - Hide/minimize/unminimize, app quit/relaunch, and longer ordinary-use sessions.
 - Split-axis changes, balance and swap; exclusions and gap/margin persistence;
   paused membership changes and mixed-app previous-position restoration.
-- The Settings session switch and optional Tiling-panel shortcut added in build
-  45 need normal owner interaction checks after the installed UI review.
+- The Settings session switch, Tiling-panel shortcut and Settings navigation
+  were accepted by the owner on build 45; observe them during ordinary use.
 
 Multi-desktop/display ownership, saved tree templates and tiling agent commands
 remain feature choices; they are not promised by the current one-session design.

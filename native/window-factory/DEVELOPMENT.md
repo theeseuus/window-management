@@ -1692,3 +1692,22 @@ Shortcut Reference in General, the preserved Codex chord and the new row unassig
 Normal owner shortcut/toggle interaction acceptance remains pending. Desktop
 automation was left idle for the recording check. All existing control algorithms
 and the Hammerspoon fallback were unchanged.
+
+
+### Build 45 Settings and tiling access accepted, 2026-10-25
+
+The owner confirmed the Tiling controls shortcut and Settings session switch
+work, Shortcut Reference is in General, and About is the far-right tab. This
+accepts those normal interaction paths following the installed UI review and
+fixture checks. Both layout catalogs still match the pre-build-45 hash baseline.
+
+The owner also flagged the Accessibility presentation: its status is right-aligned
+while the related Settings button sits on a separate left-aligned line. Record
+that grouping issue for a visual tidy-up, retaining a read-only permission status
+and the macOS Settings action rather than presenting permission as an app toggle.
+
+This documentation-only acceptance commit changes no executable code, bindings,
+settings, working controls or Hammerspoon fallback. Repository validation passed;
+prior native regression results remain applicable. The owner's next direction
+is to address CLI coverage, then icon design, leaving other feature work until
+ordinary use provides more feedback.
