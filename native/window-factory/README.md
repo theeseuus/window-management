@@ -1,5 +1,8 @@
 # Window Factory
 
+Version: 1.0
+Updated: 2026-10-25
+
 Window Factory is the installed Swift/AppKit app for saved layouts, direct window
 controls, Space move-and-follow and the menu-bar desktop badge. Tab+R opens its
 library or closes it when focused, while the app is running. Optional start at login is in Settings;

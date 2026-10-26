@@ -1,5 +1,8 @@
 # Adding an application adapter
 
+Version: 1.0
+Updated: 2026-10-23
+
 This is the shared maintainer/agent route for adding **Establish here** support.
 
 The shared engine prepares apps sequentially and places each app's matching

@@ -1,5 +1,8 @@
 # Complete Keyboard Shortcut Reference
 
+Version: 1.0
+Updated: 2026-10-25
+
 2026-10-22
 
 Hyper = `Control + Option + Command`

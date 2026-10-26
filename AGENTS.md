@@ -1,5 +1,8 @@
 # Working on Theseus window/workspace management
 
+Version: 1.0
+Updated: 2026-10-07
+
 - The two Spoons are independent. Keep window geometry/Space movement in
   TheseusWindow and cross-app recipe workflows in TheseusWorkspace.
 - To add or change application creation support, start with

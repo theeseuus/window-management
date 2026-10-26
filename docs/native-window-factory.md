@@ -1,5 +1,8 @@
 # Window Factory: build and transition
 
+Version: 1.0
+Updated: 2026-10-25
+
 Current status, 2026-10-25: the complete controller and core workspace workflow
 are ported and accepted. Configurable shortcuts, the reference window and the
 agent CLI are also implemented; the live Rex CLI pilot passed.

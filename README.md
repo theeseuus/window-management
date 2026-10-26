@@ -1,5 +1,8 @@
 # Window Factory: Window and Workspace Management
 
+Version: 1.0
+Updated: 2026-10-25
+
 Window Factory is the installed Swift/AppKit app for macOS window controls and
 saved workspace layouts. Its library captures, restores and establishes layouts;
 its controls cover geometry, focus, stash, switching, accordion and Space
