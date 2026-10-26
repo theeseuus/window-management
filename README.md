@@ -1,4 +1,12 @@
-# Window Factory: Window and Workspace Management
+# Hammerspoon window and workspace tools
+
+Version: 1.0
+Updated: 2026-10-26
+
+This repository contains the Lua/Hammerspoon implementation. The standalone
+Swift macOS app is maintained separately in
+[Window Factory](https://github.com/theeseuus/window-factory). Neither project
+requires the other at runtime.
 
 Window Factory contains two independent components, implemented as Hammerspoon
 Spoons:
@@ -12,7 +20,7 @@ The Spoon filenames and Lua API names are `TheseusWindow` for Factory Window
 and `TheseusWorkspace` for Factory Workspace, as used in the installation and
 code examples below.
 
-## Hammerspoon baseline and native successor
+## Hammerspoon recovery baseline
 
 The Hammerspoon recovery baseline is tagged `hammerspoon-baseline-2026-10-23`.
 On 2026-10-23 the owner accepted production typing, navigation, Escape,
@@ -22,7 +30,8 @@ duplicate-free repeats remain the retained creation/reuse evidence. Restore
 keeps its existing implementation; this latest owner check did not separately
 exercise Restore. Rex startup placement can still visibly jump despite verified
 final geometry. That known visual limitation is retained in the baseline.
-Native macOS development follows from this recoverable Hammerspoon checkpoint.
+The separate Window Factory app grew from this recoverable checkpoint. This
+repository retains the working Hammerspoon implementation and its own tests.
 
 The product's core is capturing the active applications and window layout and
 restoring that workspace later. Recreating application contents, browser URLs,
