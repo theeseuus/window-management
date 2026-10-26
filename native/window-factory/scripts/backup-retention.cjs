@@ -43,8 +43,9 @@ if(require.main===module){
  if(args.length!==2 || !['--plan','--apply'].includes(args[0])){console.error('Use --plan or --apply with an install-backups directory');process.exit(2);}
  const root=path.resolve(args[1]);
  if(path.basename(root)!=='install-backups')throw Error('Expected exact install-backups directory');
- const requirement='=identifier "local.windowfactory.native" and anchor apple generic and certificate leaf[subject.OU] = "S5V98VJ2UV" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists';
- const verify=app=>{execFileSync('/usr/bin/codesign',['--verify','--strict',app],{stdio:'pipe'});execFileSync('/usr/bin/codesign',['--verify','-R',requirement,app],{stdio:'pipe'});};
+ const {verifyDeveloperApp,designatedRequirement,verifyRequirement}=require('./signing-verification.cjs');
+ const installed='/Applications/Window Factory.app';
+ const verify=app=>{verifyDeveloperApp(installed);verifyRequirement(app,designatedRequirement(installed));};
  const plan=args[0]==='--apply'?pruneBackups(root,{verify}):planRetention(root);
  console.log(JSON.stringify({kept:plan.keep.map(e=>({name:e.name,version:e.version,build:e.build})),removed:plan.remove.map(e=>e.name),applied:args[0]==='--apply'},null,2));
 }

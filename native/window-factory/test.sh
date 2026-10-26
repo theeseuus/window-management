@@ -11,6 +11,7 @@ xcrun --sdk macosx swiftc -swift-version 6 -parse-as-library -warnings-as-errors
     "$native_root/Sources/Core.swift" "$native_root/Sources/Store.swift" \
     "$native_root/Tests/StoreTests.swift" -o "$native_root/.build/store-tests"
 "$native_root/.build/store-tests"
+mise exec -- node "$native_root/Tests/signing-tests.cjs"
 mise exec -- node "$native_root/Tests/install-tests.cjs"
 mise exec -- node "$native_root/Tests/data-migration-tests.cjs"
 mise exec -- node "$native_root/Tests/backup-retention-tests.cjs"

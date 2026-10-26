@@ -42,12 +42,13 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 signed=no
+if [ "$signing_mode" = developer-id ]; then timestamp=--timestamp; else timestamp=--timestamp=none; fi
 for attempt in 1 2 3; do
     for attribute in com.apple.FinderInfo com.apple.ResourceFork; do xattr -dr "$attribute" "$app" 2>/dev/null || :; done
-    if codesign --force --sign "$signing_identity" --options runtime --timestamp \
+    if codesign --force --sign "$signing_identity" --options runtime "$timestamp" \
         --entitlements "$native_root/Resources/entitlements.plist" "$app" \
         && codesign --verify --strict "$app" \
-        && codesign --verify -R "=identifier \"local.windowfactory.native\" and anchor apple generic and certificate leaf[subject.OU] = \"$signing_team\" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists" "$app"; then signed=yes; break; fi
+        && { [ "$signing_mode" = adhoc ] || codesign --verify -R "=identifier \"local.windowfactory.native\" and anchor apple generic and certificate leaf[subject.OU] = \"$signing_team\" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists" "$app"; }; then signed=yes; break; fi
 done
 [ "$signed" = yes ]
 printf 'Built %s\n' "$app"

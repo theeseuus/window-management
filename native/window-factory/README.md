@@ -1,7 +1,10 @@
 # Window Factory
 
-Version: 1.0
-Updated: 2026-10-25
+Version: 1.1
+Updated: 2026-10-26
+
+The standalone source now lives in [window-factory](https://github.com/theeseuus/window-factory).
+This branch retains the pre-split source and development record.
 
 Window Factory is the installed Swift/AppKit app for saved layouts, direct window
 controls, Space move-and-follow and the menu-bar desktop badge. Tab+R opens its
@@ -285,9 +288,11 @@ can select another local output directory. Do not put signed app bundles in the
 iCloud-managed source tree: Finder metadata previously invalidated their strict
 signature checks and file pickers showed empty folders.
 
-`signing-config.sh` records the selected public Developer ID Application
-certificate fingerprint and Team, matching the signing route used by the
-installed Freehold app. The build signs with Hardened Runtime and a secure
+`signing.local.sh` (ignored) or explicit build environment values select the
+Developer ID Application identity and Team. The repository contains no fixed
+certificate fingerprint or Team. Copy `signing.example.sh` to configure another
+builder. An explicit `WINDOW_FACTORY_SIGNING_MODE=adhoc` build is development-only;
+the installer requires Developer ID and matching update identity. The build signs with Hardened Runtime and a secure
 timestamp and verifies the Apple Developer ID/Team requirement. Only the Apple
 Events automation entitlement is added for the existing scripting adapters.
 Private keys are never exported or stored here. macOS owns signing-key access;
@@ -483,7 +488,7 @@ For another installation that still uses the old folder, quit Window Factory
 with no active operation or session stashes, then run:
 
 ```fish
-mise run native-install -- --migrate-data-from /Users/troymay/.local/share/window-factory-native
+mise run native-install -- --migrate-data-from ~/.local/share/window-factory-native
 ```
 
 Substitute that Mac's actual old directory. This explicit operation validates

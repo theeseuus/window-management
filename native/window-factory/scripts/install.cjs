@@ -21,16 +21,17 @@ const migrateFrom = option('--migrate-data-from');
 if(migrateFrom && catalog)throw Error('Migrate data and import catalog are separate operations');
 const previousTarget = option('--previous-target');
 const previousInstall = previousTarget || target;
-const requirement = '=identifier "local.windowfactory.native" and anchor apple generic and certificate leaf[subject.OU] = "S5V98VJ2UV" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists';
-function verify(app) { execFileSync('/usr/bin/codesign',['--verify','--strict',app],{stdio:'pipe'}); execFileSync('/usr/bin/codesign',['--verify','-R',requirement,app],{stdio:'pipe'}); }
-function dr(app) { const value = execFileSync('/usr/bin/codesign',['-d','-r-',app],{encoding:'utf8',stdio:['ignore','pipe','pipe']}); if (!value.includes('designated =>')) throw Error('Designated requirement unavailable'); return value.trim(); }
+const {verifyDeveloperApp,designatedRequirement,verifyRequirement}=require('./signing-verification.cjs');
+let expectedRequirement;
+function verify(app){verifyDeveloperApp(app);if(expectedRequirement)verifyRequirement(app,expectedRequirement);}
+function dr(app){return designatedRequirement(app);}
 function run() {
   if (!source || !fs.existsSync(source)) throw Error('--source must name the signed candidate');
   if (source === target || fs.lstatSync(source).isSymbolicLink()) throw Error('Source must be a separate real app bundle');
   if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink()) throw Error('Refusing a symlink install target');
   if (previousTarget && (previousTarget === target || fs.existsSync(target) || !fs.existsSync(previousTarget))) throw Error('Rename requires one existing old app and an unused new target');
   if (fs.existsSync(previousInstall) && fs.lstatSync(previousInstall).isSymbolicLink()) throw Error('Refusing a symlink previous install');
-  verify(source);
+  verify(source); expectedRequirement=dr(source);
   if(!migrateFrom && !args.includes('--data-dir') && fs.existsSync(path.join(path.dirname(dataDir),'window-factory-native')))throw Error('Legacy data exists; use --migrate-data-from before installing');
   const executableName = validateExecutable(execFileSync('/usr/libexec/PlistBuddy',['-c','Print :CFBundleExecutable',path.join(source,'Contents/Info.plist')],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim());
   if (fs.existsSync(previousInstall)) { verify(previousInstall); if (dr(source) !== dr(previousInstall)) throw Error('Designated requirement changed; refusing update'); }

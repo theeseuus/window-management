@@ -100,7 +100,7 @@ The pilot app and its data remain isolated development artifacts.
 ## Stable local installation and settings checks, 2026-10-24
 
 The Developer ID Application public leaf certificate was matched to the existing
-installed Freehold signing route (Team `S5V98VJ2UV`, valid through September 2031).
+existing local signing route (Team `[local signing team]`, valid through September 2031).
 No new key/certificate or key-access policy was created. Build 0.2.0/2 was signed
 with Hardened Runtime and a secure timestamp and installed at the stable
 Applications path. All six current native layouts copied exactly into the local
@@ -1819,7 +1819,7 @@ The earlier retired-development stash described in README is now superseded by
 this cleanup. Its small manifest/data and historical pilot catalogs, reports,
 rollback patches, notes and screenshots were preserved in a private compressed
 archive before retiring the loose copies:
-`/Users/troymay/.local/share/window-factory/development-archives/dev-evidence-20261025T100644Z.tar.gz`.
+`~/.local/share/window-factory/development-archives/dev-evidence-20261025T100644Z.tar.gz`.
 The archive contains 370 evidence files plus a manifest with original
 paths and SHA-256 values. Every archived file was read back and hash-verified.
 Reproducible binaries, generated app bundles and module caches were discarded.
